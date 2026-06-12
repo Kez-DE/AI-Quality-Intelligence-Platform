@@ -1,12 +1,14 @@
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useMe, ROLE_LABELS } from "@/lib/api";
 import {
   Bell,
   Car,
   Gauge,
   LogOut,
   MessageSquare,
+  Shield,
   Sparkles,
   User as UserIcon,
 } from "lucide-react";
@@ -19,10 +21,17 @@ const NAV = [
   { to: "/chat", label: "AI Chat", icon: Sparkles },
 ] as const;
 
+// Link chỉ hiện với admin.
+const ADMIN_NAV = { to: "/admin", label: "Quản lý người dùng", icon: Shield } as const;
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [email, setEmail] = useState<string>("");
+  const { data: me } = useMe();
+
+  // Admin thấy thêm link quản lý người dùng.
+  const navItems = me?.role === "admin" ? [...NAV, ADMIN_NAV] : NAV;
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -57,7 +66,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
         <nav className="p-3 flex-1 space-y-1">
-          {NAV.map((n) => {
+          {navItems.map((n) => {
             const Icon = n.icon;
             const active = pathname === n.to;
             return (
@@ -81,7 +90,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="h-7 w-7 rounded-full bg-xanh-mint grid place-items-center">
               <UserIcon className="h-3.5 w-3.5 text-xanh-deep" />
             </div>
-            <span className="truncate font-mono text-muted-foreground">{email}</span>
+            <div className="min-w-0 leading-tight">
+              <div className="truncate font-mono text-muted-foreground">{email}</div>
+              {me?.role && (
+                <div className="text-[10px] font-semibold text-xanh-deep">{ROLE_LABELS[me.role]}</div>
+              )}
+            </div>
           </div>
           <button
             onClick={signOut}
@@ -110,7 +124,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         <div className="flex overflow-x-auto px-2 pb-2 gap-1">
-          {NAV.map((n) => {
+          {navItems.map((n) => {
             const Icon = n.icon;
             const active = pathname === n.to;
             return (

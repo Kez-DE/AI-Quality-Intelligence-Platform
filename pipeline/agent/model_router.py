@@ -50,6 +50,28 @@ def resolve_provider() -> str:
     return "mock"
 
 
+# Thứ tự ưu tiên mặc định khi thử failover (provider nào có key sẽ được thử lần lượt).
+PROVIDER_PRIORITY = ["openrouter", "openai", "gemini", "groq"]
+
+
+def resolve_provider_chain() -> list[str]:
+    """Trả về danh sách provider sẽ thử lần lượt.
+
+    - Nếu LLM_PROVIDER ép cứng 1 provider hợp lệ (khác 'auto'): chỉ dùng provider đó
+      (vẫn thêm 'mock' ở cuối để không bao giờ vỡ).
+    - Nếu 'auto' (hoặc rỗng): thử mọi provider CÓ KEY theo thứ tự ưu tiên, rồi 'mock'.
+
+    Nhờ vậy một key chết/hết credit sẽ tự động nhảy sang provider kế tiếp thay vì raise.
+    """
+    if LLM_PROVIDER in {"openrouter", "openai", "gemini", "groq"}:
+        return [LLM_PROVIDER, "mock"]
+    if LLM_PROVIDER == "mock":
+        return ["mock"]
+    chain = [p for p in PROVIDER_PRIORITY if provider_has_key(p)]
+    chain.append("mock")
+    return chain
+
+
 def provider_has_key(provider: str) -> bool:
     return {
         "openrouter": bool(OPENROUTER_API_KEY),
@@ -126,95 +148,106 @@ def gemini_messages_to_prompt(messages: list[ChatMessage]) -> str:
     return "\n\n".join(lines)
 
 
+def _call_provider(
+    provider: str,
+    messages: list[ChatMessage],
+    response_json: bool,
+    temperature: float,
+) -> str:
+    """Gọi đúng 1 provider, trả về content. Raise nếu provider lỗi (để caller failover)."""
+    model_name = provider_model(provider)
+
+    if provider == "mock":
+        return mock_chat(messages)
+    if provider == "openrouter":
+        client = OpenAI(
+            api_key=OPENROUTER_API_KEY,
+            base_url="https://openrouter.ai/api/v1",
+            default_headers={
+                "HTTP-Referer": os.getenv("OPENROUTER_SITE_URL", "http://localhost:8000"),
+                "X-Title": os.getenv("OPENROUTER_APP_NAME", "AI Quality Intelligence Platform"),
+            },
+        )
+        kwargs = {"messages": messages, "model": model_name, "temperature": temperature}
+        if response_json:
+            kwargs["response_format"] = {"type": "json_object"}
+        response = client.chat.completions.create(**kwargs)
+        return response.choices[0].message.content or ""
+    if provider == "openai":
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        kwargs = {"messages": messages, "model": model_name, "temperature": temperature}
+        if response_json:
+            kwargs["response_format"] = {"type": "json_object"}
+        response = client.chat.completions.create(**kwargs)
+        return response.choices[0].message.content or ""
+    if provider == "gemini":
+        genai.configure(api_key=GEMINI_API_KEY)
+        generation_config = {"temperature": temperature}
+        if response_json:
+            generation_config["response_mime_type"] = "application/json"
+        model = genai.GenerativeModel(model_name, generation_config=generation_config)
+        response = model.generate_content(gemini_messages_to_prompt(messages))
+        return response.text
+    # groq
+    client = Groq(api_key=GROQ_API_KEY)
+    kwargs = {"messages": messages, "model": model_name, "temperature": temperature}
+    if response_json:
+        kwargs["response_format"] = {"type": "json_object"}
+    response = client.chat.completions.create(**kwargs)
+    return response.choices[0].message.content or ""
+
+
 def chat_completion(
     messages: list[ChatMessage],
     *,
     response_json: bool = False,
     temperature: float = 0.3,
 ) -> dict:
-    provider = resolve_provider()
-    if not provider_has_key(provider):
-        provider = "mock"
-    model_name = provider_model(provider)
-    started = perf_counter()
+    """Gọi LLM với failover: thử lần lượt các provider có key trong .env.
+
+    Provider nào lỗi (key chết, hết credit, mạng) thì log lại và thử provider kế tiếp,
+    thay vì raise ngay. Chỉ raise khi TẤT CẢ provider thật đều fail (mock luôn ở cuối
+    nên thực tế gần như không bao giờ raise — cùng lắm trả lời mock).
+    """
+    chain = resolve_provider_chain()
     first_user = next((m["content"] for m in messages if m["role"] == "user"), "")
+    last_exc: Exception | None = None
 
-    try:
-        if provider == "mock":
-            content = mock_chat(messages)
-        elif provider == "openrouter":
-            client = OpenAI(
-                api_key=OPENROUTER_API_KEY,
-                base_url="https://openrouter.ai/api/v1",
-                default_headers={
-                    "HTTP-Referer": os.getenv("OPENROUTER_SITE_URL", "http://localhost:8000"),
-                    "X-Title": os.getenv("OPENROUTER_APP_NAME", "AI Quality Intelligence Platform"),
-                },
-            )
-            kwargs = {
-                "messages": messages,
+    for provider in chain:
+        model_name = provider_model(provider)
+        started = perf_counter()
+        try:
+            content = _call_provider(provider, messages, response_json, temperature)
+            latency_ms = round((perf_counter() - started) * 1000)
+            write_agent_log({
+                "event": "chat_completion",
+                "provider": provider,
                 "model": model_name,
-                "temperature": temperature,
-            }
-            if response_json:
-                kwargs["response_format"] = {"type": "json_object"}
-            response = client.chat.completions.create(**kwargs)
-            content = response.choices[0].message.content or ""
-        elif provider == "openai":
-            client = OpenAI(api_key=OPENAI_API_KEY)
-            kwargs = {
-                "messages": messages,
+                "ok": True,
+                "latency_ms": latency_ms,
+                "prompt_preview": first_user[:160],
+            })
+            return {
+                "content": content,
+                "provider": provider,
                 "model": model_name,
-                "temperature": temperature,
+                "latency_ms": latency_ms,
             }
-            if response_json:
-                kwargs["response_format"] = {"type": "json_object"}
-            response = client.chat.completions.create(**kwargs)
-            content = response.choices[0].message.content or ""
-        elif provider == "gemini":
-            genai.configure(api_key=GEMINI_API_KEY)
-            generation_config = {"temperature": temperature}
-            if response_json:
-                generation_config["response_mime_type"] = "application/json"
-            model = genai.GenerativeModel(model_name, generation_config=generation_config)
-            response = model.generate_content(gemini_messages_to_prompt(messages))
-            content = response.text
-        else:
-            client = Groq(api_key=GROQ_API_KEY)
-            kwargs = {
-                "messages": messages,
+        except Exception as exc:
+            last_exc = exc
+            latency_ms = round((perf_counter() - started) * 1000)
+            write_agent_log({
+                "event": "chat_completion",
+                "provider": provider,
                 "model": model_name,
-                "temperature": temperature,
-            }
-            if response_json:
-                kwargs["response_format"] = {"type": "json_object"}
-            response = client.chat.completions.create(**kwargs)
-            content = response.choices[0].message.content or ""
+                "ok": False,
+                "latency_ms": latency_ms,
+                "error": str(exc)[:500],
+                "failover": True,
+                "prompt_preview": first_user[:160],
+            })
+            print(f"[model_router] provider={provider} lỗi, thử provider kế tiếp: {str(exc)[:160]}")
+            continue
 
-        latency_ms = round((perf_counter() - started) * 1000)
-        write_agent_log({
-            "event": "chat_completion",
-            "provider": provider,
-            "model": model_name,
-            "ok": True,
-            "latency_ms": latency_ms,
-            "prompt_preview": first_user[:160],
-        })
-        return {
-            "content": content,
-            "provider": provider,
-            "model": model_name,
-            "latency_ms": latency_ms,
-        }
-    except Exception as exc:
-        latency_ms = round((perf_counter() - started) * 1000)
-        write_agent_log({
-            "event": "chat_completion",
-            "provider": provider,
-            "model": model_name,
-            "ok": False,
-            "latency_ms": latency_ms,
-            "error": str(exc)[:500],
-            "prompt_preview": first_user[:160],
-        })
-        raise
+    # Tất cả provider đều fail (kể cả mock — gần như không xảy ra).
+    raise RuntimeError(f"All LLM providers failed. Last error: {last_exc}")

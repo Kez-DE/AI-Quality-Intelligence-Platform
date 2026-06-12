@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, MessageSquarePlus, MapPin, Tag, AlertCircle } from "lucide-react";
+import { Loader2, MessageSquarePlus, MapPin, Tag, AlertCircle, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/feedback")({
@@ -17,13 +17,43 @@ type Feedback = {
   sentiment: string | null;
   severity: string | null;
   area: string | null;
+  confidence: number | null;
   created_at: string;
 };
 
-const TOPICS = ["Tài xế", "Xe", "Ứng dụng", "Giá & thanh toán", "An toàn", "Khác"];
-const SENTIMENTS = ["positive", "neutral", "negative"];
-const SEVERITIES = ["P0", "P1", "P2", "P3"];
+// Ngưỡng confidence: dưới mức này coi như AI "không chắc" -> gắn cờ cần người duyệt.
+const REVIEW_THRESHOLD = 0.5;
+
 const CHANNELS = ["app", "rating", "hotline", "cs", "survey"];
+
+// 16 khu vực chuẩn (HN/HCM/ĐN) — khớp data/reference/area_catalog.json.
+// value = area code (lưu DB, khớp spike detector), label = tên hiển thị.
+const AREAS: { code: string; label: string }[] = [
+  { code: "HN-Cau-Giay", label: "Cầu Giấy, Hà Nội" },
+  { code: "HN-Ha-Dong", label: "Hà Đông, Hà Nội" },
+  { code: "HN-Dong-Da", label: "Đống Đa, Hà Nội" },
+  { code: "HN-Hoan-Kiem", label: "Hoàn Kiếm, Hà Nội" },
+  { code: "HN-Tay-Ho", label: "Tây Hồ, Hà Nội" },
+  { code: "HN-Long-Bien", label: "Long Biên, Hà Nội" },
+  { code: "HCM-Quan-1", label: "Quận 1, Hồ Chí Minh" },
+  { code: "HCM-Binh-Thanh", label: "Bình Thạnh, Hồ Chí Minh" },
+  { code: "HCM-Thu-Duc", label: "Thủ Đức, Hồ Chí Minh" },
+  { code: "HCM-Quan-7", label: "Quận 7, Hồ Chí Minh" },
+  { code: "HCM-Tan-Binh", label: "Tân Bình, Hồ Chí Minh" },
+  { code: "HCM-Go-Vap", label: "Gò Vấp, Hồ Chí Minh" },
+  { code: "DN-Hai-Chau", label: "Hải Châu, Đà Nẵng" },
+  { code: "DN-Son-Tra", label: "Sơn Trà, Đà Nẵng" },
+  { code: "DN-Ngu-Hanh-Son", label: "Ngũ Hành Sơn, Đà Nẵng" },
+  { code: "DN-Thanh-Khe", label: "Thanh Khê, Đà Nẵng" },
+];
+
+// Nhịp làm mới danh sách phản hồi (ms). 5s đủ "live" mà không nhảy liên tục/giật.
+const REFRESH_INTERVAL_MS = 5000;
+
+// Options cho ô sửa nhãn (Human-in-the-loop). Khớp nhãn classifier sinh ra.
+const TOPIC_OPTIONS = ["Safety", "Driver Behavior", "App Issue", "Payment", "Pricing", "Delay", "Other"];
+const SENTIMENT_OPTIONS = ["negative", "neutral", "positive"];
+const SEVERITY_OPTIONS = ["P1", "P2", "P3", "P4", "P5"];
 const API_BASE = import.meta.env.VITE_BACKEND_API_URL ?? "http://127.0.0.1:8000";
 
 function FeedbackPage() {
@@ -37,11 +67,55 @@ function FeedbackPage() {
   const [form, setForm] = useState({
     text: "",
     channel: "app",
-    topic: "Tài xế",
-    sentiment: "negative",
-    severity: "P2",
-    area: "",
+    area: AREAS[0].code,
   });
+
+  // Human-in-the-loop: state cho ô sửa nhãn đang mở (theo feedback id).
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<{ topic: string; sentiment: string; severity: string }>({
+    topic: "",
+    sentiment: "",
+    severity: "",
+  });
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  function openEditor(f: Feedback) {
+    setEditingId(f.id);
+    setEditDraft({
+      topic: f.topic ?? TOPIC_OPTIONS[0],
+      sentiment: f.sentiment ?? SENTIMENT_OPTIONS[0],
+      severity: f.severity ?? SEVERITY_OPTIONS[0],
+    });
+  }
+
+  async function saveCorrection(id: string) {
+    setSavingId(id);
+    const { data: s } = await supabase.auth.getSession();
+    const token = s.session?.access_token;
+    if (!token) {
+      toast.error("Chưa đăng nhập");
+      setSavingId(null);
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/api/feedback/${id}/label`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(editDraft),
+      });
+      if (!res.ok) {
+        const detail = await res.text();
+        throw new Error(`${res.status}: ${detail.slice(0, 200)}`);
+      }
+      toast.success("Đã cập nhật nhãn — ghi vào correction log");
+      setEditingId(null);
+      load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không sửa được nhãn");
+    } finally {
+      setSavingId(null);
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -67,7 +141,7 @@ function FeedbackPage() {
 
   useEffect(() => {
     load();
-    const id = window.setInterval(load, 1000);
+    const id = window.setInterval(load, REFRESH_INTERVAL_MS);
     return () => window.clearInterval(id);
   }, []);
 
@@ -75,31 +149,38 @@ function FeedbackPage() {
     e.preventDefault();
     if (!form.text.trim()) return;
     setSubmitting(true);
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) {
+    const { data: s } = await supabase.auth.getSession();
+    const token = s.session?.access_token;
+    if (!token) {
       toast.error("Chưa đăng nhập");
       setSubmitting(false);
       return;
     }
-    const { error } = await supabase.from("feedback").insert({
-      user_id: u.user.id,
-      source: "manual",
-      channel: form.channel,
-      text: form.text.trim(),
-      topic: form.topic,
-      sentiment: form.sentiment,
-      severity: form.severity,
-      area: form.area || null,
-      confidence: 1,
-    });
-    setSubmitting(false);
-    if (error) {
-      toast.error(error.message);
-      return;
+    try {
+      const res = await fetch(`${API_BASE}/api/feedback/submit`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          text: form.text.trim(),
+          channel: form.channel,
+          area: form.area || null,
+        }),
+      });
+      if (!res.ok) {
+        const detail = await res.text();
+        throw new Error(`${res.status}: ${detail.slice(0, 200)}`);
+      }
+      toast.success("Đã gửi phản hồi — AI đang phân tích & gán nhãn");
+      setForm({ ...form, text: "", area: AREAS[0].code });
+      load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không gửi được phản hồi");
+    } finally {
+      setSubmitting(false);
     }
-    toast.success("Đã thêm phản hồi");
-    setForm({ ...form, text: "", area: "" });
-    load();
   }
 
   return (
@@ -125,21 +206,27 @@ function FeedbackPage() {
             placeholder="VD: Tài xế đi sai đường, không dùng định vị, thái độ khó chịu..."
             className="w-full p-3 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-xanh-green/40 resize-none"
           />
-          <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-2">
+          <div className="grid sm:grid-cols-2 gap-2">
             <Select label="Kênh" value={form.channel} onChange={(v) => setForm({ ...form, channel: v })} options={CHANNELS} />
-            <Select label="Chủ đề" value={form.topic} onChange={(v) => setForm({ ...form, topic: v })} options={TOPICS} />
-            <Select label="Cảm xúc" value={form.sentiment} onChange={(v) => setForm({ ...form, sentiment: v })} options={SENTIMENTS} />
-            <Select label="Severity" value={form.severity} onChange={(v) => setForm({ ...form, severity: v })} options={SEVERITIES} />
             <label className="text-xs">
               <div className="text-muted-foreground mb-1">Khu vực</div>
-              <input
+              <select
                 value={form.area}
                 onChange={(e) => setForm({ ...form, area: e.target.value })}
-                placeholder="VD: HN-Cầu Giấy"
-                className="w-full h-9 px-3 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-xanh-green/40"
-              />
+                className="w-full h-9 px-2 rounded-lg border border-border bg-white focus:outline-none focus:ring-2 focus:ring-xanh-green/40"
+              >
+                {AREAS.map((a) => (
+                  <option key={a.code} value={a.code}>
+                    {a.label}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
+          <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <Tag className="h-3 w-3" />
+            Chủ đề, cảm xúc và mức độ nghiêm trọng do AI tự phân tích sau khi gửi.
+          </p>
           <button
             type="submit"
             disabled={submitting}
@@ -176,6 +263,10 @@ function FeedbackPage() {
                 key={f.id}
                 className={`p-4 grid grid-cols-12 gap-3 items-center hover:bg-xanh-mint/20 ${
                   newFeedbackIds.has(f.id) ? "live-feedback-row-new" : ""
+                } ${
+                  f.confidence != null && f.confidence < REVIEW_THRESHOLD
+                    ? "bg-amber-50/60 border-l-2 border-l-amber-400"
+                    : ""
                 }`}
               >
                 <span className="col-span-2 sm:col-span-1 text-[10px] font-mono uppercase text-muted-foreground">
@@ -190,13 +281,45 @@ function FeedbackPage() {
                     </Pill>
                   )}
                   {f.severity && <Pill tone="deep">{f.severity}</Pill>}
+                  {f.confidence != null &&
+                    (f.confidence < REVIEW_THRESHOLD ? (
+                      <Pill icon={AlertCircle} tone="coral">
+                        cần duyệt · {Math.round(f.confidence * 100)}%
+                      </Pill>
+                    ) : (
+                      <span className="text-[10px] font-mono text-muted-foreground">
+                        {Math.round(f.confidence * 100)}%
+                      </span>
+                    ))}
                   {f.area && (
                     <span className="text-[10px] font-mono text-muted-foreground inline-flex items-center gap-1">
                       <MapPin className="h-3 w-3" />
                       {f.area}
                     </span>
                   )}
+                  <button
+                    onClick={() => (editingId === f.id ? setEditingId(null) : openEditor(f))}
+                    className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-border hover:border-xanh-green/50 hover:bg-xanh-mint/30 inline-flex items-center gap-1"
+                  >
+                    <Pencil className="h-3 w-3" />
+                    {editingId === f.id ? "đóng" : "sửa nhãn"}
+                  </button>
                 </div>
+                {editingId === f.id && (
+                  <div className="col-span-12 mt-2 p-3 rounded-xl bg-muted/40 border border-border grid sm:grid-cols-4 gap-2 items-end">
+                    <Select label="Chủ đề" value={editDraft.topic} onChange={(v) => setEditDraft({ ...editDraft, topic: v })} options={TOPIC_OPTIONS} />
+                    <Select label="Cảm xúc" value={editDraft.sentiment} onChange={(v) => setEditDraft({ ...editDraft, sentiment: v })} options={SENTIMENT_OPTIONS} />
+                    <Select label="Severity" value={editDraft.severity} onChange={(v) => setEditDraft({ ...editDraft, severity: v })} options={SEVERITY_OPTIONS} />
+                    <button
+                      onClick={() => saveCorrection(f.id)}
+                      disabled={savingId === f.id}
+                      className="h-9 px-4 rounded-lg text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-[var(--shadow-green)] disabled:opacity-60"
+                      style={{ background: "var(--gradient-green)" }}
+                    >
+                      {savingId === f.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Lưu nhãn"}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 import os
@@ -11,6 +11,8 @@ from contextlib import asynccontextmanager
 from ingest import ingest_dataset
 from ingest import get_supabase
 from agent import chat_completion, get_agent_status
+from auth_guard import AuthUser, get_current_user, require_admin, require_ops_staff
+from users_admin import router as users_router
 
 PIPELINE_DIR = os.path.dirname(__file__)
 PROJECT_ROOT = os.path.abspath(os.path.join(PIPELINE_DIR, ".."))
@@ -277,6 +279,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# User-management (admin only) — định danh + RBAC ở tầng API vì service role bypass RLS.
+app.include_router(users_router)
+
+
+@app.get("/api/me")
+def whoami(user: AuthUser = Depends(get_current_user)):
+    """Trả về danh tính + role của user đang đăng nhập (frontend dùng để render nav theo quyền)."""
+    return {"status": "success", "data": {"id": user.id, "email": user.email, "role": user.role}}
+
+
 AGENT_SYSTEM_PROMPT = """Bạn là AI Assistant cho Quality Operation Cockpit của xanhSM.
 Nhiệm vụ: phân tích feedback, alerts, spike, vận hành khu vực, chất lượng tài xế/xe/app/thanh toán/an toàn.
 Trả lời tiếng Việt, ngắn gọn, có cấu trúc, ưu tiên hành động cụ thể và mức độ ưu tiên P0/P1/P2."""
@@ -365,7 +377,7 @@ def alert_workflow_status():
     return {"status": "success", "data": dict(ticket_workflow_state)}
 
 @app.patch("/api/alerts/{alert_id}/status")
-def update_alert_status(alert_id: str, payload: dict):
+def update_alert_status(alert_id: str, payload: dict, _: AuthUser = Depends(require_ops_staff)):
     new_status = payload.get("status")
     if new_status not in {"open", "in_progress", "resolved"}:
         raise HTTPException(status_code=400, detail="Invalid alert status")
@@ -421,6 +433,7 @@ def ingest_real_dataset(
     limit: int | None = Query(default=None, ge=1),
     batch_size: int = Query(default=150, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
+    _: AuthUser = Depends(require_admin),
 ):
     """
     Ingest dataset thật từ thư mục /data. Không truyền limit thì chạy toàn bộ file.
@@ -445,6 +458,7 @@ def start_live_feedback_stream(
     auto_ticket: bool = Query(default=True),
     ticket_every_batches: int = Query(default=10, ge=1, le=100),
     ticket_max_spikes: int = Query(default=1, ge=1, le=10),
+    _: AuthUser = Depends(require_admin),
 ):
     """
     Bắt đầu live stream feedback từ dataset thật trong /data.
@@ -465,7 +479,7 @@ def start_live_feedback_stream(
     return {"status": "success", "data": result}
 
 @app.post("/api/live-stream/stop")
-def stop_live_feedback_stream():
+def stop_live_feedback_stream(_: AuthUser = Depends(require_admin)):
     return {"status": "success", "data": stop_live_stream()}
 
 @app.get("/api/live-stream/status")
@@ -478,6 +492,7 @@ def run_real_pipeline(
     batch_size: int = Query(default=150, ge=1, le=500),
     max_feedback: int = Query(default=1000, ge=1, le=5000),
     max_spikes: int = Query(default=3, ge=1, le=20),
+    _: AuthUser = Depends(require_admin),
 ):
     """
     Chạy luồng thật: ingest dataset từ /data rồi detect spike/agent.
@@ -506,6 +521,7 @@ def run_real_pipeline(
 def trigger_spike_detect(
     max_feedback: int = Query(default=1000, ge=1, le=5000),
     max_spikes: int = Query(default=3, ge=1, le=20),
+    _: AuthUser = Depends(require_admin),
 ):
     """
     Endpoint để kích hoạt thủ công tiến trình Spike Detection
@@ -516,6 +532,144 @@ def trigger_spike_detect(
     except ValueError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    return {"status": "success", "data": result}
+
+@app.post("/api/feedback/submit")
+def submit_feedback(payload: dict, user: AuthUser = Depends(get_current_user)):
+    """Người dùng gửi phản hồi: CHỈ nhập text + kênh + khu vực.
+
+    Topic / sentiment / severity / confidence do AI tự phân tích (classifier +
+    rule Safety) — KHÔNG cho người gửi tự chọn, tránh làm hỏng dữ liệu nhãn.
+    """
+    text = (payload.get("text") or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Thiếu nội dung phản hồi (text)")
+
+    channel = (payload.get("channel") or "app").strip() or "app"
+    area = (payload.get("area") or "").strip() or None
+
+    from clean import clean_text
+    from classifier import predict_feedback
+
+    cleaned = clean_text(text)
+    prediction = predict_feedback(cleaned)
+
+    severity = prediction["severity"]
+    severity_value = severity if isinstance(severity, str) and severity.upper().startswith("P") else f"P{int(severity)}"
+
+    row = {
+        "user_id": user.id,
+        "source": "manual",
+        "channel": channel,
+        "text": cleaned,
+        "topic": prediction["topic"],
+        "sentiment": prediction["sentiment"],
+        "severity": severity_value,
+        "confidence": prediction["confidence"],
+        "area": area,
+    }
+    try:
+        db = get_supabase()
+        data = db.table("feedback").insert(row).execute().data or []
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Cannot save feedback: {str(exc)[:300]}") from exc
+    return {"status": "success", "data": data[0] if data else row}
+
+@app.patch("/api/feedback/{feedback_id}/label")
+def correct_feedback_label(
+    feedback_id: str,
+    payload: dict,
+    user: AuthUser = Depends(require_ops_staff),
+):
+    """Human-in-the-loop: nhân viên sửa nhãn AI gán sai.
+
+    Nhận các field muốn sửa (topic / sentiment / severity). Ghi lại giá trị
+    cũ -> mới vào correction_logs (audit), rồi cập nhật feedback. Sau khi người
+    sửa, confidence được set = 1.0 (nhãn do người xác nhận, không cần duyệt nữa).
+    """
+    ALLOWED = {"topic", "sentiment", "severity"}
+    changes = {k: v for k, v in payload.items() if k in ALLOWED and isinstance(v, str) and v.strip()}
+    if not changes:
+        raise HTTPException(status_code=400, detail="Không có nhãn hợp lệ để sửa (topic/sentiment/severity)")
+
+    db = get_supabase()
+    rows = db.table("feedback").select("*").eq("id", feedback_id).limit(1).execute().data or []
+    if not rows:
+        raise HTTPException(status_code=404, detail="Feedback not found")
+    current = rows[0]
+
+    # Ghi audit cho từng field thực sự đổi.
+    log_entries = []
+    for field, new_val in changes.items():
+        old_val = current.get(field)
+        if str(old_val) == str(new_val):
+            continue
+        log_entries.append({
+            "feedback_id": feedback_id,
+            "corrected_by": user.id,
+            "field": field,
+            "old_value": str(old_val) if old_val is not None else None,
+            "new_value": new_val,
+        })
+
+    if not log_entries:
+        return {"status": "success", "data": current, "note": "Không có thay đổi"}
+
+    update = {k: changes[k] for k in changes}
+    update["confidence"] = 1.0  # nhãn do người xác nhận
+    try:
+        db.table("correction_logs").insert(log_entries).execute()
+        updated = db.table("feedback").update(update).eq("id", feedback_id).execute().data or []
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Cannot correct label: {str(exc)[:300]}") from exc
+    return {"status": "success", "data": updated[0] if updated else current, "corrections": len(log_entries)}
+
+# ============================================================
+# Multi-agent layer: insight theo phòng ban + root-cause analysis
+# ============================================================
+
+@app.get("/api/insights/departments")
+def list_department_insights(
+    hours: int = Query(default=24, ge=1, le=720),
+    _: AuthUser = Depends(require_ops_staff),
+):
+    """Chạy orchestrator: tổng hợp insight + root-cause cho mọi phòng ban."""
+    from agents.orchestrator import run_agent_pipeline
+    try:
+        result = run_agent_pipeline(hours=hours)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Agent pipeline error: {str(exc)[:300]}") from exc
+    return {"status": "success", "data": result}
+
+@app.get("/api/insights/departments/{team}")
+def get_department_insights(
+    team: str,
+    hours: int = Query(default=24, ge=1, le=720),
+    with_analysis: bool = Query(default=True),
+    _: AuthUser = Depends(require_ops_staff),
+):
+    """Insight cho 1 phòng ban; with_analysis=true thì gọi LLM phân tích root cause."""
+    from agents.insight_agent import generate_department_insights
+    from agents.analyst_agent import analyze_root_cause
+    try:
+        insights = generate_department_insights(team, hours)
+        if with_analysis and insights.get("total_feedback", 0) > 0:
+            insights["analysis"] = analyze_root_cause(team, insights)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Insight error: {str(exc)[:300]}") from exc
+    return {"status": "success", "data": insights}
+
+@app.post("/api/agent/run")
+def run_multi_agent_pipeline(
+    hours: int = Query(default=24, ge=1, le=720),
+    _: AuthUser = Depends(require_admin),
+):
+    """Kích hoạt thủ công toàn bộ multi-agent pipeline (admin only)."""
+    from agents.orchestrator import run_agent_pipeline
+    try:
+        result = run_agent_pipeline(hours=hours)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Agent pipeline error: {str(exc)[:300]}") from exc
     return {"status": "success", "data": result}
 
 if __name__ == "__main__":

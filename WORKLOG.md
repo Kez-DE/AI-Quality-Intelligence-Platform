@@ -82,3 +82,36 @@ Chưa phân công. TODO: ai làm module nào, deadline nội bộ.
 - Phân biệt rõ trường THẬT (text/title/rating/timestamp/app...) vs TỔNG HỢP
   (area/driver_id/trip_id/event_time/is_demo_spike). Chi tiết: `data/README.md`.
 - Pin `scikit-learn==1.6.1` khớp version train model (tránh InconsistentVersionWarning).
+
+## 2026-06-12 (chiều) — đảo chiều: bật streaming, verify chạy thật E2E
+
+### Quyết định đảo chiều constraint
+- Trước đây chốt "không real-time, batch thủ công". NAY đổi: ứng dụng chạy thật
+  CÓ STREAMING, đúng luồng thực tế. Quyết định giữ **cả hai mode** — streaming
+  (live-stream + APScheduler) làm luồng chính, vẫn giữ nút bắn batch cho demo
+  an toàn trên sân khấu (đỡ phụ thuộc mạng/LLM lúc demo trực tiếp).
+- Lý do giữ batch: streaming phụ thuộc scheduler + LLM + mạng; nút bấm batch là
+  đường lui an toàn khi demo trước hội đồng.
+
+### Verify chạy thật end-to-end (không phải chỉ đọc code)
+- Supabase cloud thật: 4 bảng đã tồn tại, `profiles` có user thật để ingest.
+- Backend FastAPI sống, provider = OpenRouter (key thật, model owl-alpha).
+- Ingest 200 review thật → DB: 0 failed, severity convert đúng P-format.
+- Streaming engine: scheduler tự bơm 27 batch (~1.860 review) không can thiệp tay.
+- LLM thật sinh alert root-cause đa tầng + định tuyến phòng ban (Vận hành/CSKH...);
+  ticket workflow tự chuyển open → in_progress → resolved.
+- Frontend: `vite build` OK (client+SSR, 80 modules); dev server cổng 5174 phục vụ
+  app thật, nối đúng `VITE_BACKEND_API_URL`; alerts/feedback subscribe Supabase realtime.
+
+### Bug quan trọng 4 — LLM key chết giữa lúc verify
+- Triệu chứng: alert sinh ra nhưng nội dung là fallback "Không thể phân tích do
+  lỗi LLM: 401 User not found". Spike detect + severity ĐÚNG, chỉ mắt xích LLM hỏng.
+- Root cause: OpenRouter key cũ (từ xanh_iu/.env) hết hạn/hết credit; OpenAI key
+  cũng 401; 9router local không chạy.
+- Fix: Kez cấp key OpenRouter mới → test `/auth/key` HTTP 200 + chat completion thật
+  trả nội dung → restart backend (env chỉ đọc lúc khởi động) → spike lại sinh alert
+  phân tích thật. Bài học: env đổi phải restart server; verify key sống TRƯỚC khi chạy luồng.
+
+### Bảo mật
+- `.gitignore` thêm `.env.*` + `!.env.example` để chặn mọi biến thể env (kể cả backup).
+- `.env` thật (Supabase + OpenRouter) chỉ sống local, KHÔNG commit.

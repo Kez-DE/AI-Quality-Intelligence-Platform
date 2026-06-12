@@ -1,5 +1,7 @@
 # Environment
 .env
+.env.*
+!.env.example
 
 # Python
 __pycache__/
@@ -27,3 +29,9 @@ pipeline/logs/*.log
 
 # AI logs — tracked structure, ignored content
 .ai-log/*.jsonl
+
+# Model backups (local only, không commit)
+pipeline/ml/_backup_*/
+
+# Supabase CLI temp
+supabase/.temp/

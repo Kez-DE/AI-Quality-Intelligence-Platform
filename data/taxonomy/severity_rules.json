@@ -1,0 +1,8 @@
+{
+  "alert_escalation": {
+    "WATCH":    { "min_negative": 3 },
+    "WARNING":  { "min_negative": 5 },
+    "CRITICAL": { "min_negative": 10 }
+  },
+  "alert_cooldown_minutes": 60
+}

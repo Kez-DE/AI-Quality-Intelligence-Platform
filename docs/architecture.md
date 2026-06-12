@@ -39,19 +39,31 @@ Review (demo 150 / dataset 4837)
 [6] alerts          ghi alert vào Supabase → frontend hiển thị
 ```
 
+## Hai chế độ chạy
+
+Hệ thống chạy thật end-to-end với **hai chế độ song song**, dùng chung pipeline xử lý:
+
+**1. Streaming (luồng chính) — gần real-time**
+- `POST /api/live-stream/start` bật APScheduler tự bơm từng batch review theo `interval_seconds`.
+- Sau mỗi `ticket_every_batches` lô, hệ thống tự chạy spike detect → LLM phân tích → ghi alert.
+- Ticket workflow tự chuyển trạng thái `open → in_progress → resolved` theo thời gian.
+- Frontend subscribe Supabase realtime (`postgres_changes`) → dashboard tự cập nhật, không cần reload.
+- Bật/tắt bằng `LIVE_STREAM_ENABLED` hoặc API runtime.
+
+**2. Batch thủ công — nút bấm demo an toàn**
+- `POST /api/run-real-pipeline` / `POST /api/trigger-spike-detect`: bắn một lô 100–150 review và sinh alert ngay.
+- Dùng trên sân khấu khi không muốn phụ thuộc nhịp scheduler / mạng / LLM lúc demo trực tiếp.
+
+Cả hai đã verify chạy thật: streaming bơm 1.860 review tự động qua scheduler; LLM thật (OpenRouter) sinh alert root-cause đa tầng và định tuyến phòng ban.
+
 ## Demo vs Production
 
-Đây là ranh giới quan trọng — hệ thống xây cho **demo trước hội đồng**, không triển khai vận hành lâu dài.
-
-| Khía cạnh | Demo (cái đang build) | Production (nếu làm thật) |
+| Khía cạnh | Cái đang build (chạy thật) | Production đầy đủ (nếu mở rộng) |
 | :--- | :--- | :--- |
-| Ingest | Batch thủ công, bấm nút bắn 100–150 review/lô | Micro-batch / real-time hút review từ store |
-| Lập lịch | Chạy tay qua endpoint hoặc CLI | Cron/scheduler 5–10 phút |
+| Ingest | Streaming scheduler + batch thủ công, nguồn là dataset đóng gói | Hút review real-time trực tiếp từ store/app |
 | Data | Public store review + metadata synthetic | Dữ liệu vận hành thật của hãng |
-| Thông báo | Hiển thị trên dashboard | Push tới Slack/email/app tài xế |
-| Hạ tầng | Supabase cloud + chạy local | Container hóa, CI/CD, monitoring |
-
-Live-stream + APScheduler có sẵn trong code nhưng **tắt mặc định** (`LIVE_STREAM_ENABLED=false`). Demo dùng chế độ batch.
+| Thông báo | Realtime trên dashboard | Push tới Slack/email/app tài xế |
+| Hạ tầng | Supabase cloud + chạy local | Container hóa, CI/CD, monitoring, auth/roles đầy đủ |
 
 ## ML — distillation, không train lại từ đầu
 

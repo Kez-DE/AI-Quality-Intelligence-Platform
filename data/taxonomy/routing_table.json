@@ -1,0 +1,15 @@
+{
+  "default_team": "CSKH",
+  "routes": [
+    { "topic": "Safety",         "team": "Safety",   "sla_hours": 1 },
+    { "topic": "Driver Behavior","team": "Vận hành", "sla_hours": 8 },
+    { "topic": "App Issue",      "team": "IT",       "sla_hours": 12 },
+    { "topic": "Payment",        "team": "CSKH",     "sla_hours": 12 },
+    { "topic": "Pricing",        "team": "Pricing",  "sla_hours": 24 },
+    { "topic": "Delay",          "team": "Vận hành", "sla_hours": 8 },
+    { "topic": "Other",          "team": "CSKH",     "sla_hours": 24 }
+  ],
+  "severity_overrides": [
+    { "severity": "P5", "team": "Safety", "sla_hours": 1 }
+  ]
+}
