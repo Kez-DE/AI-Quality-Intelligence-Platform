@@ -6,75 +6,128 @@ Dự án AI20K-223. Phân tích phản hồi khách hàng smart mobility (xanhSM
 
 ```
 C2-App-116/
-├── app/        Frontend TanStack Start + React 19 (Quality Cockpit, auth, chat)
-├── pipeline/   Python: clean → classify → ingest → spike detect → LLM agent
-├── supabase/   Schema PostgreSQL (profiles, feedback, alerts, chat_messages)
-└── data/       Dataset public review + metadata synthetic + train splits
+├── app/        Frontend TanStack Start + React 19 (Quality Cockpit, auth, chat, admin)
+├── pipeline/   Python FastAPI: clean → classify → ingest → spike → LLM agent → multi-agent
+├── supabase/   Schema PostgreSQL + RLS + RBAC (6 migration)
+└── data/       Dataset public review + metadata synthetic + train splits + taxonomy
 ```
 
-Supabase là trục nối: pipeline Python **ghi** kết quả, frontend **đọc** để hiển thị. Không có backend server trung gian cho phần đọc — frontend gọi thẳng Supabase qua RLS.
+Supabase là trục nối: pipeline Python **ghi** kết quả, frontend **đọc** để hiển thị (realtime). Backend FastAPI chịu trách nhiệm xử lý + xác thực; frontend cũng đọc trực tiếp Supabase qua RLS cho realtime subscription.
 
 ## Luồng xử lý
 
 ```
-Review (demo 150 / dataset 4837)
+Review (form thủ công / demo 150 / dataset 4837 / streaming)
    │
    ▼
 [1] clean.py        mask PII (SĐT, email), chuẩn hóa text
    │
    ▼
-[2] classifier.py   TF-IDF + LinearSVC → topic (7 lớp) + sentiment
-   │                 → severity suy từ sentiment (P1..P5, P5 nặng nhất)
-   │                 → Safety rule override: keyword nguy hiểm ép P5 + hạ confidence
-   ▼
-[3] ingest.py       ghi vào Supabase feedback (dùng nhãn sẵn nếu data đã label)
+[2] classifier.py   TF-IDF + LinearSVC → topic (7 lớp) + sentiment   (tầng MODEL)
    │
    ▼
-[4] spike_detector  group by area, đếm P4/P5 trong cửa sổ thời gian
-   │                 ≥ ngưỡng → spike
+[3] rules.py        rule keyword ghi đè khi tín hiệu rõ              (tầng RULE)
+   │                 - Safety / Payment-fraud / App / Map / Supply / Driver / Pricing / Delay
+   │                 - negation guard ("app không thân thiện" ≠ positive)
+   │                 - confidence band thật (rule mạnh 80–88%, mơ hồ 50–65%, câu ngắn ≤50%)
+   │                 - needs_review = P5 / safety / confidence thấp
    ▼
-[5] llm_agent.py    gửi review của vùng spike cho LLM → JSON
-   │                 {title, root cause, action, assigned_team}
+[4] ingest.py       ghi vào Supabase feedback (topic, sentiment, severity P1..P5,
+   │                 confidence, area code, needs_review, review_reason)
    ▼
-[6] alerts          ghi alert vào Supabase → frontend hiển thị
+[5] spike_detector  group by area, đếm P4/P5 trong cửa sổ thời gian → spike
+   │
+   ▼
+[6] llm_agent.py    gửi review của vùng spike cho LLM → {title, root cause, action, team}
+   │
+   ▼
+[7] alerts          ghi alert vào Supabase → frontend hiển thị realtime
 ```
+
+## Phân loại 2 tầng: Model + Rule
+
+Khác bản đầu (chỉ có model + rule Safety đơn giản), giờ có **rule engine đầy đủ** (`pipeline/rules.py`) chạy SAU model:
+
+- **Model** (TF-IDF + LinearSVC) cho dự đoán nền.
+- **Rule keyword** ghi đè khi có tín hiệu mạnh và rõ, theo thứ tự ưu tiên: Safety > Driver-positive > Payment-fraud > App > Map > Payment > Supply > Driver-negative > Pricing > Delay > Positive chung.
+- **Negation guard**: từ phủ định ("không/ko/chẳng/chưa") ngay trước keyword sẽ chặn gán sai.
+- **Confidence band**: phản ánh độ chắc thật, không còn 95% cứng cho mọi câu.
+
+Lý do: model thuần yếu ở **câu ngắn** (người dùng gõ form hay viết ngắn → ít token → model ngả về lớp đa số negative). Rule layer lấp đúng lỗ hổng này. (Đã thử retrain với augment câu ngắn nhưng làm sụp neutral recall 78%→7%, nên giữ model gốc + dùng rule.)
+
+## Lưới Safety
+
+Bất kỳ review chứa keyword nguy hiểm (tai nạn, xe tông, bỏ chạy, say xỉn, cướp, hành hung, sàm sỡ...) đều bị ép `Safety / negative / P5 / needs_review=true`, confidence hạ thấp. Rule luôn thắng model — an toàn không nhường cho xác suất.
 
 ## Hai chế độ chạy
 
-Hệ thống chạy thật end-to-end với **hai chế độ song song**, dùng chung pipeline xử lý:
-
 **1. Streaming (luồng chính) — gần real-time**
-- `POST /api/live-stream/start` bật APScheduler tự bơm từng batch review theo `interval_seconds`.
-- Sau mỗi `ticket_every_batches` lô, hệ thống tự chạy spike detect → LLM phân tích → ghi alert.
-- Ticket workflow tự chuyển trạng thái `open → in_progress → resolved` theo thời gian.
-- Frontend subscribe Supabase realtime (`postgres_changes`) → dashboard tự cập nhật, không cần reload.
-- Bật/tắt bằng `LIVE_STREAM_ENABLED` hoặc API runtime.
+- `POST /api/live-stream/start` bật APScheduler bơm batch theo `interval_seconds`. Demo dùng **50 review/giây** (`LIVE_STREAM_BATCH_SIZE=50`, `INTERVAL_SECONDS=1`, `LOOP=false`).
+- Sau mỗi `ticket_every_batches` lô → tự spike detect → LLM → ghi alert.
+- Ticket workflow tự chuyển `open → in_progress → resolved`.
+- Frontend subscribe Supabase realtime → dashboard tự cập nhật.
 
 **2. Batch thủ công — nút bấm demo an toàn**
-- `POST /api/run-real-pipeline` / `POST /api/trigger-spike-detect`: bắn một lô 100–150 review và sinh alert ngay.
-- Dùng trên sân khấu khi không muốn phụ thuộc nhịp scheduler / mạng / LLM lúc demo trực tiếp.
+- `POST /api/run-real-pipeline` / `POST /api/trigger-spike-detect`: bắn một lô review và sinh alert ngay. Dùng khi không muốn phụ thuộc nhịp scheduler/mạng lúc demo.
 
-Cả hai đã verify chạy thật: streaming bơm 1.860 review tự động qua scheduler; LLM thật (OpenRouter) sinh alert root-cause đa tầng và định tuyến phòng ban.
+Đã verify chạy thật: streaming bơm trọn 4837 review/~97s qua scheduler (sau khi fix lỗi Broken pipe do stdout pipe); LLM thật (OpenRouter) sinh alert root-cause + định tuyến phòng ban.
+
+## Review Queue / Feedback Stream
+
+Trang `/feedback` tách 2 luồng rõ ràng:
+
+- **Cần duyệt (Review Queue)** — lấy đúng từ server `GET /api/feedback/recent?needs_review=true&reviewed=false`. Gồm ca P5/safety/confidence thấp. Có badge lý do + nút Duyệt / Sửa nhãn / Đã xử lý.
+- **Luồng phản hồi (Feedback Stream)** — danh sách chung, loại các id đang trong Queue.
+- **Stat cards**: Tổng / Cần duyệt / P5+P4 / Confidence thấp.
+
+## Human-in-the-Loop + audit
+
+- `PATCH /api/feedback/{id}/label` — nhân viên sửa nhãn AI gán sai → ghi `correction_logs` (ai sửa, field nào, cũ→mới), set `confidence=1.0`, `reviewed=true`, rời Review Queue.
+- `PATCH /api/feedback/{id}/review` — duyệt / đánh dấu đã xử lý.
+- `correction_logs` vừa là audit, vừa là dữ liệu retrain tương lai (vòng học khép kín).
+- `POST /api/feedback/reclassify` (admin) — phân loại lại data cũ bằng rule mới, bỏ qua bản đã có người duyệt.
+
+## Multi-agent layer
+
+`pipeline/agents/` — 6 agent phân tích theo phòng ban (IT/Safety/CSKH/Vận hành/Pricing/Marketing):
+
+- **router_agent** — định tuyến ticket theo topic→phòng ban + SLA; P5 override → Safety.
+- **insight_agent** — gom metric/topic theo phòng ban.
+- **analyst_agent** — gọi LLM phân tích root cause + action items.
+- **alert_agent** — phân cấp WATCH/WARNING/CRITICAL + chống alert trùng (cooldown).
+- **orchestrator** — điều phối quét toàn bộ phòng ban.
+- **common** — bridge LLM + DB.
+
+Endpoint: `GET /api/insights/departments`, `GET /api/insights/departments/{team}`, `POST /api/agent/run`.
+
+## RBAC — 4 vai trò
+
+`pipeline/auth_guard.py` xác thực Supabase JWT + đọc role từ `profiles`. 4 role: **admin / manager / staff / guest**.
+- Backend dùng SERVICE_ROLE_KEY (bypass RLS) nên gate quyền ở tầng API: `require_admin`, `require_ops_staff`.
+- `pipeline/users_admin.py` — CRUD user (admin only).
+- Bootstrap: user đăng ký đầu tiên = admin, còn lại = staff.
+
+## Region mapping (code ↔ label)
+
+`pipeline/regions.py` + `app/src/lib/regions.ts` (mirror). DB lưu **code** (`HN-Cau-Giay`, khớp spike detector); UI luôn hiển thị **label đẹp** (`Cầu Giấy, Hà Nội`). 16 khu vực HN/HCM/ĐN. Form dùng dropdown thay vì gõ tay → dữ liệu khu vực nhất quán.
 
 ## Demo vs Production
 
 | Khía cạnh | Cái đang build (chạy thật) | Production đầy đủ (nếu mở rộng) |
 | :--- | :--- | :--- |
-| Ingest | Streaming scheduler + batch thủ công, nguồn là dataset đóng gói | Hút review real-time trực tiếp từ store/app |
+| Ingest | Streaming scheduler 50/s + batch thủ công, nguồn dataset đóng gói | Hút review real-time trực tiếp từ store/app |
 | Data | Public store review + metadata synthetic | Dữ liệu vận hành thật của hãng |
 | Thông báo | Realtime trên dashboard | Push tới Slack/email/app tài xế |
-| Hạ tầng | Supabase cloud + chạy local | Container hóa, CI/CD, monitoring, auth/roles đầy đủ |
+| Hạ tầng | Supabase cloud + chạy local | Container hóa, CI/CD, monitoring |
 
-## ML — distillation, không train lại từ đầu
+## ML — distillation
 
-Model `.joblib` (TF-IDF + LinearSVC) train trên nhãn do LLM sinh trước đó (distillation). Đây là quyết định cố ý: rẻ, nhanh, đủ chính xác cho demo.
-
-Độ chính xác đo trên `data/train/test_split.json` (932 mẫu có nhãn):
+Model `.joblib` (TF-IDF + LinearSVC) train trên nhãn do LLM sinh (distillation). Độ chính xác trên `data/train/test_split.json` (932 mẫu):
 - Topic: 77.1%
-- Sentiment: 94.3%
+- Sentiment: 94.3% (negative recall 97%, positive 87%, neutral 78%)
 
-Safety là rule cứng đặt **trên** model: bất kỳ review chứa keyword nguy hiểm (tai nạn, cướp, sàm sỡ...) đều bị ép `Safety / P5 / confidence 0.3`, buộc Human-in-the-Loop review lại. Rule luôn thắng model để không bỏ sót ca an toàn.
+Rule engine bù phần model yếu (câu ngắn, từ khóa rõ).
 
-## LLM provider
+## LLM provider — failover
 
-`pipeline/agent/model_router.py` hỗ trợ nhiều provider (OpenRouter, OpenAI, Gemini, Groq) + mock. Chọn theo `LLM_PROVIDER` trong `.env`; mặc định `auto` lấy key đầu tiên có sẵn. Không có key → chạy mock (vẫn sinh alert giả lập để demo luồng).
+`pipeline/agent/model_router.py` hỗ trợ nhiều provider (OpenRouter, OpenAI, Gemini, Groq) + mock. `LLM_PROVIDER=auto` → dựng chuỗi mọi provider CÓ KEY, thử lần lượt; provider lỗi (key chết, hết credit) tự nhảy sang provider kế. Hết key thật → mock (vẫn sinh alert giả lập để demo luồng). Chat, spike, multi-agent đều hưởng failover này.
