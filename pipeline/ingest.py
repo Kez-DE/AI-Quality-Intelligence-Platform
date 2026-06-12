@@ -130,9 +130,8 @@ if __name__ == "__main__":
     dataset_file = os.path.join(
         os.path.dirname(__file__),
         "..",
-        "..",
         "data",
         "processed",
-        "seed_real_clean (1).json",
+        "seed_real_clean.json",
     )
     ingest_dataset(dataset_file)

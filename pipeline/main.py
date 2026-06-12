@@ -13,12 +13,12 @@ from ingest import get_supabase
 from agent import chat_completion, get_agent_status
 
 PIPELINE_DIR = os.path.dirname(__file__)
-PROJECT_ROOT = os.path.abspath(os.path.join(PIPELINE_DIR, "..", ".."))
+PROJECT_ROOT = os.path.abspath(os.path.join(PIPELINE_DIR, ".."))
 DEFAULT_DATA_FILE = os.path.join(
     PROJECT_ROOT,
     "data",
     "processed",
-    "seed_real_clean (1).json",
+    "seed_real_clean.json",
 )
 
 scheduler: BackgroundScheduler | None = None

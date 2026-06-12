@@ -25,11 +25,12 @@ def detect_spikes(hours: int = 1, max_feedback: int = 1000, max_spikes: int = 3,
     
     since = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
     
-    # P0/P1 are the critical severities used by the dataset and UI.
+    # Thang P1..P5, P5 = nghiêm trọng nhất. Spike chỉ quan tâm các phản hồi
+    # mức cao (P4/P5) — bao gồm Safety override (luôn ép P5).
     response = db.table("feedback") \
         .select("id, text, area, severity, topic") \
         .gte("created_at", since) \
-        .in_("severity", ["P0", "P1"]) \
+        .in_("severity", ["P4", "P5"]) \
         .order("created_at", desc=True) \
         .limit(max_feedback) \
         .execute()
@@ -42,16 +43,25 @@ def detect_spikes(hours: int = 1, max_feedback: int = 1000, max_spikes: int = 3,
     # Gom nhóm theo khu vực (area)
     area_counts = {}
     area_texts = {}
-    
+    area_max_sev = {}  # mức severity cao nhất quan sát được trong khu vực (P5 > P4)
+
+    def _sev_num(value: str) -> int:
+        try:
+            return int(str(value).upper().lstrip("P"))
+        except (ValueError, AttributeError):
+            return 0
+
     for row in data:
         area = row.get("area", "Unknown")
         text = row.get("text", "")
-        
+
         if area not in area_counts:
             area_counts[area] = 0
             area_texts[area] = []
-            
+            area_max_sev[area] = 0
+
         area_counts[area] += 1
+        area_max_sev[area] = max(area_max_sev[area], _sev_num(row.get("severity")))
         if len(area_texts[area]) < texts_per_area:
             area_texts[area].append(text)
         
@@ -79,7 +89,7 @@ def detect_spikes(hours: int = 1, max_feedback: int = 1000, max_spikes: int = 3,
                 "user_id": mock_user_id,
                 "title": alert_data.get("title", f"Spike tại {area}"),
                 "description": alert_data.get("description", "Không có mô tả chi tiết") + f"\n\n**Action Plan:** {alert_data.get('action', '')}\n**Assigned Team:** {alert_data.get('assigned_team', '')}",
-                "severity": "P1",
+                "severity": f"P{area_max_sev[area]}" if area_max_sev.get(area) else "P5",
                 "area": area,
                 "status": "open"
             }

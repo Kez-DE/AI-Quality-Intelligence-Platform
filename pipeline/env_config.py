@@ -4,9 +4,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
+# pipeline/ sits directly under the repository root in this layout.
 PIPELINE_DIR = Path(__file__).resolve().parent
-BACKEND_DIR = PIPELINE_DIR.parent
-PROJECT_ROOT = BACKEND_DIR.parent
+PROJECT_ROOT = PIPELINE_DIR.parent
 
 
 def load_project_env() -> None:

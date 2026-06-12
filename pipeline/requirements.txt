@@ -2,7 +2,9 @@ fastapi
 uvicorn
 supabase
 pandas
-scikit-learn
+# Pinned to the version the .joblib models were trained on (avoids
+# sklearn InconsistentVersionWarning / silent prediction drift).
+scikit-learn==1.6.1
 google-generativeai
 apscheduler
 python-dotenv
