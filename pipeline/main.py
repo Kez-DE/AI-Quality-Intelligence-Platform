@@ -546,7 +546,8 @@ def submit_feedback(payload: dict, user: AuthUser = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="Thiếu nội dung phản hồi (text)")
 
     channel = (payload.get("channel") or "app").strip() or "app"
-    area = (payload.get("area") or "").strip() or None
+    from regions import region_code
+    area = region_code((payload.get("area") or "").strip())
 
     from clean import clean_text
     from classifier import predict_feedback
@@ -567,6 +568,8 @@ def submit_feedback(payload: dict, user: AuthUser = Depends(get_current_user)):
         "severity": severity_value,
         "confidence": prediction["confidence"],
         "area": area,
+        "needs_review": prediction.get("needs_review", False),
+        "review_reason": prediction.get("review_reason"),
     }
     try:
         db = get_supabase()
@@ -617,12 +620,84 @@ def correct_feedback_label(
 
     update = {k: changes[k] for k in changes}
     update["confidence"] = 1.0  # nhãn do người xác nhận
+    update["reviewed"] = True   # đã có người sửa = đã duyệt
+    update["needs_review"] = False
     try:
         db.table("correction_logs").insert(log_entries).execute()
         updated = db.table("feedback").update(update).eq("id", feedback_id).execute().data or []
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot correct label: {str(exc)[:300]}") from exc
     return {"status": "success", "data": updated[0] if updated else current, "corrections": len(log_entries)}
+
+
+@app.patch("/api/feedback/{feedback_id}/review")
+def review_feedback(
+    feedback_id: str,
+    payload: dict | None = None,
+    user: AuthUser = Depends(require_ops_staff),
+):
+    """Duyệt / đánh dấu đã xử lý: chuyển feedback khỏi Review Queue.
+
+    action='approve'  -> reviewed=true, needs_review=false (xác nhận nhãn AI đúng).
+    action='handled'  -> như approve (đã xử lý xong). Giữ đơn giản cho demo.
+    """
+    db = get_supabase()
+    rows = db.table("feedback").select("id").eq("id", feedback_id).limit(1).execute().data or []
+    if not rows:
+        raise HTTPException(status_code=404, detail="Feedback not found")
+    try:
+        updated = db.table("feedback").update(
+            {"reviewed": True, "needs_review": False}
+        ).eq("id", feedback_id).execute().data or []
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Cannot review feedback: {str(exc)[:300]}") from exc
+    return {"status": "success", "data": updated[0] if updated else None}
+
+
+@app.post("/api/feedback/reclassify")
+def reclassify_feedback(
+    limit: int = Query(default=5000, ge=1, le=10000),
+    _: AuthUser = Depends(require_admin),
+):
+    """Phân loại lại feedback cũ bằng rule engine mới (admin only).
+
+    Đọc text từng feedback -> predict_feedback -> cập nhật topic/sentiment/
+    severity/confidence/needs_review/review_reason. Bỏ qua bản đã có người duyệt
+    (reviewed=true) để không ghi đè nhãn người đã sửa.
+    """
+    from classifier import predict_feedback
+    from regions import region_code
+
+    db = get_supabase()
+    rows = db.table("feedback").select("id,text,area,reviewed").limit(limit).execute().data or []
+    updated_count = 0
+    needs_review_count = 0
+    for r in rows:
+        if r.get("reviewed"):
+            continue
+        pred = predict_feedback(r.get("text") or "")
+        sev = pred["severity"]
+        sev_val = sev if isinstance(sev, str) and sev.upper().startswith("P") else f"P{int(sev)}"
+        upd = {
+            "topic": pred["topic"],
+            "sentiment": pred["sentiment"],
+            "severity": sev_val,
+            "confidence": pred["confidence"],
+            "needs_review": pred.get("needs_review", False),
+            "review_reason": pred.get("review_reason"),
+            "area": region_code(r.get("area")),
+        }
+        try:
+            db.table("feedback").update(upd).eq("id", r["id"]).execute()
+            updated_count += 1
+            if upd["needs_review"]:
+                needs_review_count += 1
+        except Exception:
+            continue
+    return {
+        "status": "success",
+        "data": {"updated": updated_count, "needs_review": needs_review_count, "scanned": len(rows)},
+    }
 
 # ============================================================
 # Multi-agent layer: insight theo phòng ban + root-cause analysis

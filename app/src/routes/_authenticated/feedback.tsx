@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, MessageSquarePlus, MapPin, Tag, AlertCircle, Pencil } from "lucide-react";
+import { Loader2, MessageSquarePlus, MapPin, Tag, AlertCircle, Pencil, ShieldAlert, CheckCircle2, Inbox } from "lucide-react";
 import { toast } from "sonner";
+import { AREAS, regionLabel } from "@/lib/regions";
 
 export const Route = createFileRoute("/_authenticated/feedback")({
   component: FeedbackPage,
@@ -18,36 +19,13 @@ type Feedback = {
   severity: string | null;
   area: string | null;
   confidence: number | null;
+  needs_review: boolean | null;
+  reviewed: boolean | null;
+  review_reason: string | null;
   created_at: string;
 };
 
-// Ngưỡng confidence: dưới mức này coi như AI "không chắc" -> gắn cờ cần người duyệt.
-const REVIEW_THRESHOLD = 0.5;
-
 const CHANNELS = ["app", "rating", "hotline", "cs", "survey"];
-
-// 16 khu vực chuẩn (HN/HCM/ĐN) — khớp data/reference/area_catalog.json.
-// value = area code (lưu DB, khớp spike detector), label = tên hiển thị.
-const AREAS: { code: string; label: string }[] = [
-  { code: "HN-Cau-Giay", label: "Cầu Giấy, Hà Nội" },
-  { code: "HN-Ha-Dong", label: "Hà Đông, Hà Nội" },
-  { code: "HN-Dong-Da", label: "Đống Đa, Hà Nội" },
-  { code: "HN-Hoan-Kiem", label: "Hoàn Kiếm, Hà Nội" },
-  { code: "HN-Tay-Ho", label: "Tây Hồ, Hà Nội" },
-  { code: "HN-Long-Bien", label: "Long Biên, Hà Nội" },
-  { code: "HCM-Quan-1", label: "Quận 1, Hồ Chí Minh" },
-  { code: "HCM-Binh-Thanh", label: "Bình Thạnh, Hồ Chí Minh" },
-  { code: "HCM-Thu-Duc", label: "Thủ Đức, Hồ Chí Minh" },
-  { code: "HCM-Quan-7", label: "Quận 7, Hồ Chí Minh" },
-  { code: "HCM-Tan-Binh", label: "Tân Bình, Hồ Chí Minh" },
-  { code: "HCM-Go-Vap", label: "Gò Vấp, Hồ Chí Minh" },
-  { code: "DN-Hai-Chau", label: "Hải Châu, Đà Nẵng" },
-  { code: "DN-Son-Tra", label: "Sơn Trà, Đà Nẵng" },
-  { code: "DN-Ngu-Hanh-Son", label: "Ngũ Hành Sơn, Đà Nẵng" },
-  { code: "DN-Thanh-Khe", label: "Thanh Khê, Đà Nẵng" },
-];
-
-// Nhịp làm mới danh sách phản hồi (ms). 5s đủ "live" mà không nhảy liên tục/giật.
 const REFRESH_INTERVAL_MS = 5000;
 
 // Options cho ô sửa nhãn (Human-in-the-loop). Khớp nhãn classifier sinh ra.
@@ -55,6 +33,12 @@ const TOPIC_OPTIONS = ["Safety", "Driver Behavior", "App Issue", "Payment", "Pri
 const SENTIMENT_OPTIONS = ["negative", "neutral", "positive"];
 const SEVERITY_OPTIONS = ["P1", "P2", "P3", "P4", "P5"];
 const API_BASE = import.meta.env.VITE_BACKEND_API_URL ?? "http://127.0.0.1:8000";
+
+function severityNum(sev: string | null): number {
+  if (!sev) return 0;
+  const n = parseInt(sev.replace(/^P/i, ""), 10);
+  return Number.isFinite(n) ? n : 0;
+}
 
 function FeedbackPage() {
   const [list, setList] = useState<Feedback[]>([]);
@@ -78,6 +62,7 @@ function FeedbackPage() {
     severity: "",
   });
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [actingId, setActingId] = useState<string | null>(null);
 
   function openEditor(f: Feedback) {
     setEditingId(f.id);
@@ -88,10 +73,14 @@ function FeedbackPage() {
     });
   }
 
+  async function authToken(): Promise<string | null> {
+    const { data: s } = await supabase.auth.getSession();
+    return s.session?.access_token ?? null;
+  }
+
   async function saveCorrection(id: string) {
     setSavingId(id);
-    const { data: s } = await supabase.auth.getSession();
-    const token = s.session?.access_token;
+    const token = await authToken();
     if (!token) {
       toast.error("Chưa đăng nhập");
       setSavingId(null);
@@ -117,10 +106,37 @@ function FeedbackPage() {
     }
   }
 
+  async function reviewAction(id: string) {
+    setActingId(id);
+    const token = await authToken();
+    if (!token) {
+      toast.error("Chưa đăng nhập");
+      setActingId(null);
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/api/feedback/${id}/review`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: "approve" }),
+      });
+      if (!res.ok) {
+        const detail = await res.text();
+        throw new Error(`${res.status}: ${detail.slice(0, 200)}`);
+      }
+      toast.success("Đã duyệt — chuyển khỏi hàng đợi");
+      load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không duyệt được");
+    } finally {
+      setActingId(null);
+    }
+  }
+
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/feedback/recent?limit=100`);
+      const res = await fetch(`${API_BASE}/api/feedback/recent?limit=200`);
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       const json = (await res.json()) as { data?: Feedback[] };
       const rows = json.data ?? [];
@@ -149,8 +165,7 @@ function FeedbackPage() {
     e.preventDefault();
     if (!form.text.trim()) return;
     setSubmitting(true);
-    const { data: s } = await supabase.auth.getSession();
-    const token = s.session?.access_token;
+    const token = await authToken();
     if (!token) {
       toast.error("Chưa đăng nhập");
       setSubmitting(false);
@@ -183,15 +198,27 @@ function FeedbackPage() {
     }
   }
 
+  // Tách 2 luồng: cần duyệt (needs_review && chưa reviewed) vs đã thu thập.
+  const reviewQueue = list.filter((f) => f.needs_review && !f.reviewed);
+  const stream = list.filter((f) => !(f.needs_review && !f.reviewed));
+
+  const stats = {
+    total: list.length,
+    review: reviewQueue.length,
+    critical: list.filter((f) => severityNum(f.severity) >= 4).length,
+    lowConf: list.filter((f) => f.confidence != null && f.confidence < 0.55).length,
+  };
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-3xl font-bold">Thu thập phản hồi</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Nhập tay hoặc dán phản hồi từ nhiều kênh — hệ thống lưu lại để phân tích.
+          AI tự phân loại & gán nhãn. Ca nguy hiểm hoặc không chắc được tách sang hàng đợi duyệt.
         </p>
       </div>
 
+      {/* 1. Form phản hồi mới */}
       <section className="rounded-2xl border border-border bg-white p-5 shadow-[var(--shadow-card)]">
         <div className="flex items-center gap-2 mb-4">
           <MessageSquarePlus className="h-4 w-4 text-xanh-green" />
@@ -238,93 +265,210 @@ function FeedbackPage() {
         </form>
       </section>
 
-      <section className="rounded-2xl border border-border bg-white shadow-[var(--shadow-card)]">
-        <div className="p-5 border-b border-border flex items-center justify-between">
-          <h2 className="font-display font-semibold">
-            Đã thu thập <span className="text-muted-foreground font-mono text-xs">({list.length})</span>
+      {/* 2. Stat cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard label="Tổng phản hồi" value={stats.total} icon={Inbox} tone="deep" />
+        <StatCard label="Cần duyệt" value={stats.review} icon={ShieldAlert} tone="coral" />
+        <StatCard label="P4 / P5" value={stats.critical} icon={AlertCircle} tone="amber" />
+        <StatCard label="Confidence thấp" value={stats.lowConf} icon={AlertCircle} tone="mint" />
+      </div>
+
+      {/* 3. Review Queue */}
+      <section className="rounded-2xl border border-amber-300 bg-amber-50/40 shadow-[var(--shadow-card)]">
+        <div className="p-5 border-b border-amber-200 flex items-center gap-2">
+          <ShieldAlert className="h-5 w-5 text-amber-600" />
+          <h2 className="font-display font-semibold text-amber-900">
+            Cần duyệt / Review Queue <span className="font-mono text-xs">({reviewQueue.length})</span>
           </h2>
-          <button onClick={load} className="text-xs font-mono text-xanh-deep hover:underline">
-            ↻ refresh
-          </button>
         </div>
-        {loading ? (
-          <div className="p-10 text-center text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin inline" />
-          </div>
-        ) : list.length === 0 ? (
-          <div className="p-10 text-center text-sm text-muted-foreground">
-            <AlertCircle className="h-5 w-5 inline mr-2" />
-            Chưa có phản hồi nào. Hãy thêm phản hồi đầu tiên ở trên.
+        {reviewQueue.length === 0 ? (
+          <div className="p-8 text-center text-sm text-muted-foreground">
+            <CheckCircle2 className="h-5 w-5 inline mr-2 text-xanh-green" />
+            Không có phản hồi nào cần duyệt.
           </div>
         ) : (
-          <div className="divide-y divide-border">
-            {list.map((f) => (
-              <div
+          <div className="divide-y divide-amber-200/60">
+            {reviewQueue.map((f) => (
+              <FeedbackRow
                 key={f.id}
-                className={`p-4 grid grid-cols-12 gap-3 items-center hover:bg-xanh-mint/20 ${
-                  newFeedbackIds.has(f.id) ? "live-feedback-row-new" : ""
-                } ${
-                  f.confidence != null && f.confidence < REVIEW_THRESHOLD
-                    ? "bg-amber-50/60 border-l-2 border-l-amber-400"
-                    : ""
-                }`}
-              >
-                <span className="col-span-2 sm:col-span-1 text-[10px] font-mono uppercase text-muted-foreground">
-                  {f.channel}
-                </span>
-                <p className="col-span-10 sm:col-span-7 text-sm">{f.text}</p>
-                <div className="col-span-12 sm:col-span-4 flex flex-wrap justify-start sm:justify-end gap-1.5 items-center">
-                  {f.topic && <Pill icon={Tag}>{f.topic}</Pill>}
-                  {f.sentiment && (
-                    <Pill tone={f.sentiment === "negative" ? "coral" : f.sentiment === "positive" ? "green" : "mint"}>
-                      {f.sentiment}
-                    </Pill>
-                  )}
-                  {f.severity && <Pill tone="deep">{f.severity}</Pill>}
-                  {f.confidence != null &&
-                    (f.confidence < REVIEW_THRESHOLD ? (
-                      <Pill icon={AlertCircle} tone="coral">
-                        cần duyệt · {Math.round(f.confidence * 100)}%
-                      </Pill>
-                    ) : (
-                      <span className="text-[10px] font-mono text-muted-foreground">
-                        {Math.round(f.confidence * 100)}%
-                      </span>
-                    ))}
-                  {f.area && (
-                    <span className="text-[10px] font-mono text-muted-foreground inline-flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      {f.area}
-                    </span>
-                  )}
-                  <button
-                    onClick={() => (editingId === f.id ? setEditingId(null) : openEditor(f))}
-                    className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-border hover:border-xanh-green/50 hover:bg-xanh-mint/30 inline-flex items-center gap-1"
-                  >
-                    <Pencil className="h-3 w-3" />
-                    {editingId === f.id ? "đóng" : "sửa nhãn"}
-                  </button>
-                </div>
-                {editingId === f.id && (
-                  <div className="col-span-12 mt-2 p-3 rounded-xl bg-muted/40 border border-border grid sm:grid-cols-4 gap-2 items-end">
-                    <Select label="Chủ đề" value={editDraft.topic} onChange={(v) => setEditDraft({ ...editDraft, topic: v })} options={TOPIC_OPTIONS} />
-                    <Select label="Cảm xúc" value={editDraft.sentiment} onChange={(v) => setEditDraft({ ...editDraft, sentiment: v })} options={SENTIMENT_OPTIONS} />
-                    <Select label="Severity" value={editDraft.severity} onChange={(v) => setEditDraft({ ...editDraft, severity: v })} options={SEVERITY_OPTIONS} />
-                    <button
-                      onClick={() => saveCorrection(f.id)}
-                      disabled={savingId === f.id}
-                      className="h-9 px-4 rounded-lg text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-[var(--shadow-green)] disabled:opacity-60"
-                      style={{ background: "var(--gradient-green)" }}
-                    >
-                      {savingId === f.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Lưu nhãn"}
-                    </button>
-                  </div>
-                )}
-              </div>
+                f={f}
+                isNew={newFeedbackIds.has(f.id)}
+                editing={editingId === f.id}
+                editDraft={editDraft}
+                setEditDraft={setEditDraft}
+                onToggleEdit={() => (editingId === f.id ? setEditingId(null) : openEditor(f))}
+                onSave={() => saveCorrection(f.id)}
+                saving={savingId === f.id}
+                onApprove={() => reviewAction(f.id)}
+                acting={actingId === f.id}
+                showActions
+              />
             ))}
           </div>
         )}
       </section>
+
+      {/* 4. Feedback Stream */}
+      <section className="rounded-2xl border border-border bg-white shadow-[var(--shadow-card)]">
+        <div className="p-5 border-b border-border flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Inbox className="h-4 w-4 text-xanh-deep" />
+            <h2 className="font-display font-semibold">
+              Luồng phản hồi <span className="text-muted-foreground font-mono text-xs">({stream.length})</span>
+            </h2>
+          </div>
+          <button onClick={load} className="text-xs font-mono text-xanh-deep hover:underline">
+            ↻ refresh
+          </button>
+        </div>
+        {loading && list.length === 0 ? (
+          <div className="p-10 text-center text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin inline" />
+          </div>
+        ) : stream.length === 0 ? (
+          <div className="p-10 text-center text-sm text-muted-foreground">
+            <AlertCircle className="h-5 w-5 inline mr-2" />
+            Chưa có phản hồi nào.
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {stream.map((f) => (
+              <FeedbackRow
+                key={f.id}
+                f={f}
+                isNew={newFeedbackIds.has(f.id)}
+                editing={editingId === f.id}
+                editDraft={editDraft}
+                setEditDraft={setEditDraft}
+                onToggleEdit={() => (editingId === f.id ? setEditingId(null) : openEditor(f))}
+                onSave={() => saveCorrection(f.id)}
+                saving={savingId === f.id}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function FeedbackRow({
+  f,
+  isNew,
+  editing,
+  editDraft,
+  setEditDraft,
+  onToggleEdit,
+  onSave,
+  saving,
+  onApprove,
+  acting,
+  showActions,
+}: {
+  f: Feedback;
+  isNew: boolean;
+  editing: boolean;
+  editDraft: { topic: string; sentiment: string; severity: string };
+  setEditDraft: (d: { topic: string; sentiment: string; severity: string }) => void;
+  onToggleEdit: () => void;
+  onSave: () => void;
+  saving: boolean;
+  onApprove?: () => void;
+  acting?: boolean;
+  showActions?: boolean;
+}) {
+  return (
+    <div className={`p-4 grid grid-cols-12 gap-3 items-center ${isNew ? "live-feedback-row-new" : ""}`}>
+      <span className="col-span-2 sm:col-span-1 text-[10px] font-mono uppercase text-muted-foreground">
+        {f.channel}
+      </span>
+      <div className="col-span-10 sm:col-span-6">
+        <p className="text-sm">{f.text}</p>
+        {f.review_reason && showActions && (
+          <p className="text-[11px] text-amber-700 mt-1 flex items-center gap-1">
+            <ShieldAlert className="h-3 w-3" />
+            {f.review_reason}
+          </p>
+        )}
+      </div>
+      <div className="col-span-12 sm:col-span-5 flex flex-wrap justify-start sm:justify-end gap-1.5 items-center">
+        {f.topic && <Pill icon={Tag}>{f.topic}</Pill>}
+        {f.sentiment && (
+          <Pill tone={f.sentiment === "negative" ? "coral" : f.sentiment === "positive" ? "green" : "mint"}>
+            {f.sentiment}
+          </Pill>
+        )}
+        {f.severity && <Pill tone="deep">{f.severity}</Pill>}
+        {f.confidence != null && (
+          <span className="text-[10px] font-mono text-muted-foreground">{Math.round(f.confidence * 100)}%</span>
+        )}
+        {f.area && (
+          <span className="text-[10px] font-mono text-muted-foreground inline-flex items-center gap-1">
+            <MapPin className="h-3 w-3" />
+            {regionLabel(f.area)}
+          </span>
+        )}
+        {showActions && onApprove && (
+          <button
+            onClick={onApprove}
+            disabled={acting}
+            className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-xanh-green/50 text-xanh-deep hover:bg-xanh-green/10 inline-flex items-center gap-1 disabled:opacity-50"
+          >
+            {acting ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+            duyệt
+          </button>
+        )}
+        <button
+          onClick={onToggleEdit}
+          className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-border hover:border-xanh-green/50 hover:bg-xanh-mint/30 inline-flex items-center gap-1"
+        >
+          <Pencil className="h-3 w-3" />
+          {editing ? "đóng" : "sửa nhãn"}
+        </button>
+      </div>
+      {editing && (
+        <div className="col-span-12 mt-2 p-3 rounded-xl bg-muted/40 border border-border grid sm:grid-cols-4 gap-2 items-end">
+          <Select label="Chủ đề" value={editDraft.topic} onChange={(v) => setEditDraft({ ...editDraft, topic: v })} options={TOPIC_OPTIONS} />
+          <Select label="Cảm xúc" value={editDraft.sentiment} onChange={(v) => setEditDraft({ ...editDraft, sentiment: v })} options={SENTIMENT_OPTIONS} />
+          <Select label="Severity" value={editDraft.severity} onChange={(v) => setEditDraft({ ...editDraft, severity: v })} options={SEVERITY_OPTIONS} />
+          <button
+            onClick={onSave}
+            disabled={saving}
+            className="h-9 px-4 rounded-lg text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-[var(--shadow-green)] disabled:opacity-60"
+            style={{ background: "var(--gradient-green)" }}
+          >
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Lưu nhãn"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  tone,
+}: {
+  label: string;
+  value: number;
+  icon: React.ComponentType<{ className?: string }>;
+  tone: "deep" | "coral" | "amber" | "mint";
+}) {
+  const toneMap: Record<string, string> = {
+    deep: "text-xanh-deep",
+    coral: "text-xanh-coral",
+    amber: "text-amber-600",
+    mint: "text-xanh-green",
+  };
+  return (
+    <div className="rounded-xl border border-border bg-white p-4 shadow-[var(--shadow-card)]">
+      <div className="flex items-center justify-between">
+        <div className="text-[11px] text-muted-foreground">{label}</div>
+        <Icon className={`h-4 w-4 ${toneMap[tone]}`} />
+      </div>
+      <div className={`font-display text-2xl font-bold mt-1 ${toneMap[tone]}`}>{value}</div>
     </div>
   );
 }

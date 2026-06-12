@@ -23,7 +23,10 @@ def load_models():
 
 # Mức độ nghiêm trọng suy ra từ sentiment khi model không tự sinh severity.
 # Thang P1..P5, P5 = nghiêm trọng nhất (theo blueprint).
-SENTIMENT_SEVERITY = {"negative": 4, "neutral": 3, "positive": 1}
+# Negative MẶC ĐỊNH P3 (cần chú ý) — chỉ leo P4/P5 khi rule cụ thể bắt được
+# tín hiệu nghiêm trọng (gian lận, app nặng, safety). Tránh dồn mọi review
+# tiêu cực vào Review Queue làm nó vô nghĩa.
+SENTIMENT_SEVERITY = {"negative": 3, "neutral": 2, "positive": 1}
 
 # Từ khoá an toàn — bất kỳ phản hồi nào chứa các từ này bị ép Safety/severity 5
 # và hạ confidence để buộc Human-in-the-Loop review lại.
@@ -67,39 +70,33 @@ def _model_confidence(model, text: str, default: float = 0.85) -> float:
 def predict_feedback(text: str):
     """
     Hàm dự đoán chính.
-    Chạy Model (TF-IDF + LinearSVC) -> Rule-based Safety override -> kết quả cuối.
-    Nếu model chưa load được thì fallback an toàn (không làm vỡ pipeline ingest).
+    Model (TF-IDF + LinearSVC) cho nền -> rule keyword ghi đè khi tín hiệu rõ.
+    Rule layer (rules.apply_rules) lo: Safety/App/Payment/Supply/Driver/Map...,
+    negation guard, confidence band thật, và cờ needs_review.
+
+    Trả về: topic, sentiment, severity (str 'P1'..'P5'), confidence,
+    needs_review (bool), review_reason (str|None).
     """
     if _topic_model is not None and _sentiment_model is not None:
         topic = str(_topic_model.predict([text])[0])
         sentiment = str(_sentiment_model.predict([text])[0])
         severity = SENTIMENT_SEVERITY.get(sentiment, 3)
-        # Confidence lấy theo model topic (quyết định routing) — đủ cho demo HITL.
         confidence = _model_confidence(_topic_model, text)
     else:
-        # Fallback khi thiếu artifact: nhãn trung tính, đánh dấu cần review.
         print("Warning: classifier chạy fallback vì chưa load được model .joblib")
         topic = "Other"
         sentiment = "neutral"
         severity = 3
         confidence = 0.3
 
-    # Rule-based ghi đè (Safety Override) — luôn thắng model.
-    is_modified, rule_topic, rule_severity, rule_confidence = apply_safety_rules(
-        text, topic, severity, confidence
-    )
-    if is_modified:
-        topic = rule_topic
-        severity = rule_severity
-        confidence = rule_confidence
-        sentiment = "negative"
+    # Rule layer ghi đè model khi keyword rõ + tính needs_review.
+    from rules import apply_rules
 
-    return {
-        "topic": topic,
-        "sentiment": sentiment,
-        "severity": severity,
-        "confidence": confidence,
-    }
+    result = apply_rules(text, topic, sentiment, severity, confidence)
+
+    # severity trả ra dạng 'P{n}' cho khớp DB/UI.
+    result["severity"] = f"P{int(result['severity'])}"
+    return result
 
 # Khởi tạo model ngay khi module được import
 load_models()
