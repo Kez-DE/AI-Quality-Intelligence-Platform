@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+supabase
+pandas
+scikit-learn
+google-generativeai
+apscheduler
+python-dotenv
+openai
+groq==0.8.0
