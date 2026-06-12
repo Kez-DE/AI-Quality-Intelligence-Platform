@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, MessageSquarePlus, MapPin, Tag, AlertCircle, Pencil, ShieldAlert, CheckCircle2, Inbox } from "lucide-react";
 import { toast } from "sonner";
 import { AREAS, regionLabel } from "@/lib/regions";
+import { sentimentLabel, topicLabel, channelLabel, severityLabel } from "@/lib/labels";
 
 export const Route = createFileRoute("/_authenticated/feedback")({
   component: FeedbackPage,
@@ -246,7 +247,7 @@ function FeedbackPage() {
             className="w-full p-3 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-xanh-green/40 resize-none"
           />
           <div className="grid sm:grid-cols-2 gap-2">
-            <Select label="Kênh" value={form.channel} onChange={(v) => setForm({ ...form, channel: v })} options={CHANNELS} />
+            <Select label="Kênh" value={form.channel} onChange={(v) => setForm({ ...form, channel: v })} options={CHANNELS} labelFn={channelLabel} />
             <label className="text-xs">
               <div className="text-muted-foreground mb-1">Khu vực</div>
               <select
@@ -392,7 +393,7 @@ function FeedbackRow({
   return (
     <div className={`p-4 grid grid-cols-12 gap-3 items-center ${isNew ? "live-feedback-row-new" : ""}`}>
       <span className="col-span-2 sm:col-span-1 text-[10px] font-mono uppercase text-muted-foreground">
-        {f.channel}
+        {channelLabel(f.channel)}
       </span>
       <div className="col-span-10 sm:col-span-6">
         <p className="text-sm">{f.text}</p>
@@ -404,13 +405,13 @@ function FeedbackRow({
         )}
       </div>
       <div className="col-span-12 sm:col-span-5 flex flex-wrap justify-start sm:justify-end gap-1.5 items-center">
-        {f.topic && <Pill icon={Tag}>{f.topic}</Pill>}
+        {f.topic && <Pill icon={Tag}>{topicLabel(f.topic)}</Pill>}
         {f.sentiment && (
           <Pill tone={f.sentiment === "negative" ? "coral" : f.sentiment === "positive" ? "green" : "mint"}>
-            {f.sentiment}
+            {sentimentLabel(f.sentiment)}
           </Pill>
         )}
-        {f.severity && <Pill tone="deep">{f.severity}</Pill>}
+        {f.severity && <Pill tone="deep">{severityLabel(f.severity)}</Pill>}
         {f.confidence != null && (
           <span className="text-[10px] font-mono text-muted-foreground">{Math.round(f.confidence * 100)}%</span>
         )}
@@ -440,9 +441,9 @@ function FeedbackRow({
       </div>
       {editing && (
         <div className="col-span-12 mt-2 p-3 rounded-xl bg-muted/40 border border-border grid sm:grid-cols-4 gap-2 items-end">
-          <Select label="Chủ đề" value={editDraft.topic} onChange={(v) => setEditDraft({ ...editDraft, topic: v })} options={TOPIC_OPTIONS} />
-          <Select label="Cảm xúc" value={editDraft.sentiment} onChange={(v) => setEditDraft({ ...editDraft, sentiment: v })} options={SENTIMENT_OPTIONS} />
-          <Select label="Severity" value={editDraft.severity} onChange={(v) => setEditDraft({ ...editDraft, severity: v })} options={SEVERITY_OPTIONS} />
+          <Select label="Chủ đề" value={editDraft.topic} onChange={(v) => setEditDraft({ ...editDraft, topic: v })} options={TOPIC_OPTIONS} labelFn={topicLabel} />
+          <Select label="Cảm xúc" value={editDraft.sentiment} onChange={(v) => setEditDraft({ ...editDraft, sentiment: v })} options={SENTIMENT_OPTIONS} labelFn={sentimentLabel} />
+          <Select label="Mức độ" value={editDraft.severity} onChange={(v) => setEditDraft({ ...editDraft, severity: v })} options={SEVERITY_OPTIONS} labelFn={severityLabel} />
           <button
             onClick={onSave}
             disabled={saving}
@@ -490,11 +491,13 @@ function Select({
   value,
   onChange,
   options,
+  labelFn,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: string[];
+  labelFn?: (v: string) => string;
 }) {
   return (
     <label className="text-xs">
@@ -506,7 +509,7 @@ function Select({
       >
         {options.map((o) => (
           <option key={o} value={o}>
-            {o}
+            {labelFn ? labelFn(o) : o}
           </option>
         ))}
       </select>
