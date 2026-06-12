@@ -1,0 +1,44 @@
+{
+  "input_rows": 5000,
+  "enriched_rows": 5000,
+  "demo_rows": 150,
+  "seed": 223,
+  "cities": {
+    "Hà Nội": 2475,
+    "Đà Nẵng": 654,
+    "Hồ Chí Minh": 1871
+  },
+  "areas": {
+    "HN-Cau-Giay": 744,
+    "HN-Dong-Da": 394,
+    "HN-Long-Bien": 225,
+    "DN-Thanh-Khe": 136,
+    "HCM-Thu-Duc": 370,
+    "HCM-Binh-Thanh": 356,
+    "HCM-Go-Vap": 222,
+    "HN-Tay-Ho": 282,
+    "HCM-Quan-1": 418,
+    "HN-Ha-Dong": 523,
+    "DN-Son-Tra": 156,
+    "HCM-Quan-7": 270,
+    "HCM-Tan-Binh": 235,
+    "DN-Hai-Chau": 238,
+    "HN-Hoan-Kiem": 307,
+    "DN-Ngu-Hanh-Son": 124
+  },
+  "issue_hints": {
+    "Driver Behavior": 1250,
+    "Safety": 61,
+    "Payment": 448,
+    "App Issue": 1068,
+    "Other": 1741,
+    "Delay": 280,
+    "Pricing": 152
+  },
+  "demo_spike_rows": 80,
+  "demo_spike_area": "HN-Cau-Giay",
+  "missing_area": 0,
+  "missing_driver_id": 0,
+  "missing_trip_id": 0,
+  "provenance_note": "Review text/rating/source are public app-store data. city/area/driver_id/trip_id/event_time are synthetic demo metadata."
+}

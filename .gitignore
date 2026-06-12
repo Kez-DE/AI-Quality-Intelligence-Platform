@@ -12,6 +12,16 @@ build/
 .pytest_cache/
 .mypy_cache/
 
+# Node / frontend
+node_modules/
+app/node_modules/
+app/dist/
+dist/
+*.tsbuildinfo
+
+# Pipeline runtime logs
+pipeline/logs/*.log
+
 # OS
 .DS_Store
 

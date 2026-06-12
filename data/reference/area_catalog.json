@@ -1,0 +1,114 @@
+[
+  {
+    "city": "Ha Noi",
+    "city_label": "Hà Nội",
+    "area": "HN-Cau-Giay",
+    "area_label": "Cầu Giấy, Hà Nội",
+    "weight": 14
+  },
+  {
+    "city": "Ha Noi",
+    "city_label": "Hà Nội",
+    "area": "HN-Ha-Dong",
+    "area_label": "Hà Đông, Hà Nội",
+    "weight": 11
+  },
+  {
+    "city": "Ha Noi",
+    "city_label": "Hà Nội",
+    "area": "HN-Dong-Da",
+    "area_label": "Đống Đa, Hà Nội",
+    "weight": 9
+  },
+  {
+    "city": "Ha Noi",
+    "city_label": "Hà Nội",
+    "area": "HN-Hoan-Kiem",
+    "area_label": "Hoàn Kiếm, Hà Nội",
+    "weight": 7
+  },
+  {
+    "city": "Ha Noi",
+    "city_label": "Hà Nội",
+    "area": "HN-Tay-Ho",
+    "area_label": "Tây Hồ, Hà Nội",
+    "weight": 6
+  },
+  {
+    "city": "Ha Noi",
+    "city_label": "Hà Nội",
+    "area": "HN-Long-Bien",
+    "area_label": "Long Biên, Hà Nội",
+    "weight": 5
+  },
+  {
+    "city": "Ho Chi Minh",
+    "city_label": "Hồ Chí Minh",
+    "area": "HCM-Quan-1",
+    "area_label": "Quận 1, Hồ Chí Minh",
+    "weight": 10
+  },
+  {
+    "city": "Ho Chi Minh",
+    "city_label": "Hồ Chí Minh",
+    "area": "HCM-Binh-Thanh",
+    "area_label": "Bình Thạnh, Hồ Chí Minh",
+    "weight": 8
+  },
+  {
+    "city": "Ho Chi Minh",
+    "city_label": "Hồ Chí Minh",
+    "area": "HCM-Thu-Duc",
+    "area_label": "Thủ Đức, Hồ Chí Minh",
+    "weight": 8
+  },
+  {
+    "city": "Ho Chi Minh",
+    "city_label": "Hồ Chí Minh",
+    "area": "HCM-Quan-7",
+    "area_label": "Quận 7, Hồ Chí Minh",
+    "weight": 6
+  },
+  {
+    "city": "Ho Chi Minh",
+    "city_label": "Hồ Chí Minh",
+    "area": "HCM-Tan-Binh",
+    "area_label": "Tân Bình, Hồ Chí Minh",
+    "weight": 6
+  },
+  {
+    "city": "Ho Chi Minh",
+    "city_label": "Hồ Chí Minh",
+    "area": "HCM-Go-Vap",
+    "area_label": "Gò Vấp, Hồ Chí Minh",
+    "weight": 5
+  },
+  {
+    "city": "Da Nang",
+    "city_label": "Đà Nẵng",
+    "area": "DN-Hai-Chau",
+    "area_label": "Hải Châu, Đà Nẵng",
+    "weight": 5
+  },
+  {
+    "city": "Da Nang",
+    "city_label": "Đà Nẵng",
+    "area": "DN-Son-Tra",
+    "area_label": "Sơn Trà, Đà Nẵng",
+    "weight": 4
+  },
+  {
+    "city": "Da Nang",
+    "city_label": "Đà Nẵng",
+    "area": "DN-Ngu-Hanh-Son",
+    "area_label": "Ngũ Hành Sơn, Đà Nẵng",
+    "weight": 3
+  },
+  {
+    "city": "Da Nang",
+    "city_label": "Đà Nẵng",
+    "area": "DN-Thanh-Khe",
+    "area_label": "Thanh Khê, Đà Nẵng",
+    "weight": 3
+  }
+]

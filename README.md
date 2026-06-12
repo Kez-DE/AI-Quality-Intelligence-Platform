@@ -1,100 +1,93 @@
-# Starter Code Template — Cohort 2
+# C2-App-116 — AI Quality Intelligence Platform
 
-Empty starter template for AI20K Build Cohort 2 team repositories. Includes pre-configured AI usage logging hooks for Claude Code, Cursor, Codex, Gemini CLI, Antigravity, and GitHub Copilot.
+Hệ thống phân tích phản hồi khách hàng cho dịch vụ gọi xe (smart mobility). Nhận đánh giá → ML phân loại topic/sentiment/severity → safety rule → agent LLM gom sự cố và định tuyến ticket cho phòng ban → dashboard + human review.
 
-## Structure
+Dự án của **AI20K Build Cohort 2 — Team 116**. Xây trên dữ liệu đánh giá công khai (App Store / Google Play) kết hợp metadata vận hành tổng hợp — xem `data/README.md` để biết nguồn gốc từng trường.
+
+## Kiến trúc (tóm tắt)
 
 ```
-├── scripts/
-│   ├── _pyrun.sh             # Cross-platform Python launcher (bash)
-│   ├── _pyrun.cmd            # Cross-platform Python launcher (Windows)
-│   ├── setup_hooks.sh        # One-time pre-push hook installer (POSIX)
-│   ├── setup_hooks.ps1       # One-time pre-push hook installer (Windows)
-│   ├── log_hook.py           # AI tool hook handler (Claude / Cursor / Codex / Gemini / Copilot)
-│   ├── log_antigravity.py    # Auto-log hook for Antigravity
-│   ├── log_manual.py         # Manual log for ChatGPT / web tools
-│   └── submit_log.py         # Submits logs on git push
-├── .agents/                  # Antigravity rules + workflows
-├── .claude/  .codex/  .cursor/  .gemini/  .github/hooks/   # Per-tool hook configs
-├── .env.example
-├── JOURNAL.md                # Weekly journal — product journey & learnings
-└── WORKLOG.md                # Technical decisions, task assignments, brainstorming
+┌─────────────┐   ghi    ┌────────────┐   đọc   ┌──────────────┐
+│  pipeline/  │ ───────▶ │  Supabase  │ ◀────── │     app/     │
+│ Python ML + │          │ (Postgres) │         │ React + Vite │
+│  LLM agent  │          │            │         │  (dashboard) │
+└─────────────┘          └────────────┘         └──────────────┘
 ```
 
-## Getting Started
+Supabase là trục: pipeline Python ghi vào, frontend đọc ra. Không cần backend server trung gian. Chi tiết luồng demo vs production: `docs/architecture.md`.
 
-### 1. Clone and install pre-push hook
+## Cấu trúc repo
+
+```
+├── app/             # Frontend — TanStack Start + React 19 + Supabase
+├── pipeline/        # Backend xử lý — Python (ingest, ML, agent, spike)
+├── supabase/        # DB migrations (profiles, feedback, alerts, chat)
+├── data/            # Dataset: raw / processed / train / demo / reference
+├── docs/            # architecture, demo-script
+├── scripts/         # 🔒 Khung cohort — AI usage logging (không sửa)
+├── JOURNAL.md       # Nhật ký tuần (bắt buộc cập nhật trước mỗi PR)
+├── WORKLOG.md       # Quyết định kỹ thuật
+└── .env.example     # Mẫu cấu hình (không commit .env thật)
+```
+
+## Chạy nhanh
+
+**Backend pipeline** (chi tiết: `pipeline/README.md`):
+```bash
+cd pipeline && python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python main.py     # http://localhost:8000/docs
+```
+
+**Frontend** (chi tiết: `app/README.md`):
+```bash
+cd app && bun install && bun run dev
+```
+
+Cấu hình `.env` ở gốc repo (copy từ `.env.example`). Cần Supabase URL + service role key cho pipeline, và publishable key cho frontend.
+
+## Demo
+
+Kịch bản 5 phút trong `docs/demo-script.md`: bấm nút nạp ~150 đánh giá → dashboard sáng đỏ khu vực sự cố → agent sinh ticket gửi đúng phòng ban → nhân viên sửa một nhãn AI nhận nhầm (vòng Human-in-the-Loop).
+
+---
+
+## Khung Cohort — AI Logging (giữ nguyên)
+
+### Cài pre-push hook
 
 **Linux / macOS / Git Bash:**
 ```bash
-git clone <repo-url>
-cd <repo>
 bash scripts/setup_hooks.sh
 ```
 
 **Windows PowerShell:**
 ```powershell
-git clone <repo-url>
-cd <repo>
 powershell -ExecutionPolicy Bypass -File scripts\setup_hooks.ps1
 ```
 
-### 2. Configure environment
+### Cấu hình môi trường
 
 ```bash
-cp .env.example .env       # macOS / Linux / Git Bash
-# copy .env.example .env   # Windows cmd
+cp .env.example .env
 ```
 
-Fill in `AI_LOG_SERVER` and `AI_LOG_API_KEY` (provided by the course).
+Điền `AI_LOG_SERVER` và `AI_LOG_API_KEY` (do khóa học cung cấp).
 
-### 3. Build your project
+### Nhật ký tuần
 
-This is an empty starter — pick any language/framework. The hooks are language-agnostic; they only need Python on the host (any of `python3`, `python`, or `py` works).
+Cập nhật **[JOURNAL.md](./JOURNAL.md)** cuối mỗi tuần: feature đã ship, AI tool đã dùng, vấn đề khó nhất, điều sẽ làm khác, kế hoạch tuần sau. **Phải cập nhật trước mỗi PR.**
 
-## Weekly Journal
+### Worklog
 
-Update **[JOURNAL.md](./JOURNAL.md)** at the end of every week:
+Cập nhật **[WORKLOG.md](./WORKLOG.md)** mỗi khi có quyết định kỹ thuật hoặc đổi hướng: lý do chọn cách này, phân công, brainstorm, bug quan trọng + cách sửa.
 
-- Features shipped
-- AI tools used and how they helped
-- Hardest problem of the week and how you solved it
-- What you'd do differently
-- Plan for next week
+### AI Logging
 
-> JOURNAL.md **must be updated** before each PR — it is your learning record for the course.
-
-## Worklog
-
-Update **[WORKLOG.md](./WORKLOG.md)** whenever your team makes a technical decision or changes direction:
-
-- **Technical decisions** — why this approach over alternatives?
-- **Task assignments** — who does what, by when
-- **Brainstorming** — options considered, pros / cons, conclusion
-- **Important bugs** — root cause and fix
-
-## AI Logging
-
-Prompts and tool calls are **automatically logged** when you use any supported AI tool (Claude Code, Cursor, Codex, Gemini, Antigravity, Copilot). No manual steps needed after running `setup_hooks`.
-
-For ChatGPT or other web tools, log manually:
+Prompt và tool call được **tự động log** khi dùng các AI tool được hỗ trợ (Claude Code, Cursor, Codex, Gemini, Antigravity, Copilot) sau khi chạy `setup_hooks`. Với ChatGPT/web tool, log thủ công:
 
 ```bash
-# POSIX
-bash scripts/_pyrun.sh scripts/log_manual.py --tool chatgpt --prompt "<what you did>"
-
-# Windows
-scripts\_pyrun.cmd scripts\log_manual.py --tool chatgpt --prompt "<what you did>"
+bash scripts/_pyrun.sh scripts/log_manual.py --tool chatgpt --prompt "<việc đã làm>"
 ```
 
-### Python requirements
-
-The hook system needs **one** of: `python3`, `python`, or `py` on PATH.
-
-| OS | Recommended install |
-|---|---|
-| Windows | Python 3 from [python.org](https://www.python.org/downloads/) — installer adds both `python` and `py` to PATH |
-| Ubuntu / Debian | `sudo apt install python3` (already preinstalled on most distros) |
-| macOS | `brew install python3` or use system Python 3 |
-
-The `scripts/_pyrun.*` wrappers detect whichever is available — students do not need to alias `python3` → `python`.
+Hệ thống hook cần **một** trong: `python3`, `python`, hoặc `py` trên PATH.
