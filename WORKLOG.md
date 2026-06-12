@@ -30,3 +30,55 @@ Chưa phân công. TODO: ai làm module nào, deadline nội bộ.
 - Fix: thêm `"type": "command"` vào cả 2 handler (`log-prompt`, `log-stop`),
   theo schema chính thức tại developers.openai.com/codex/hooks → PR #1.
 - Ghi chú: BTC đã cho phép team chủ động sửa scripts.
+
+## 2026-06-12
+
+### Chốt đề tài & stack
+- Sản phẩm: **AI Quality Intelligence Platform** (Quality Operation Cockpit) —
+  phân tích phản hồi khách hàng smart mobility (xanhSM/GreenSM).
+- Stack: React 19 + TanStack Start (frontend `app/`), Python FastAPI + scikit-learn
+  (pipeline `pipeline/`), Supabase (Postgres + Auth) làm trục dữ liệu.
+
+### Quyết định kỹ thuật — cấu trúc repo (Hướng A)
+- Dự án nguồn `xanh_iu` (build sẵn ~90% qua Lovable) được di trú vào repo theo
+  layout chuẩn "một repo một nguồn sự thật": `app/` (frontend) + `pipeline/`
+  (Python, phẳng ở root) + `supabase/` + `data/` + `docs/`.
+- Lý do chọn restructure thay vì giữ `UI/`+`backend/` đã commit: layout phẳng
+  khớp blueprint, dễ truy vết, tách bạch frontend/pipeline/schema/data.
+- Dùng `git mv` để giữ lịch sử file (tracked thành rename, không mất blame).
+- Bỏ thư mục `.joblib` trùng trong `app/pipeline/` (MD5 trùng `pipeline/ml/`).
+
+### Quyết định — chế độ Batch (không real-time cho demo)
+- Backend xanh_iu có sẵn live-stream + APScheduler. Theo constraint đã chốt
+  (batch thủ công, demo 100–150 review/lô), `LIVE_STREAM_ENABLED=false` mặc định.
+- Luồng demo dùng các endpoint batch: `/api/ingest-real-dataset`,
+  `/api/run-real-pipeline`, `/api/trigger-spike-detect`.
+
+### Bug quan trọng 1 — classifier chạy MOCK
+- Root cause: `classifier.py` load model `.joblib` nhưng nhánh predict là `pass`
+  + TODO, trả nhãn giả theo độ dài text. Model thật (TF-IDF + LinearSVC) không
+  được gọi.
+- Fix: nối `topic_model`/`sentiment_model` thật; severity suy từ sentiment;
+  confidence ước lượng từ `decision_function` margin (LinearSVC không có proba).
+- Verify: accuracy trên 932 mẫu test → topic 77.1%, sentiment 94.3%.
+
+### Bug quan trọng 2 — severity inversion trong spike_detector
+- Root cause: spike detector lọc `severity in ["P0","P1"]`, nhưng thang dự án là
+  P1..P5 với **P5 = nghiêm trọng nhất**. Safety override sinh P5 → spike detector
+  bỏ sót đúng các ca nguy hiểm cần bắt. Alert lại hardcode `severity="P1"`.
+- Fix: lọc band cao `["P4","P5"]`; alert lấy mức severity cao nhất thực tế trong
+  vùng spike.
+
+### Bug quan trọng 3 — path math sai sau khi làm phẳng pipeline
+- Root cause: code giả định `backend/pipeline/` (2 cấp dưới root); layout phẳng
+  `pipeline/` chỉ còn 1 cấp → `PROJECT_ROOT` trỏ ra ngoài repo.
+- Fix: sửa `env_config.py`, `main.py`, `ingest.py`. Verify import chain đầy đủ +
+  `PROJECT_ROOT` đúng + canonical data tồn tại.
+
+### Data provenance
+- Canonical: `data/raw` (5000 review công khai Google Play/App Store),
+  `data/processed/seed_real_clean.json` (đã nhãn LLM), `data/train` (train/eval),
+  `data/demo/seed_demo_150.json` (nút bấm demo, chưa nhãn ML).
+- Phân biệt rõ trường THẬT (text/title/rating/timestamp/app...) vs TỔNG HỢP
+  (area/driver_id/trip_id/event_time/is_demo_spike). Chi tiết: `data/README.md`.
+- Pin `scikit-learn==1.6.1` khớp version train model (tránh InconsistentVersionWarning).
