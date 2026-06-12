@@ -22,7 +22,7 @@ type Feedback = {
 
 const TOPICS = ["Tài xế", "Xe", "Ứng dụng", "Giá & thanh toán", "An toàn", "Khác"];
 const SENTIMENTS = ["positive", "neutral", "negative"];
-const SEVERITIES = ["P0", "P1", "P2", "P3"];
+const SEVERITIES = ["P1", "P2", "P3", "P4", "P5"];
 const CHANNELS = ["app", "rating", "hotline", "cs", "survey"];
 const API_BASE = import.meta.env.VITE_BACKEND_API_URL ?? "http://127.0.0.1:8000";
 
@@ -37,14 +37,11 @@ function FeedbackPage() {
   const [form, setForm] = useState({
     text: "",
     channel: "app",
-    topic: "Tài xế",
-    sentiment: "negative",
-    severity: "P2",
     area: "",
   });
 
-  async function load() {
-    setLoading(true);
+  async function load(isBackground = false) {
+    if (!isBackground && list.length === 0) setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/feedback/recent?limit=100`);
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
@@ -67,7 +64,7 @@ function FeedbackPage() {
 
   useEffect(() => {
     load();
-    const id = window.setInterval(load, 1000);
+    const id = window.setInterval(() => load(true), 3000);
     return () => window.clearInterval(id);
   }, []);
 
@@ -81,25 +78,72 @@ function FeedbackPage() {
       setSubmitting(false);
       return;
     }
-    const { error } = await supabase.from("feedback").insert({
-      user_id: u.user.id,
-      source: "manual",
-      channel: form.channel,
-      text: form.text.trim(),
-      topic: form.topic,
-      sentiment: form.sentiment,
-      severity: form.severity,
-      area: form.area || null,
-      confidence: 1,
-    });
-    setSubmitting(false);
+    
+    try {
+      const res = await fetch(`${API_BASE}/api/feedback/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: u.user.id,
+          text: form.text.trim(),
+          channel: form.channel,
+          area: form.area || null,
+        }),
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.detail || "Lỗi máy chủ");
+      }
+      
+      const json = await res.json();
+      toast.success(
+        `Đã ghi nhận! AI tự động gắn nhãn: [${json.data.prediction.topic}] [${json.data.prediction.sentiment}] [P${json.data.prediction.severity}]`
+      );
+      setForm({ ...form, text: "", area: "" });
+      load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Có lỗi xảy ra khi gửi phản hồi");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // T-C-R: Control & Recovery - Cập nhật nhãn và cho phép Undo
+  async function updateLabel(id: string, field: "topic" | "severity", newValue: string, oldValue: string | null) {
+    // Optimistic update
+    setList((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, [field]: newValue } : f))
+    );
+    
+    // API Call
+    const { error } = await supabase
+      .from("feedback")
+      .update({ [field]: newValue })
+      .eq("id", id);
+      
     if (error) {
-      toast.error(error.message);
+      toast.error(`Lỗi khi cập nhật: ${error.message}`);
+      // Revert on error
+      setList((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, [field]: oldValue } : f))
+      );
       return;
     }
-    toast.success("Đã thêm phản hồi");
-    setForm({ ...form, text: "", area: "" });
-    load();
+
+    // Recovery (Undo) Action in Toast
+    toast.success(`Đã cập nhật ${field === 'topic' ? 'Chủ đề' : 'Mức độ'}`, {
+      action: {
+        label: "Hoàn tác",
+        onClick: async () => {
+          setList((prev) =>
+            prev.map((f) => (f.id === id ? { ...f, [field]: oldValue } : f))
+          );
+          await supabase.from("feedback").update({ [field]: oldValue }).eq("id", id);
+          toast.success("Đã hoàn tác thay đổi");
+        },
+      },
+    });
   }
 
   return (
@@ -123,30 +167,27 @@ function FeedbackPage() {
             value={form.text}
             onChange={(e) => setForm({ ...form, text: e.target.value })}
             placeholder="VD: Tài xế đi sai đường, không dùng định vị, thái độ khó chịu..."
-            className="w-full p-3 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-xanh-green/40 resize-none"
+            className="w-full p-4 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-xanh-green/40 resize-none min-h-[88px]"
           />
-          <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-2">
+          <div className="grid sm:grid-cols-2 gap-4">
             <Select label="Kênh" value={form.channel} onChange={(v) => setForm({ ...form, channel: v })} options={CHANNELS} />
-            <Select label="Chủ đề" value={form.topic} onChange={(v) => setForm({ ...form, topic: v })} options={TOPICS} />
-            <Select label="Cảm xúc" value={form.sentiment} onChange={(v) => setForm({ ...form, sentiment: v })} options={SENTIMENTS} />
-            <Select label="Severity" value={form.severity} onChange={(v) => setForm({ ...form, severity: v })} options={SEVERITIES} />
-            <label className="text-xs">
-              <div className="text-muted-foreground mb-1">Khu vực</div>
+            <label className="text-sm font-medium">
+              <div className="text-muted-foreground mb-1.5">Khu vực</div>
               <input
                 value={form.area}
                 onChange={(e) => setForm({ ...form, area: e.target.value })}
                 placeholder="VD: HN-Cầu Giấy"
-                className="w-full h-9 px-3 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-xanh-green/40"
+                className="w-full min-h-[44px] px-3 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-xanh-green/40 transition-shadow"
               />
             </label>
           </div>
           <button
             type="submit"
             disabled={submitting}
-            className="h-10 px-5 rounded-xl text-white font-semibold flex items-center gap-2 shadow-[var(--shadow-green)] disabled:opacity-60"
+            className="min-h-[44px] px-6 rounded-xl text-white font-semibold flex items-center justify-center gap-2 shadow-[var(--shadow-green)] disabled:opacity-50 transition-opacity w-full sm:w-auto"
             style={{ background: "var(--gradient-green)" }}
           >
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Lưu phản hồi"}
+            {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : "Lưu phản hồi"}
           </button>
         </form>
       </section>
@@ -182,17 +223,40 @@ function FeedbackPage() {
                   {f.channel}
                 </span>
                 <p className="col-span-10 sm:col-span-7 text-sm">{f.text}</p>
-                <div className="col-span-12 sm:col-span-4 flex flex-wrap justify-start sm:justify-end gap-1.5 items-center">
-                  {f.topic && <Pill icon={Tag}>{f.topic}</Pill>}
+                <div className="col-span-12 sm:col-span-4 flex flex-wrap justify-start sm:justify-end gap-2 items-center">
+                  {/* Topic Edit (Control) */}
+                  {f.topic && (
+                    <select 
+                      className="bg-transparent border-none text-[11px] font-mono text-xanh-deep bg-xanh-mint/20 hover:bg-xanh-mint/40 px-2 py-1 rounded-md min-h-[36px] cursor-pointer focus:ring-2 focus:ring-xanh-green transition-colors appearance-none"
+                      value={f.topic}
+                      onChange={(e) => updateLabel(f.id, "topic", e.target.value, f.topic)}
+                    >
+                      {TOPICS.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  )}
+                  {/* Sentiment (Display only) */}
                   {f.sentiment && (
-                    <Pill tone={f.sentiment === "negative" ? "coral" : f.sentiment === "positive" ? "green" : "mint"}>
-                      {f.sentiment}
+                    <Pill tone={f.sentiment?.toLowerCase() === "negative" ? "coral" : f.sentiment?.toLowerCase() === "positive" ? "green" : f.sentiment?.toLowerCase() === "neutral" ? "amber" : "mint"}>
+                      <span className="flex items-center gap-1 min-h-[28px] px-1">
+                        {/* Confidence Dot (Transparency) */}
+                        <span className={`w-1.5 h-1.5 rounded-full ${f.sentiment?.toLowerCase() === "negative" ? "bg-red-500" : f.sentiment?.toLowerCase() === "positive" ? "bg-green-500" : f.sentiment?.toLowerCase() === "neutral" ? "bg-amber-500" : "bg-gray-400"}`}></span>
+                        {f.sentiment}
+                      </span>
                     </Pill>
                   )}
-                  {f.severity && <Pill tone="deep">{f.severity}</Pill>}
+                  {/* Severity Edit (Control) */}
+                  {f.severity && (
+                    <select 
+                      className={`bg-xanh-deep text-white border-none text-[11px] font-mono hover:bg-xanh-deep/80 px-2 py-1 rounded-md min-h-[36px] cursor-pointer focus:ring-2 focus:ring-xanh-green transition-colors appearance-none ${(f.severity === "P5" || f.severity === "P4") ? "bg-red-500 hover:bg-red-600" : ""}`}
+                      value={f.severity}
+                      onChange={(e) => updateLabel(f.id, "severity", e.target.value, f.severity)}
+                    >
+                      {SEVERITIES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  )}
                   {f.area && (
-                    <span className="text-[10px] font-mono text-muted-foreground inline-flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
+                    <span className="text-xs font-mono text-muted-foreground inline-flex items-center gap-1 min-h-[36px] px-1">
+                      <MapPin className="h-3.5 w-3.5" />
                       {f.area}
                     </span>
                   )}
@@ -218,12 +282,12 @@ function Select({
   options: string[];
 }) {
   return (
-    <label className="text-xs">
-      <div className="text-muted-foreground mb-1">{label}</div>
+    <label className="text-sm font-medium">
+      <div className="text-muted-foreground mb-1.5">{label}</div>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full h-9 px-2 rounded-lg border border-border bg-white focus:outline-none focus:ring-2 focus:ring-xanh-green/40"
+        className="w-full min-h-[44px] px-3 rounded-xl border border-border bg-white focus:outline-none focus:ring-2 focus:ring-xanh-green/40 transition-shadow"
       >
         {options.map((o) => (
           <option key={o} value={o}>
@@ -242,13 +306,14 @@ function Pill({
 }: {
   children: React.ReactNode;
   icon?: React.ComponentType<{ className?: string }>;
-  tone?: "mint" | "green" | "coral" | "deep";
+  tone?: "mint" | "green" | "coral" | "deep" | "amber";
 }) {
   const map: Record<string, string> = {
     mint: "bg-xanh-mint text-xanh-deep border-xanh-green/30",
     green: "bg-xanh-green/15 text-xanh-deep border-xanh-green/40",
     coral: "bg-xanh-coral/15 text-xanh-coral border-xanh-coral/30",
     deep: "bg-xanh-deep text-white border-xanh-deep",
+    amber: "bg-amber-100 text-amber-800 border-amber-300",
   };
   return (
     <span className={`inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border ${map[tone]}`}>
