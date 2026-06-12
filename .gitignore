@@ -21,8 +21,8 @@ app/dist/
 dist/
 *.tsbuildinfo
 
-# Pipeline runtime logs
-pipeline/logs/*.log
+# Pipeline runtime logs (server stdout/stderr, uvicorn, *.log)
+pipeline/logs/
 
 # OS
 .DS_Store
