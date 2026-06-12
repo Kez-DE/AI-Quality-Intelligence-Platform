@@ -345,15 +345,25 @@ def health_check():
     return {"status": "ok", "message": "Backend service is running"}
 
 @app.get("/api/feedback/recent")
-def recent_feedback(limit: int = Query(default=100, ge=1, le=500)):
+def recent_feedback(
+    limit: int = Query(default=100, ge=1, le=500),
+    needs_review: bool | None = Query(default=None),
+    reviewed: bool | None = Query(default=None),
+):
+    """Đọc feedback gần nhất.
+
+    needs_review=true  -> chỉ Review Queue (ca cần duyệt).
+    reviewed=false     -> chỉ ca chưa duyệt.
+    Không truyền filter  -> toàn bộ (Feedback Stream).
+    """
     try:
         db = get_supabase()
-        data = db.table("feedback") \
-            .select("*") \
-            .order("created_at", desc=True) \
-            .limit(limit) \
-            .execute() \
-            .data or []
+        q = db.table("feedback").select("*")
+        if needs_review is not None:
+            q = q.eq("needs_review", needs_review)
+        if reviewed is not None:
+            q = q.eq("reviewed", reviewed)
+        data = q.order("created_at", desc=True).limit(limit).execute().data or []
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot read feedback: {str(exc)[:300]}") from exc
     return {"status": "success", "data": data}

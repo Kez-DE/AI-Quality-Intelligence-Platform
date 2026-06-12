@@ -42,6 +42,7 @@ function severityNum(sev: string | null): number {
 
 function FeedbackPage() {
   const [list, setList] = useState<Feedback[]>([]);
+  const [queue, setQueue] = useState<Feedback[]>([]);
   const [newFeedbackIds, setNewFeedbackIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -136,10 +137,15 @@ function FeedbackPage() {
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/feedback/recent?limit=200`);
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-      const json = (await res.json()) as { data?: Feedback[] };
-      const rows = json.data ?? [];
+      // 2 nguồn riêng: Review Queue lấy đúng từ server (không sót ca cũ),
+      // Stream lấy danh sách chung gần nhất.
+      const [streamRes, queueRes] = await Promise.all([
+        fetch(`${API_BASE}/api/feedback/recent?limit=200`),
+        fetch(`${API_BASE}/api/feedback/recent?limit=200&needs_review=true&reviewed=false`),
+      ]);
+      if (!streamRes.ok) throw new Error(`${streamRes.status} ${streamRes.statusText}`);
+      const streamJson = (await streamRes.json()) as { data?: Feedback[] };
+      const rows = streamJson.data ?? [];
       const incomingIds = rows.map((row) => row.id);
       const freshIds = incomingIds.filter((id) => !seenIdsRef.current.has(id));
       incomingIds.forEach((id) => seenIdsRef.current.add(id));
@@ -149,6 +155,10 @@ function FeedbackPage() {
       }
       initializedRef.current = true;
       setList(rows);
+      if (queueRes.ok) {
+        const queueJson = (await queueRes.json()) as { data?: Feedback[] };
+        setQueue(queueJson.data ?? []);
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Không đọc được live feedback");
     }
@@ -198,9 +208,11 @@ function FeedbackPage() {
     }
   }
 
-  // Tách 2 luồng: cần duyệt (needs_review && chưa reviewed) vs đã thu thập.
-  const reviewQueue = list.filter((f) => f.needs_review && !f.reviewed);
-  const stream = list.filter((f) => !(f.needs_review && !f.reviewed));
+  // Review Queue lấy đúng từ server (?needs_review=true) — không sót ca cũ.
+  // Stream = danh sách chung, loại các id đang nằm trong Queue.
+  const reviewQueue = queue;
+  const queueIds = new Set(queue.map((f) => f.id));
+  const stream = list.filter((f) => !queueIds.has(f.id));
 
   const stats = {
     total: list.length,
