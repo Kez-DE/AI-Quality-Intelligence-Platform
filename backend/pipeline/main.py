@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 import os
 from collections import Counter
@@ -18,7 +19,7 @@ DEFAULT_DATA_FILE = os.path.join(
     PROJECT_ROOT,
     "data",
     "processed",
-    "seed_real_clean (1).json",
+    "seed_real_clean.json",
 )
 
 scheduler: BackgroundScheduler | None = None
@@ -268,6 +269,12 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+class FeedbackSubmitRequest(BaseModel):
+    user_id: str
+    text: str
+    channel: str = "app"
+    area: str | None = None
+
 # CORS config to allow frontend to communicate with backend
 app.add_middleware(
     CORSMiddleware,
@@ -436,6 +443,51 @@ def ingest_real_dataset(
     else:
         return {"status": "error", "message": result["error"]}
 
+@app.post("/api/feedback/submit")
+def submit_feedback(payload: FeedbackSubmitRequest):
+    """
+    Nhận feedback từ user trên UI, tự động phân loại bằng AI Fast Layer (classifier)
+    sau đó insert vào Supabase.
+    """
+    from classifier import predict_feedback
+    
+    # Chạy AI Classifier
+    prediction = predict_feedback(payload.text)
+    
+    severity_int = prediction["severity"]
+    severity_value = f"P{severity_int}" if isinstance(severity_int, int) else severity_int
+    
+    # Lưu vào Supabase
+    try:
+        db = get_supabase()
+        db.table("feedback").insert({
+            "user_id": payload.user_id,
+            "source": "manual",
+            "channel": payload.channel,
+            "text": payload.text.strip(),
+            "topic": prediction["topic"],
+            "sentiment": prediction["sentiment"],
+            "severity": severity_value,
+            "area": payload.area or "Unknown",
+            "confidence": prediction["confidence"],
+        }).execute()
+        
+        # Nếu là P5, kích hoạt check spike ngay lập tức
+        if severity_value == "P5":
+            from spike_detector import detect_spikes
+            detect_spikes(max_feedback=100, max_spikes=1)
+            
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Cannot save feedback: {str(exc)[:300]}") from exc
+
+    return {
+        "status": "success", 
+        "data": {
+            "prediction": prediction,
+            "message": "Feedback submitted and auto-tagged successfully"
+        }
+    }
+
 @app.post("/api/live-stream/start")
 def start_live_feedback_stream(
     batch_size: int = Query(default=150, ge=1, le=500),
@@ -517,6 +569,46 @@ def trigger_spike_detect(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     return {"status": "success", "data": result}
+
+@app.post("/api/agent/run")
+def run_orchestrator():
+    """
+    Kích hoạt toàn bộ hệ thống Multi-Agent thủ công qua API.
+    """
+    from backend.pipeline.agents.orchestrator import run_agent_pipeline
+    try:
+        result = run_agent_pipeline()
+        return result
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@app.get("/api/insights/departments/{team}")
+def get_department_insights(team: str, hours: int = Query(default=24, ge=1, le=720)):
+    """
+    Lấy thông tin insight và phân tích sâu (root cause) cho một phòng ban cụ thể.
+    """
+    from backend.pipeline.agents.insight_agent import generate_department_insights
+    from backend.pipeline.agents.analyst_agent import analyze_root_cause
+    
+    try:
+        insights = generate_department_insights(team, hours)
+        analysis = analyze_root_cause(team, insights)
+        insights["analysis"] = analysis
+        return {"status": "success", "data": insights}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@app.get("/api/insights/departments")
+def list_department_insights(hours: int = Query(default=24, ge=1, le=720)):
+    """
+    Lấy thông tin insight cho tất cả phòng ban.
+    """
+    from backend.pipeline.agents.orchestrator import run_agent_pipeline
+    try:
+        result = run_agent_pipeline()
+        return {"status": "success", "data": result["data"]}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 if __name__ == "__main__":
     import uvicorn

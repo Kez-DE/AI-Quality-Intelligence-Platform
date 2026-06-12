@@ -186,7 +186,7 @@ function AlertsPage() {
         </div>
         <button
           onClick={() => fetchAlerts(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-white text-sm hover:bg-muted/50 transition-colors"
+          className="flex items-center gap-2 px-4 min-h-[44px] rounded-xl border border-border bg-white text-sm hover:bg-muted/50 transition-colors"
         >
           <RefreshCw className="h-4 w-4" />
           Làm mới
@@ -252,13 +252,13 @@ function AlertsPage() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium border transition-all ${
+              className={`flex items-center justify-center gap-1.5 px-4 min-h-[44px] rounded-full text-sm font-medium border transition-all ${
                 activeTab === tab
                   ? "border-xanh-green bg-xanh-deep text-white shadow"
-                  : "border-border bg-white text-muted-foreground hover:border-xanh-green/40"
+                  : "border-border bg-white text-muted-foreground hover:border-xanh-green/40 hover:text-foreground"
               }`}
             >
-              {Icon && <Icon className="h-3.5 w-3.5" />}
+              {Icon && <Icon className="h-4 w-4" />}
               {tab}
             </button>
           );
@@ -309,12 +309,19 @@ function AlertsPage() {
                   <div className="flex items-start gap-3 flex-1">
                     {/* Severity badge */}
                     <span
-                      className={`shrink-0 px-2 py-1 rounded-lg text-xs font-mono font-bold ${
-                        alert.severity === "P1" || alert.severity === "P0"
-                          ? "bg-red-600 text-white"
-                          : "bg-yellow-400 text-yellow-900"
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold border ${
+                        alert.severity === "P5" || alert.severity === "P4"
+                          ? "bg-red-50 border-red-200 text-red-700"
+                          : "bg-amber-50 border-amber-200 text-amber-800"
                       }`}
                     >
+                      <div
+                        className={`h-2 w-2 rounded-full ${
+                          alert.severity === "P5" || alert.severity === "P4"
+                            ? "bg-red-500"
+                            : "bg-amber-500"
+                        }`}
+                      />
                       {alert.severity}
                     </span>
                     <div>
@@ -348,14 +355,14 @@ function AlertsPage() {
                   </div>
 
                   {/* Action buttons */}
-                  <div className="flex gap-2 shrink-0">
+                  <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0 w-full sm:w-auto mt-3 sm:mt-0">
                     {alert.status === "open" && (
                       <button
                         onClick={() => updateStatus(alert.id, "in_progress")}
                         disabled={isUpdating}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-yellow-500 text-white text-xs font-semibold hover:bg-yellow-600 disabled:opacity-60 transition-colors"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 min-h-[44px] rounded-xl bg-yellow-500 text-white text-sm font-semibold hover:bg-yellow-600 disabled:opacity-50 transition-colors shadow-sm"
                       >
-                        {isUpdating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <AlertTriangle className="h-3.5 w-3.5" />}
+                        {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertTriangle className="h-4 w-4" />}
                         Nhận xử lý
                       </button>
                     )}
@@ -363,15 +370,15 @@ function AlertsPage() {
                       <button
                         onClick={() => updateStatus(alert.id, "resolved")}
                         disabled={isUpdating}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-600 text-white text-xs font-semibold hover:bg-green-700 disabled:opacity-60 transition-colors"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 min-h-[44px] rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
                       >
-                        {isUpdating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                        {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                         Đã giải quyết
                       </button>
                     )}
                     {alert.status === "resolved" && (
-                      <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-100 text-green-700 text-xs font-semibold">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      <span className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 min-h-[44px] rounded-xl bg-green-100 text-green-700 text-sm font-semibold">
+                        <CheckCircle2 className="h-4 w-4" />
                         Hoàn thành
                       </span>
                     )}
