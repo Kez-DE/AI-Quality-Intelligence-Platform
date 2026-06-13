@@ -96,7 +96,18 @@ POSITIVE_KEYWORDS = [
     "tuyệt vời", "tuyet voi", "rất tốt", "rat tot", "hài lòng", "hai long",
     "tốt", "ổn", "ok", "cảm ơn", "cam on", "5 sao", "tuyệt", "hay", "thích",
     "ưng", "đáng tiền", "recommend", "sẽ dùng tiếp", "dùng tiếp", "tốt lắm",
-    "không có vấn đề", "ko có vấn đề", "chưa gặp vấn đề", "ổn định",
+    "không có vấn đề", "ko có vấn đề", "chưa gặp vấn đề", "ổn định", "ngon",
+]
+
+# Cụm tiêu cực chung (chê / bực / slang / chửi) — rất phổ biến ở review ngắn.
+# Bắt các câu như "app chán", "quá tệ", "cskh tệ", "đắt cc" để KHÔNG dồn
+# nhầm vào Review Queue dưới nhãn "câu ngắn/mơ hồ".
+NEGATIVE_KEYWORDS = [
+    "tệ", "kém", "chán", "dở", "tồi", "ngu", "đểu", "cùi", "lởm", "lỏ", "lol",
+    "loz", "lz", "lol", "cc", "đm", "vl", "vcl", "rác", "thất vọng", "bực",
+    "khó chịu", "phiền", "bức xúc", "chậm", "lâu", "không hài lòng",
+    "ko hài lòng", "chả ra gì", "vô dụng", "vô lý", "bịp", "lừa", "như lol",
+    "như cc", "quá kém", "quá tệ", "tệ hại", "thậm tệ", "kinh khủng",
 ]
 
 
@@ -241,13 +252,36 @@ def apply_rules(text: str, model_topic: str, model_sentiment: str,
             confidence = max(confidence, 0.78)
             matched_rule = True
 
-    # --- Câu quá ngắn / mơ hồ: hạ confidence + cần duyệt ---
+    # --- 12. NEGATIVE chung (chê/slang/chửi) — bắt review ngắn rõ nghĩa ---
+    if not matched_rule:
+        kw = _has(t, NEGATIVE_KEYWORDS)
+        if kw and not _negated_near(t, kw):
+            sentiment = "negative"
+            severity = max(severity, 3)
+            confidence = max(confidence, 0.72)
+            matched_rule = True
+
+    # --- Câu thật sự vô nghĩa / gibberish: mới cần duyệt ---
+    # Chỉ đánh dấu khi câu ngắn VÀ không match rule nào VÀ trông như gõ ngẫu nhiên
+    # (ít chữ cái tiếng Việt, nhiều ký tự lặp). Câu ngắn rõ nghĩa đã được rule trên bắt.
     word_count = len(t.split())
-    if word_count <= 4 and not matched_rule:
+    if word_count <= 3 and not matched_rule and _looks_gibberish(t):
         confidence = min(confidence, 0.5)
-        review_reason = review_reason or "Câu ngắn/mơ hồ"
+        review_reason = review_reason or "Câu quá ngắn/khó hiểu"
 
     return _finalize(topic, sentiment, severity, confidence, review_reason)
+
+
+def _looks_gibberish(t: str) -> bool:
+    """Đoán câu vô nghĩa: bỏ dấu cách, nếu phần lớn KHÔNG phải nguyên âm
+    tiếng Việt thông thường hoặc lặp ký tự bất thường thì coi là khó hiểu.
+    Heuristic nhẹ — chỉ để lọc 'Hnh Hnh Hhigvv' kiểu OCR/gõ ẩu."""
+    compact = t.replace(" ", "")
+    if not compact:
+        return True
+    vowels = sum(1 for c in compact if c in "aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ")
+    # Tỷ lệ nguyên âm quá thấp -> chuỗi phụ âm bất thường -> nhiều khả năng gibberish.
+    return (vowels / len(compact)) < 0.2
 
 
 def _finalize(topic, sentiment, severity, confidence, review_reason, force_review=False):
