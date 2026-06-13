@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMe, ROLE_LABELS } from "@/lib/api";
 import {
   Bell,
+  Building2,
   Car,
   Gauge,
   LogOut,
@@ -18,6 +19,7 @@ const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: Gauge },
   { to: "/alerts", label: "Ticket Triage 🔴", icon: Bell },
   { to: "/feedback", label: "Phản hồi", icon: MessageSquare },
+  { to: "/insights", label: "Phân tích phòng ban", icon: Building2 },
   { to: "/chat", label: "AI Chat", icon: Sparkles },
 ] as const;
 
