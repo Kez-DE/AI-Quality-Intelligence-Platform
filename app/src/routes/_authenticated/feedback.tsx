@@ -286,81 +286,84 @@ function FeedbackPage() {
         <StatCard label="Confidence thấp" value={stats.lowConf} icon={AlertCircle} tone="mint" />
       </div>
 
-      {/* 3. Review Queue */}
-      <section className="rounded-2xl border border-amber-300 bg-amber-50/40 shadow-[var(--shadow-card)]">
-        <div className="p-5 border-b border-amber-200 flex items-center gap-2">
-          <ShieldAlert className="h-5 w-5 text-amber-600" />
-          <h2 className="font-display font-semibold text-amber-900">
-            Cần duyệt / Review Queue <span className="font-mono text-xs">({reviewQueue.length})</span>
-          </h2>
-        </div>
-        {reviewQueue.length === 0 ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">
-            <CheckCircle2 className="h-5 w-5 inline mr-2 text-xanh-green" />
-            Không có phản hồi nào cần duyệt.
+      {/* 3. Hai cột: Luồng phản hồi (trái) | Cần duyệt (phải) */}
+      <div className="grid lg:grid-cols-2 gap-4 items-start">
+        {/* Cột trái: Luồng phản hồi */}
+        <section className="rounded-2xl border border-border bg-white shadow-[var(--shadow-card)]">
+          <div className="p-5 border-b border-border flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Inbox className="h-4 w-4 text-xanh-deep" />
+              <h2 className="font-display font-semibold">
+                Luồng phản hồi <span className="text-muted-foreground font-mono text-xs">({stream.length})</span>
+              </h2>
+            </div>
+            <button onClick={load} className="text-xs font-mono text-xanh-deep hover:underline">
+              ↻ refresh
+            </button>
           </div>
-        ) : (
-          <div className="divide-y divide-amber-200/60">
-            {reviewQueue.map((f) => (
-              <FeedbackRow
-                key={f.id}
-                f={f}
-                isNew={newFeedbackIds.has(f.id)}
-                editing={editingId === f.id}
-                editDraft={editDraft}
-                setEditDraft={setEditDraft}
-                onToggleEdit={() => (editingId === f.id ? setEditingId(null) : openEditor(f))}
-                onSave={() => saveCorrection(f.id)}
-                saving={savingId === f.id}
-                onApprove={() => reviewAction(f.id)}
-                acting={actingId === f.id}
-                showActions
-              />
-            ))}
-          </div>
-        )}
-      </section>
+          {loading && list.length === 0 ? (
+            <div className="p-10 text-center text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin inline" />
+            </div>
+          ) : stream.length === 0 ? (
+            <div className="p-10 text-center text-sm text-muted-foreground">
+              <AlertCircle className="h-5 w-5 inline mr-2" />
+              Chưa có phản hồi nào.
+            </div>
+          ) : (
+            <div className="divide-y divide-border max-h-[70vh] overflow-y-auto">
+              {stream.map((f) => (
+                <FeedbackRow
+                  key={f.id}
+                  f={f}
+                  isNew={newFeedbackIds.has(f.id)}
+                  editing={editingId === f.id}
+                  editDraft={editDraft}
+                  setEditDraft={setEditDraft}
+                  onToggleEdit={() => (editingId === f.id ? setEditingId(null) : openEditor(f))}
+                  onSave={() => saveCorrection(f.id)}
+                  saving={savingId === f.id}
+                />
+              ))}
+            </div>
+          )}
+        </section>
 
-      {/* 4. Feedback Stream */}
-      <section className="rounded-2xl border border-border bg-white shadow-[var(--shadow-card)]">
-        <div className="p-5 border-b border-border flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Inbox className="h-4 w-4 text-xanh-deep" />
-            <h2 className="font-display font-semibold">
-              Luồng phản hồi <span className="text-muted-foreground font-mono text-xs">({stream.length})</span>
+        {/* Cột phải: Cần duyệt / Review Queue */}
+        <section className="rounded-2xl border border-amber-300 bg-amber-50/40 shadow-[var(--shadow-card)]">
+          <div className="p-5 border-b border-amber-200 flex items-center gap-2">
+            <ShieldAlert className="h-5 w-5 text-amber-600" />
+            <h2 className="font-display font-semibold text-amber-900">
+              Cần duyệt / Review Queue <span className="font-mono text-xs">({reviewQueue.length})</span>
             </h2>
           </div>
-          <button onClick={load} className="text-xs font-mono text-xanh-deep hover:underline">
-            ↻ refresh
-          </button>
-        </div>
-        {loading && list.length === 0 ? (
-          <div className="p-10 text-center text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin inline" />
-          </div>
-        ) : stream.length === 0 ? (
-          <div className="p-10 text-center text-sm text-muted-foreground">
-            <AlertCircle className="h-5 w-5 inline mr-2" />
-            Chưa có phản hồi nào.
-          </div>
-        ) : (
-          <div className="divide-y divide-border">
-            {stream.map((f) => (
-              <FeedbackRow
-                key={f.id}
-                f={f}
-                isNew={newFeedbackIds.has(f.id)}
-                editing={editingId === f.id}
-                editDraft={editDraft}
-                setEditDraft={setEditDraft}
-                onToggleEdit={() => (editingId === f.id ? setEditingId(null) : openEditor(f))}
-                onSave={() => saveCorrection(f.id)}
-                saving={savingId === f.id}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+          {reviewQueue.length === 0 ? (
+            <div className="p-8 text-center text-sm text-muted-foreground">
+              <CheckCircle2 className="h-5 w-5 inline mr-2 text-xanh-green" />
+              Không có phản hồi nào cần duyệt.
+            </div>
+          ) : (
+            <div className="divide-y divide-amber-200/60 max-h-[70vh] overflow-y-auto">
+              {reviewQueue.map((f) => (
+                <FeedbackRow
+                  key={f.id}
+                  f={f}
+                  isNew={newFeedbackIds.has(f.id)}
+                  editing={editingId === f.id}
+                  editDraft={editDraft}
+                  setEditDraft={setEditDraft}
+                  onToggleEdit={() => (editingId === f.id ? setEditingId(null) : openEditor(f))}
+                  onSave={() => saveCorrection(f.id)}
+                  saving={savingId === f.id}
+                  onApprove={() => reviewAction(f.id)}
+                  acting={actingId === f.id}
+                  showActions
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
