@@ -34,6 +34,7 @@ def generate_department_insights(team: str, hours: int = 24) -> Dict[str, Any]:
             db.table("feedback")
             .select("id, text, topic, severity, created_at, area")
             .gte("created_at", since)
+            .order("created_at", desc=True)
             .limit(2000)
             .execute()
         )
@@ -78,10 +79,12 @@ def generate_department_insights(team: str, hours: int = 24) -> Dict[str, Any]:
         topic_counts[topic] = topic_counts.get(topic, 0) + 1
 
     sorted_topics = sorted(topic_counts.items(), key=lambda x: x[1], reverse=True)
-    samples = [
-        {"id": f["id"], "text": f["text"], "area": f.get("area")}
-        for f in team_feedback[:3]
-    ]
+    samples = []
+    for f in team_feedback[:3]:
+        text = str(f.get("text") or "").strip()
+        if not text:
+            continue
+        samples.append({"id": f.get("id"), "text": text, "area": f.get("area")})
 
     return {
         "team": team,

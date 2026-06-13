@@ -41,7 +41,7 @@ def is_duplicate_alert(db, area: str, cooldown_minutes: int) -> bool:
             .limit(1)
             .execute()
         )
-        return len(response.data) > 0
+        return len(response.data or []) > 0
     except Exception as e:
         print(f"[alert_agent] Error checking duplicate alerts: {e}")
         return False
@@ -66,6 +66,9 @@ def process_area_alerts(area: str, recent_feedbacks: List[Dict[str, Any]]) -> Di
     rules = load_severity_rules()
     cooldown = rules.get("alert_cooldown_minutes", 60)
     db = get_db()
+
+    if not area:
+        return {"action": "skip", "reason": "Missing area"}
 
     case_count = len(recent_feedbacks)
     has_p5 = any(str(f.get("severity", "")).upper() in ["P5", "P0"] for f in recent_feedbacks)

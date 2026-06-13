@@ -1,11 +1,11 @@
 import json
 import os
+import warnings
 from datetime import datetime
 from pathlib import Path
 from time import perf_counter
 from typing import Literal, TypedDict
 
-import google.generativeai as genai
 from groq import Groq
 from openai import OpenAI
 
@@ -148,6 +148,22 @@ def gemini_messages_to_prompt(messages: list[ChatMessage]) -> str:
     return "\n\n".join(lines)
 
 
+def _extract_chat_content(response: object) -> str:
+    """Extract content from OpenAI-compatible responses with clear errors."""
+    choices = getattr(response, "choices", None)
+    if not choices:
+        raise ValueError("LLM response has no choices")
+
+    message = getattr(choices[0], "message", None)
+    if message is None:
+        raise ValueError("LLM response choice has no message")
+
+    content = getattr(message, "content", None)
+    if content is None:
+        raise ValueError("LLM response message has no content")
+    return str(content)
+
+
 def _call_provider(
     provider: str,
     messages: list[ChatMessage],
@@ -172,29 +188,36 @@ def _call_provider(
         if response_json:
             kwargs["response_format"] = {"type": "json_object"}
         response = client.chat.completions.create(**kwargs)
-        return response.choices[0].message.content or ""
+        return _extract_chat_content(response)
     if provider == "openai":
         client = OpenAI(api_key=OPENAI_API_KEY)
         kwargs = {"messages": messages, "model": model_name, "temperature": temperature}
         if response_json:
             kwargs["response_format"] = {"type": "json_object"}
         response = client.chat.completions.create(**kwargs)
-        return response.choices[0].message.content or ""
+        return _extract_chat_content(response)
     if provider == "gemini":
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
+            import google.generativeai as genai
+
         genai.configure(api_key=GEMINI_API_KEY)
         generation_config = {"temperature": temperature}
         if response_json:
             generation_config["response_mime_type"] = "application/json"
         model = genai.GenerativeModel(model_name, generation_config=generation_config)
         response = model.generate_content(gemini_messages_to_prompt(messages))
-        return response.text
+        content = getattr(response, "text", None)
+        if content is None:
+            raise ValueError("Gemini response has no text")
+        return str(content)
     # groq
     client = Groq(api_key=GROQ_API_KEY)
     kwargs = {"messages": messages, "model": model_name, "temperature": temperature}
     if response_json:
         kwargs["response_format"] = {"type": "json_object"}
     response = client.chat.completions.create(**kwargs)
-    return response.choices[0].message.content or ""
+    return _extract_chat_content(response)
 
 
 def chat_completion(

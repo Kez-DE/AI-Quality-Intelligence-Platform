@@ -51,6 +51,8 @@ def analyze_spike(area: str, feedback_texts: list[str]) -> dict:
             response_json=True,
             temperature=0.3,
         )
+        if response.get("provider") == "mock":
+            return mock_spike_response(area, feedback_texts)
         return parse_json_response(response["content"])
     except Exception as e:
         print(f"Error calling LLM or parsing JSON: {e}")

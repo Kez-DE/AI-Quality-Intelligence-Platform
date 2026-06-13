@@ -36,6 +36,8 @@ def call_llm(
     want_json = response_format == "json_object"
     try:
         result = chat_completion(messages, response_json=want_json, temperature=0.1)
+        if want_json and result.get("provider") == "mock":
+            return ""
         return result.get("content", "") or ""
     except Exception as exc:  # noqa: BLE001 - agent layer phải bền, không được vỡ pipeline
         print(f"[agents.common] LLM error: {exc}")
