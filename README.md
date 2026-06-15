@@ -1,93 +1,163 @@
 # C2-App-116 — AI Quality Intelligence Platform
 
-Hệ thống phân tích phản hồi khách hàng cho dịch vụ gọi xe (smart mobility). Nhận đánh giá → ML phân loại topic/sentiment/severity → safety rule → agent LLM gom sự cố và định tuyến ticket cho phòng ban → dashboard + human review.
+Hệ thống phân tích phản hồi khách hàng cho dịch vụ smart mobility/xanhSM. Ứng dụng nhận phản hồi → làm sạch PII → phân loại topic/sentiment/severity → tách Review Queue → phát hiện spike → tạo alert/ticket → phân tích theo phòng ban bằng multi-agent → cho nhân viên duyệt/sửa nhãn AI.
 
-Dự án của **AI20K Build Cohort 2 — Team 116**. Xây trên dữ liệu đánh giá công khai (App Store / Google Play) kết hợp metadata vận hành tổng hợp — xem `data/README.md` để biết nguồn gốc từng trường.
+Dự án thuộc **AI20K Build Cohort 2 — Team 116**. Dữ liệu review là review công khai từ App Store/Google Play; metadata vận hành như khu vực/chuyến/driver là dữ liệu tổng hợp cho demo. Xem `data/README.md` để biết provenance.
 
-## Kiến trúc (tóm tắt)
+> Phạm vi local hiện tại: **không Docker, chưa deploy public URL**. Chạy local bằng Supabase cloud/remote + FastAPI + Vite.
 
-```
-┌─────────────┐   ghi    ┌────────────┐   đọc   ┌──────────────┐
-│  pipeline/  │ ───────▶ │  Supabase  │ ◀────── │     app/     │
-│ Python ML + │          │ (Postgres) │         │ React + Vite │
-│  LLM agent  │          │            │         │  (dashboard) │
-└─────────────┘          └────────────┘         └──────────────┘
-```
+## 1. Trạng thái hiện tại
 
-Supabase là trục: pipeline Python ghi vào, frontend đọc ra. Không cần backend server trung gian. Chi tiết luồng demo vs production: `docs/architecture.md`.
+Đã build và verify các luồng chính:
 
-## Cấu trúc repo
+- **Auth + RBAC 4 role**: admin, manager, staff, guest.
+- **Feedback intake**: nhập phản hồi text, kênh, khu vực; backend tự phân loại, không cho client tự gán nhãn ML.
+- **Classifier 2 tầng**: TF-IDF/LinearSVC + rule engine tiếng Việt (`pipeline/rules.py`).
+- **Review Queue / Luồng phản hồi**: tách 2 cột rõ ràng; Queue chỉ giữ P5/Safety/confidence thấp/gibberish thật.
+- **Human-in-the-Loop**: nhân viên duyệt/sửa nhãn; mọi correction ghi vào `correction_logs`.
+- **Streaming demo**: bơm review theo batch 50/s, tự trigger spike/alert theo cấu hình.
+- **Alert/Ticket triage**: spike detector + LLM agent tạo root cause/action/team.
+- **Phân tích phòng ban**: trang `/insights` gom metric 6 phòng ban và chỉ gọi LLM khi bấm “Phân tích sâu”.
+- **Giao diện tiếng Việt**: topic/sentiment/severity/channel hiển thị tiếng Việt, canonical value vẫn giữ tiếng Anh trong DB để không phá logic.
+- **Docs/setup**: hướng dẫn macOS + Windows, lệnh chạy local, troubleshooting.
 
-```
-├── app/             # Frontend — TanStack Start + React 19 + Supabase
-├── pipeline/        # Backend xử lý — Python (ingest, ML, agent, spike)
-├── supabase/        # DB migrations (profiles, feedback, alerts, chat)
-├── data/            # Dataset: raw / processed / train / demo / reference
-├── docs/            # architecture, demo-script
-├── scripts/         # 🔒 Khung cohort — AI usage logging (không sửa)
-├── JOURNAL.md       # Nhật ký tuần (bắt buộc cập nhật trước mỗi PR)
-├── WORKLOG.md       # Quyết định kỹ thuật
-└── .env.example     # Mẫu cấu hình (không commit .env thật)
-```
+## 2. Kiến trúc tóm tắt
 
-## Chạy nhanh
-
-**Backend pipeline** (chi tiết: `pipeline/README.md`):
-```bash
-cd pipeline && python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-python main.py     # http://localhost:8000/docs
-```
-
-**Frontend** (chi tiết: `app/README.md`):
-```bash
-cd app && bun install && bun run dev
+```text
+User / Demo data
+   │
+   ▼
+app/ React + TanStack Start ───────┐
+   │                               │ đọc realtime
+   │ gọi API                       ▼
+pipeline/ FastAPI + ML + Agent ─▶ Supabase Postgres/Auth
+   │
+   ├─ clean.py              mask PII
+   ├─ classifier.py         ML topic/sentiment
+   ├─ rules.py              rule override + confidence + needs_review
+   ├─ spike_detector.py     phát hiện điểm nóng P4/P5
+   ├─ llm_agent.py          tạo alert/ticket bằng LLM
+   └─ agents/               router/insight/analyst/alert/orchestrator
 ```
 
-Cấu hình `.env` ở gốc repo (copy từ `.env.example`). Cần Supabase URL + service role key cho pipeline, và publishable key cho frontend.
+Chi tiết: `docs/architecture.md`.
 
-## Demo
+## 3. Cấu trúc repo
 
-Kịch bản 5 phút trong `docs/demo-script.md`: bấm nút nạp ~150 đánh giá → dashboard sáng đỏ khu vực sự cố → agent sinh ticket gửi đúng phòng ban → nhân viên sửa một nhãn AI nhận nhầm (vòng Human-in-the-Loop).
-
----
-
-## Khung Cohort — AI Logging (giữ nguyên)
-
-### Cài pre-push hook
-
-**Linux / macOS / Git Bash:**
-```bash
-bash scripts/setup_hooks.sh
+```text
+C2-App-116/
+├── app/                    Frontend React/TanStack Start/Vite
+│   └── src/routes/         dashboard, feedback, alerts, insights, chat, admin
+├── pipeline/               FastAPI backend + ML + agent pipeline
+│   ├── main.py             API chính
+│   ├── classifier.py       ML classifier
+│   ├── rules.py            Rule engine tiếng Việt
+│   ├── agents/             Multi-agent theo phòng ban
+│   └── ml/                 model .joblib + experiment scripts
+├── supabase/               Migration SQL + hướng dẫn CLI
+├── data/                   raw/processed/demo/train/reference/auxiliary
+├── docs/                   Architecture, setup, demo script
+├── scripts/                Cohort AI logging hooks — giữ nguyên
+├── RUN.md                  Lệnh chạy/test local
+├── Todo.md                 Backlog cải tiến sản phẩm
+├── JOURNAL.md              Nhật ký cohort
+└── WORKLOG.md              Quyết định kỹ thuật
 ```
 
-**Windows PowerShell:**
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\setup_hooks.ps1
-```
+## 4. Chạy nhanh local
 
-### Cấu hình môi trường
+### 4.1 Chuẩn bị `.env`
 
 ```bash
 cp .env.example .env
 ```
 
-Điền `AI_LOG_SERVER` và `AI_LOG_API_KEY` (do khóa học cung cấp).
+Điền tối thiểu:
 
-### Nhật ký tuần
-
-Cập nhật **[JOURNAL.md](./JOURNAL.md)** cuối mỗi tuần: feature đã ship, AI tool đã dùng, vấn đề khó nhất, điều sẽ làm khác, kế hoạch tuần sau. **Phải cập nhật trước mỗi PR.**
-
-### Worklog
-
-Cập nhật **[WORKLOG.md](./WORKLOG.md)** mỗi khi có quyết định kỹ thuật hoặc đổi hướng: lý do chọn cách này, phân công, brainstorm, bug quan trọng + cách sửa.
-
-### AI Logging
-
-Prompt và tool call được **tự động log** khi dùng các AI tool được hỗ trợ (Claude Code, Cursor, Codex, Gemini, Antigravity, Copilot) sau khi chạy `setup_hooks`. Với ChatGPT/web tool, log thủ công:
-
-```bash
-bash scripts/_pyrun.sh scripts/log_manual.py --tool chatgpt --prompt "<việc đã làm>"
+```env
+SUPABASE_URL=...
+SUPABASE_PUBLISHABLE_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_PUBLISHABLE_KEY=...
+BACKEND_API_URL=http://127.0.0.1:8000
+VITE_BACKEND_API_URL=http://127.0.0.1:8000
+LLM_PROVIDER=auto
+OPENROUTER_API_KEY=...   # optional nhưng nên có để agent thật chạy
 ```
 
-Hệ thống hook cần **một** trong: `python3`, `python`, hoặc `py` trên PATH.
+Không commit `.env` thật.
+
+### 4.2 Backend
+
+```bash
+cd pipeline
+python3 -m venv .venv
+source .venv/bin/activate      # Windows: .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+set -a && . ../.env && set +a   # Windows xem docs/setup-windows.md
+python -m uvicorn main:app --host 127.0.0.1 --port 8000
+```
+
+Health check:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+### 4.3 Frontend
+
+```bash
+cd app
+npm install
+set -a && . ../.env && set +a
+node node_modules/vite/bin/vite.js dev --port 5174 --host 127.0.0.1
+```
+
+Mở: [http://localhost:5174](http://localhost:5174)
+
+Chi tiết đầy đủ: `RUN.md`, `docs/setup-macos.md`, `docs/setup-windows.md`.
+
+## 5. Tài khoản demo
+
+- Admin: `demo.20260606180215@example.com` / `Admin@12345`
+- Staff/guest: tạo trong UI hoặc Supabase Auth rồi gán role trong Admin page.
+
+Nếu DB reset hoặc tài khoản chưa tồn tại, tạo user trong Supabase Auth trước, sau đó vào bảng `profiles`/Admin page để kiểm tra role.
+
+## 6. Luồng demo nên chạy
+
+1. Login admin.
+2. Vào **Phản hồi**: gửi một phản hồi mới; kiểm tra topic/sentiment/severity tự gán.
+3. Xem **Luồng phản hồi** bên trái và **Cần duyệt** bên phải.
+4. Sửa một nhãn sai → kiểm tra correction log.
+5. Chạy streaming hoặc ingest 150 review.
+6. Vào **Ticket Triage** để xem alert/ticket.
+7. Vào **Phân tích phòng ban** → metric 6 team hiện nhanh → bấm phân tích sâu cho Safety/IT.
+8. Vào **AI Chat** hỏi “khu vực nào đang nóng?”.
+
+Kịch bản nói trước hội đồng: `docs/demo-script.md`.
+
+## 7. Có nên train lại model không?
+
+Chưa nên thay model runtime chỉ vì cảm giác imbalance. Quyết định hiện tại:
+
+- Giữ model `.joblib` hiện tại vì sentiment test tốt; đã từng thử augment câu ngắn nhưng làm neutral recall sụp mạnh.
+- Dùng **rule engine + Review Queue + correction_logs** để xử lý lỗi demo và tạo data cải thiện thật.
+- Dữ liệu `data/auxiliary/data2/` dùng cho experiment; chỉ swap model nếu metric held-out tốt hơn rõ ràng trên từng class.
+
+Nói ngắn: **measure first, retrain later**. Agent/routing hiện hưởng lợi nhiều hơn từ rule + HITL hơn là retrain vội.
+
+## 8. Quy tắc làm việc nhóm
+
+- Trước khi PR: cập nhật `JOURNAL.md`, `WORKLOG.md` nếu có quyết định mới.
+- Ghi AI usage log bằng hook hoặc manual log:
+
+```bash
+python3 scripts/log_manual.py --tool "<tool>" --prompt "<việc đã nhờ AI>" --result "<kết quả>"
+python3 scripts/submit_log.py
+```
+
+- Commit nhỏ theo phase. Không commit `.env`, `.venv`, `node_modules`, `.ai-log/session.jsonl`, logs runtime.
+- Push GitHub chỉ khi đã build/test và được team thống nhất.
+

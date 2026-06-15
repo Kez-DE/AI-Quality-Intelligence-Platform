@@ -22,22 +22,29 @@ Bản tài liệu này là Thiết kế Thi công Tổng thể (Master Blueprint
 
 ## 2. Kiến Trúc Multi-Agent (Trái tim của hệ thống)
 
-Hệ thống gồm **6 Agent chuyên trách** đặt tại `pipeline/agents/`, phối hợp qua một Orchestrator trung tâm:
+Hệ thống gồm **6 Agent nghiệp vụ** đặt tại `pipeline/agents/`, phối hợp qua một Orchestrator trung tâm (Orchestrator không tính là agent nghiệp vụ — chỉ điều phối):
 
-| Agent | File | Nhiệm vụ |
+| # | Agent | File | Nhiệm vụ |
+| :--- | :--- | :--- | :--- |
+| 1 | 📥 **Ingestion/Classifier Agent** | `ingestion_agent.py` | Nhận feedback mới → clean PII → chạy ML topic/sentiment/severity → áp rule safety keyword → ghi DB. Fallback heuristic khi model lỗi. |
+| 2 | 🧭 **Router Agent** | `router_agent.py` | Định tuyến ticket về đúng phòng ban dựa trên `data/taxonomy/routing_table.json` (topic → team + SLA). P5 **luôn** ép về Safety. Config-driven, đổi routing chỉ sửa JSON. |
+| 3 | 🎫 **Ticket Agent** | `ticket_agent.py` | Tạo/cập nhật ticket, dedup ticket trùng (cùng area + topic + severity trong cooldown), gán SLA/owner/team/status/priority. State machine: open → triaged → in_progress → resolved → closed. |
+| 4 | 📊 **Insight Agent** | `insight_agent.py` | Tổng hợp insight cho **từng phòng ban**: tổng feedback, tỷ lệ tiêu cực, phân bố severity, top topic/khu vực, xu hướng % so kỳ trước, trạng thái ticket, trích dẫn tiêu biểu. |
+| 5 | 🔬 **Analyst Agent** | `analyst_agent.py` | Phân tích sâu insight bằng LLM: nguyên nhân gốc rễ **xuyên nhiều ticket**, mức rủi ro (LOW→CRITICAL), dự báo 24-48h, 3 hành động ưu tiên kèm deadline. Fallback heuristic khi không có API key. |
+| 6 | 🚨 **Alert/Escalation Agent** | `alert_agent.py` | Cảnh báo thông minh: phân cấp 🟡 WATCH (≥3 case) / 🟠 WARNING (≥5) / 🔴 CRITICAL (≥10 hoặc có P5) theo `severity_rules.json` + **dedup** cooldown 60 phút/khu vực. Escalation khi quá SLA. |
+
+| Thành phần hỗ trợ | File | Vai trò |
 | :--- | :--- | :--- |
 | 🎯 **Scoring Agent** | `scoring_agent.py` | Sử dụng LLM (Llama 3) chấm điểm rủi ro đa chiều (Deep Risk Matrix 5 vector) ngay lúc Ingestion. Tối ưu chi phí bằng phễu lọc ML, Caching, và Batching LLM calls. |
-| 🧭 **Router Agent** | `router_agent.py` | Định tuyến ticket về đúng phòng ban dựa trên `data_real/taxonomy/routing_table.json` (topic → team + SLA). Khớp chuẩn cấu trúc dữ liệu thật. Mức độ P5 **luôn** ép về Safety. Đổi định tuyến chỉ cần sửa JSON, không sửa code. |
-| 📊 **Insight Agent** | `insight_agent.py` | Tổng hợp insight cho **từng phòng ban**: tổng feedback, tỷ lệ tiêu cực, phân bố severity, top topic/khu vực, **xu hướng % so kỳ trước**, trạng thái ticket, trích dẫn tiêu biểu. |
-| 🔬 **Analyst Agent** | `analyst_agent.py` | Phân tích sâu insight bằng LLM: nguyên nhân gốc rễ **xuyên nhiều ticket**, mức rủi ro (LOW→CRITICAL), dự báo 24-48h, 3 hành động ưu tiên kèm deadline. Fallback heuristic khi không có API key. |
-| 🚨 **Alert Agent** | `alert_agent.py` | Cảnh báo thông minh: phân cấp 🟡 WATCH (≥3 case) / 🟠 WARNING (≥5) / 🔴 CRITICAL (≥10 hoặc có P5) theo `severity_rules.json` + **dedup**: khu vực có alert đang xử lý trong 60 phút → không spam alert mới. |
-| 🎼 **Orchestrator** | `orchestrator.py` | Điều phối vòng khép kín 7 bước (xem sơ đồ dưới), chạy tự động mỗi 10 phút qua APScheduler hoặc kích hoạt thủ công qua API. |
+| 🎼 **Orchestrator** | `orchestrator.py` | Điều phối pipeline 6 agent theo thứ tự: Ingestion → Router → Ticket → Alert → Insight → Analyst. Chạy tự động mỗi 10 phút (APScheduler) hoặc kích hoạt thủ công qua API. Retry + logging + schedule. |
 
 **Nguyên tắc thiết kế:**
-- **Hybrid Fast/Slow Layer:** Dùng ML Model truyền thống để càn quét nhanh 100% dữ liệu (Fast Layer) và Multi-Agent LLM để phân tích sâu khi có cảnh báo (Slow Layer). Tối ưu chi phí API = 0 cho Ingestion.
-- **Config-driven:** Định tuyến và ngưỡng cảnh báo nằm trong `data_real/taxonomy/*.json` — chạy chuẩn 100% cấu trúc nghiệp vụ thực tế của Ops.
-- **Graceful degradation:** Mọi agent đều có chế độ fallback (mock/heuristic) khi thiếu `GROQ_API_KEY` — demo không bao giờ chết.
+- **Hybrid Fast/Slow Layer:** Ingestion Agent dùng ML Model truyền thống để càn quét nhanh 100% dữ liệu (Fast Layer, chi phí API = 0). Analyst Agent dùng LLM để phân tích sâu khi có cảnh báo (Slow Layer).
+- **Config-driven:** Định tuyến và ngưỡng cảnh báo nằm trong `data/taxonomy/*.json` — chạy chuẩn 100% cấu trúc nghiệp vụ thực tế của Ops.
+- **Graceful degradation:** Mọi agent đều có chế độ fallback (mock/heuristic) khi thiếu API key — demo không bao giờ chết.
 - **Tiết kiệm quota:** Analyst Agent chỉ phân tích sâu các phòng có feedback tiêu cực hoặc ticket đang mở.
+- **Dedup + Cooldown:** Ticket Agent dedup cùng area+topic+severity trong cooldown. Alert Agent dedup alert 60 phút/khu vực.
+- **Input/Output schema rõ ràng:** Mỗi agent định nghĩa input/output riêng, ghi `agent_run_log` cho mọi lần chạy.
 - **Tương thích ngược:** Format alert giữ chuẩn `**Action Plan:** / **Assigned Team:**` nên Frontend không cần sửa.
 
 ### 2.1. Hệ Thống Chấm Điểm Đa Chiều & Ma Trận Rủi Ro (Deep Risk Matrix)
@@ -105,29 +112,34 @@ Ngoài ra, luồng xử lý Feedback có sự phân tách rõ ràng (Human-in-th
 sequenceDiagram
     participant Cron as APScheduler (10m) / Demo API
     participant Orch as 🎼 Orchestrator
+    participant IngestA as 🔄 Ingestion Agent
     participant ML as ML Models + Rules
     participant DB as Supabase DB
     participant AlertA as 🚨 Alert Agent
     participant LLM as Groq Llama 3.3
     participant Router as 🧭 Router Agent
+    participant TicketA as 🎫 Ticket Agent
     participant Insight as 📊 Insight Agent
     participant Analyst as 🔬 Analyst Agent
     participant FE as React Dashboard
 
-    Note over ML,DB: Tầng Ingest (chạy trước): Clean PII → Topic/Sentiment → Safety Rule → bảng 'feedback'
+    Note over ML,DB: Tầng 1 — Ingestion Agent: Clean PII → Topic/Sentiment → Safety Rule → bảng 'feedback'
 
     Cron->>Orch: Kích hoạt vòng pipeline
-    Orch->>DB: [1] Quét feedback P4/P5 trong 1h, gom theo khu vực
-    Orch->>AlertA: [2] Tính mức cảnh báo từng khu vực
+    Orch->>IngestA: [1] Nhận feedback mới, clean PII, phân loại ML + rule Safety
+    IngestA->>DB: Ghi feedback đã gán nhãn vào Supabase
+    Orch->>DB: [2] Quét feedback P4/P5 trong 1h, gom theo khu vực
+    Orch->>AlertA: [3] Tính mức cảnh báo từng khu vực
     AlertA-->>Orch: WATCH / WARNING / CRITICAL (hoặc bỏ qua + dedup)
-    Orch->>LLM: [3] Phân tích root cause khu vực vượt ngưỡng
+    Orch->>LLM: [4] Phân tích root cause khu vực vượt ngưỡng
     LLM-->>Orch: JSON (title, root cause, action, team)
-    Orch->>Router: [4] Xác nhận phòng ban (routing_table.json, P5→Safety)
-    Orch->>DB: [5] Tạo Smart Alert vào bảng 'alerts'
-    Orch->>Insight: [6] Tổng hợp insight TẤT CẢ phòng ban
+    Orch->>Router: [5] Xác nhận phòng ban (routing_table.json, P5→Safety)
+    Orch->>TicketA: [6] Tạo/cập nhật ticket, dedup, gán SLA + owner
+    TicketA->>DB: Ghi ticket vào bảng 'alerts'
+    Orch->>Insight: [7] Tổng hợp insight TẤT CẢ phòng ban
     Insight->>DB: Đọc feedback + tickets 24h
     Insight-->>Orch: Insight per-department (trend, severity, tickets...)
-    Orch->>Analyst: [7] Phân tích sâu các phòng có rủi ro
+    Orch->>Analyst: [8] Phân tích sâu các phòng có rủi ro
     Analyst->>LLM: Root cause xuyên ticket + dự báo + đề xuất
     Analyst-->>Orch: risk_level, forecast, 3 recommendations
 
@@ -158,7 +170,7 @@ sequenceDiagram
 2. **Auth & Roles:** Đăng nhập, đăng ký an toàn.
 3. **Data Pipeline Dual-Mode:** APScheduler tự động (5-10 phút) và Endpoint phục vụ Demo 150 reviews.
 4. **NLP Processing:** 2 model `.joblib` gán nhãn Topic/Sentiment kết hợp Rule-based Safety (keyword → P5).
-5. **Hệ thống Multi-Agent (5 agents):** Router → Insight → Analyst → Alert → Orchestrator, chạy tự động khép kín mỗi 10 phút.
+5. **Hệ thống Multi-Agent (6 agents):** Ingestion → Router → Ticket → Insight → Analyst → Alert, điều phối bởi Orchestrator, chạy tự động khép kín mỗi 10 phút.
 6. **Cảnh báo phân cấp + chống trùng:** WATCH/WARNING/CRITICAL theo `severity_rules.json`, cooldown 60 phút.
 7. **Insight & Deep Analysis per-department:** API trả về số liệu tổng hợp + phân tích LLM cho từng phòng ban.
 8. **Config-driven Routing:** `routing_table.json` + `severity_rules.json` trong `data_real/taxonomy/` — tích hợp hoàn chỉnh với dataset thật của tổ chức.
