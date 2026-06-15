@@ -3,6 +3,9 @@
 > Yêu cầu: đã có `pipeline/.venv` (Python deps) và `app/node_modules` (frontend deps).
 > Mọi key sống trong `.env` ở repo root (KHÔNG commit).
 
+
+
+
 ## 1. Chạy BACKEND (FastAPI, cổng 8000)
 
 ```bash

@@ -1,1 +1,4 @@
 project_id = "inwdccrincuiilyrkzyc"
+
+[edge_runtime]
+enabled = false
