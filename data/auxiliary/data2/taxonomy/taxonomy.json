@@ -1,0 +1,44 @@
+{
+  "topics": {
+    "Thái độ tài xế": {
+      "description": "Phản hồi liên quan đến cách ứng xử, giao tiếp, tác phong của tài xế",
+      "department": "Quản lý đối tác tài xế"
+    },
+    "Ứng dụng": {
+      "description": "Phản hồi về app: lỗi kỹ thuật, hiệu năng, giao diện, hoặc khen ngợi trải nghiệm app",
+      "department": "Kỹ thuật / Sản phẩm"
+    },
+    "Thanh toán": {
+      "description": "Phản hồi về thanh toán, hóa đơn, ví điện tử, hoàn tiền, mã giảm giá",
+      "department": "Tài chính / Vận hành thanh toán"
+    },
+    "Trễ chuyến": {
+      "description": "Phản hồi về thời gian chờ xe, hủy chuyến, ghép tài xế chậm",
+      "department": "Vận hành điều xe"
+    },
+    "Giá cước": {
+      "description": "Phản hồi về mức giá, phụ phí, tính minh bạch của cước phí",
+      "department": "Chính sách giá"
+    },
+    "An toàn": {
+      "description": "Phản hồi liên quan đến an toàn giao thông, hành vi nguy hiểm, quấy rối, đe dọa",
+      "department": "An toàn & Tuân thủ (ưu tiên cao nhất)"
+    },
+    "Khác": {
+      "description": "Phản hồi không thuộc các nhóm trên: CSKH, khuyến mãi, giao hàng, tổng quan dịch vụ",
+      "department": "Chăm sóc khách hàng"
+    }
+  },
+  "sentiments": [
+    "Tiêu cực",
+    "Trung tính",
+    "Tích cực"
+  ],
+  "severity_scale": {
+    "1": "Thấp - phản hồi tích cực hoặc không có vấn đề",
+    "2": "Thấp - phản hồi trung tính",
+    "3": "Trung bình - phản hồi tiêu cực thông thường",
+    "4": "Cao - phản hồi tiêu cực ở nhóm Thanh toán/Thái độ tài xế",
+    "5": "Khẩn cấp - liên quan An toàn, luôn ưu tiên xử lý ngay"
+  }
+}

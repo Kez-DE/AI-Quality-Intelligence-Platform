@@ -1,0 +1,280 @@
+{
+  "purpose": "Data_2 balanced-label experiment only; production models are not overwritten.",
+  "train_rows": 3958,
+  "aux_test_rows": 990,
+  "canonical_test_rows": 932,
+  "data2_trained_model": {
+    "topic_on_data2_test": {
+      "App Issue": {
+        "precision": 0.9103448275862069,
+        "recall": 0.9428571428571428,
+        "f1-score": 0.9263157894736842,
+        "support": 140.0
+      },
+      "Delay": {
+        "precision": 0.9583333333333334,
+        "recall": 0.9517241379310345,
+        "f1-score": 0.9550173010380623,
+        "support": 145.0
+      },
+      "Driver Behavior": {
+        "precision": 0.9027777777777778,
+        "recall": 0.9848484848484849,
+        "f1-score": 0.9420289855072463,
+        "support": 132.0
+      },
+      "Other": {
+        "precision": 0.9562043795620438,
+        "recall": 0.8343949044585988,
+        "f1-score": 0.891156462585034,
+        "support": 157.0
+      },
+      "Payment": {
+        "precision": 0.9379310344827586,
+        "recall": 0.9784172661870504,
+        "f1-score": 0.9577464788732394,
+        "support": 139.0
+      },
+      "Pricing": {
+        "precision": 0.965034965034965,
+        "recall": 0.9787234042553191,
+        "f1-score": 0.971830985915493,
+        "support": 141.0
+      },
+      "Safety": {
+        "precision": 0.9848484848484849,
+        "recall": 0.9558823529411765,
+        "f1-score": 0.9701492537313433,
+        "support": 136.0
+      },
+      "accuracy": 0.9444444444444444,
+      "macro avg": {
+        "precision": 0.9450678289465101,
+        "recall": 0.9466925276398296,
+        "f1-score": 0.9448921795891575,
+        "support": 990.0
+      },
+      "weighted avg": {
+        "precision": 0.9455344457128658,
+        "recall": 0.9444444444444444,
+        "f1-score": 0.9439558969440092,
+        "support": 990.0
+      }
+    },
+    "sentiment_on_data2_test": {
+      "negative": {
+        "precision": 0.9551122194513716,
+        "recall": 0.964735516372796,
+        "f1-score": 0.9598997493734336,
+        "support": 397.0
+      },
+      "neutral": {
+        "precision": 0.9814814814814815,
+        "recall": 0.977859778597786,
+        "f1-score": 0.9796672828096118,
+        "support": 271.0
+      },
+      "positive": {
+        "precision": 0.9561128526645768,
+        "recall": 0.9472049689440993,
+        "f1-score": 0.9516380655226209,
+        "support": 322.0
+      },
+      "accuracy": 0.9626262626262626,
+      "macro avg": {
+        "precision": 0.9642355178658099,
+        "recall": 0.9632667546382271,
+        "f1-score": 0.9637350325685553,
+        "support": 990.0
+      },
+      "weighted avg": {
+        "precision": 0.962655930466333,
+        "recall": 0.9626262626262626,
+        "f1-score": 0.9626237285262038,
+        "support": 990.0
+      }
+    },
+    "topic_on_canonical_test": {
+      "App Issue": {
+        "precision": 0.890625,
+        "recall": 0.9047619047619048,
+        "f1-score": 0.8976377952755905,
+        "support": 189.0
+      },
+      "Delay": {
+        "precision": 0.6865671641791045,
+        "recall": 0.9387755102040817,
+        "f1-score": 0.7931034482758621,
+        "support": 49.0
+      },
+      "Driver Behavior": {
+        "precision": 0.9513274336283186,
+        "recall": 0.9267241379310345,
+        "f1-score": 0.9388646288209607,
+        "support": 232.0
+      },
+      "Other": {
+        "precision": 0.9743589743589743,
+        "recall": 0.8735632183908046,
+        "f1-score": 0.9212121212121213,
+        "support": 348.0
+      },
+      "Payment": {
+        "precision": 0.8043478260869565,
+        "recall": 0.961038961038961,
+        "f1-score": 0.8757396449704142,
+        "support": 77.0
+      },
+      "Pricing": {
+        "precision": 0.75,
+        "recall": 0.967741935483871,
+        "f1-score": 0.8450704225352113,
+        "support": 31.0
+      },
+      "Safety": {
+        "precision": 0.6666666666666666,
+        "recall": 0.3333333333333333,
+        "f1-score": 0.4444444444444444,
+        "support": 6.0
+      },
+      "accuracy": 0.9034334763948498,
+      "macro avg": {
+        "precision": 0.8176990092742887,
+        "recall": 0.8437055715919987,
+        "f1-score": 0.8165817865049434,
+        "support": 932.0
+      },
+      "weighted avg": {
+        "precision": 0.9130253072233528,
+        "recall": 0.9034334763948498,
+        "f1-score": 0.9047315737863357,
+        "support": 932.0
+      }
+    },
+    "sentiment_on_canonical_test": {
+      "negative": {
+        "precision": 0.9651515151515152,
+        "recall": 0.9126074498567335,
+        "f1-score": 0.9381443298969072,
+        "support": 698.0
+      },
+      "neutral": {
+        "precision": 0.6056338028169014,
+        "recall": 0.7818181818181819,
+        "f1-score": 0.6825396825396826,
+        "support": 55.0
+      },
+      "positive": {
+        "precision": 0.7910447761194029,
+        "recall": 0.888268156424581,
+        "f1-score": 0.8368421052631579,
+        "support": 179.0
+      },
+      "accuracy": 0.9002145922746781,
+      "macro avg": {
+        "precision": 0.7872766980292732,
+        "recall": 0.8608979293664988,
+        "f1-score": 0.8191753725665826,
+        "support": 932.0
+      },
+      "weighted avg": {
+        "precision": 0.9104963858970605,
+        "recall": 0.9002145922746781,
+        "f1-score": 0.9036042506972416,
+        "support": 932.0
+      }
+    }
+  },
+  "current_production_model": {
+    "topic_on_canonical_test": {
+      "App Issue": {
+        "precision": 0.8357487922705314,
+        "recall": 0.9153439153439153,
+        "f1-score": 0.8737373737373737,
+        "support": 189.0
+      },
+      "Delay": {
+        "precision": 0.5857142857142857,
+        "recall": 0.8367346938775511,
+        "f1-score": 0.6890756302521008,
+        "support": 49.0
+      },
+      "Driver Behavior": {
+        "precision": 0.96875,
+        "recall": 0.2672413793103448,
+        "f1-score": 0.4189189189189189,
+        "support": 232.0
+      },
+      "Other": {
+        "precision": 0.7472527472527473,
+        "recall": 0.9770114942528736,
+        "f1-score": 0.8468244084682441,
+        "support": 348.0
+      },
+      "Payment": {
+        "precision": 0.7395833333333334,
+        "recall": 0.922077922077922,
+        "f1-score": 0.8208092485549133,
+        "support": 77.0
+      },
+      "Pricing": {
+        "precision": 0.7894736842105263,
+        "recall": 0.967741935483871,
+        "f1-score": 0.8695652173913043,
+        "support": 31.0
+      },
+      "Safety": {
+        "precision": 1.0,
+        "recall": 0.3333333333333333,
+        "f1-score": 0.5,
+        "support": 6.0
+      },
+      "accuracy": 0.7714592274678111,
+      "macro avg": {
+        "precision": 0.8095032632544891,
+        "recall": 0.7456406676685444,
+        "f1-score": 0.716990113903265,
+        "support": 932.0
+      },
+      "weighted avg": {
+        "precision": 0.8142404277470808,
+        "recall": 0.7714592274678111,
+        "f1-score": 0.7338454793269457,
+        "support": 932.0
+      }
+    },
+    "sentiment_on_canonical_test": {
+      "negative": {
+        "precision": 0.9550561797752809,
+        "recall": 0.9742120343839542,
+        "f1-score": 0.9645390070921985,
+        "support": 698.0
+      },
+      "neutral": {
+        "precision": 0.9772727272727273,
+        "recall": 0.7818181818181819,
+        "f1-score": 0.8686868686868687,
+        "support": 55.0
+      },
+      "positive": {
+        "precision": 0.8863636363636364,
+        "recall": 0.8715083798882681,
+        "f1-score": 0.8788732394366198,
+        "support": 179.0
+      },
+      "accuracy": 0.9431330472103004,
+      "macro avg": {
+        "precision": 0.9395641811372148,
+        "recall": 0.8758461986968014,
+        "f1-score": 0.904033038405229,
+        "support": 932.0
+      },
+      "weighted avg": {
+        "precision": 0.9431741463436019,
+        "recall": 0.9431330472103004,
+        "f1-score": 0.9424295220893641,
+        "support": 932.0
+      }
+    }
+  }
+}

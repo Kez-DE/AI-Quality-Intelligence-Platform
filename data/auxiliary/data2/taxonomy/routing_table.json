@@ -1,0 +1,41 @@
+{
+  "routing": [
+    {
+      "chu_de": "Thái độ tài xế",
+      "phong_ban": "Quản lý đối tác tài xế",
+      "sla_hours": 24
+    },
+    {
+      "chu_de": "Ứng dụng",
+      "phong_ban": "Kỹ thuật / Sản phẩm",
+      "sla_hours": 48
+    },
+    {
+      "chu_de": "Thanh toán",
+      "phong_ban": "Tài chính / Vận hành thanh toán",
+      "sla_hours": 24
+    },
+    {
+      "chu_de": "Trễ chuyến",
+      "phong_ban": "Vận hành điều xe",
+      "sla_hours": 48
+    },
+    {
+      "chu_de": "Giá cước",
+      "phong_ban": "Chính sách giá",
+      "sla_hours": 72
+    },
+    {
+      "chu_de": "An toàn",
+      "phong_ban": "An toàn & Tuân thủ",
+      "sla_hours": 2
+    },
+    {
+      "chu_de": "Khác",
+      "phong_ban": "Chăm sóc khách hàng",
+      "sla_hours": 48
+    }
+  ],
+  "default_phong_ban": "Chăm sóc khách hàng",
+  "escalation_rule": "Nếu do_nghiem_trong == 5, escalate ngay cho An toàn & Tuân thủ bất kể chu_de"
+}

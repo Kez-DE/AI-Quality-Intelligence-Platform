@@ -1,0 +1,41 @@
+{
+  "description": "Quy tắc tính do_nghiem_trong (1-5), đồng bộ với hàm predict() trong Train_data_balanced.ipynb",
+  "rules": [
+    {
+      "condition": "text chứa từ khóa SAFETY_VI_PHAM_KEYWORDS",
+      "chu_de": "An toàn",
+      "cam_xuc": "Tiêu cực",
+      "do_nghiem_trong": 5
+    },
+    {
+      "condition": "text chứa từ khóa SAFETY_TICH_CUC_KEYWORDS và cam_xuc == Tiêu cực",
+      "chu_de": "An toàn",
+      "do_nghiem_trong": 5
+    },
+    {
+      "condition": "text chứa từ khóa SAFETY_TICH_CUC_KEYWORDS và cam_xuc != Tiêu cực",
+      "chu_de": "An toàn",
+      "do_nghiem_trong": 1
+    },
+    {
+      "condition": "chu_de == 'An toàn' (không qua keyword)",
+      "do_nghiem_trong": 5
+    },
+    {
+      "condition": "cam_xuc == 'Tiêu cực' và chu_de in ['Thanh toán','Thái độ tài xế']",
+      "do_nghiem_trong": 4
+    },
+    {
+      "condition": "cam_xuc == 'Tiêu cực' (chu_de khác)",
+      "do_nghiem_trong": 3
+    },
+    {
+      "condition": "cam_xuc == 'Trung tính'",
+      "do_nghiem_trong": 2
+    },
+    {
+      "condition": "cam_xuc == 'Tích cực'",
+      "do_nghiem_trong": 1
+    }
+  ]
+}

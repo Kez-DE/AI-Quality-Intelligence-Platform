@@ -12,6 +12,24 @@ không phải dữ liệu vận hành thật của xanhSM/GreenSM.
 | `train/` | `seed_train_labeled.json`, `train_split.json`, `test_split.json` | Tập huấn luyện/đánh giá classifier | Train TF-IDF + LinearSVC |
 | `demo/` | `seed_demo_150.json` | 150 review công khai + cắm spike Safety tổng hợp | "Nút bấm" demo trên sân khấu (chưa có nhãn ML) |
 | `reference/` | `area_catalog.json`, `enrichment_summary.json` | Bảng tra khu vực + tóm tắt enrichment | Tham chiếu khu vực HN/HCM/ĐN |
+| `auxiliary/data2/` | Data_2 đã chuẩn hoá schema | Bộ phụ trợ có mock/synthetic | Kiểm thử Safety spike + thử nghiệm train cân bằng nhãn |
+
+## Quyết định về Data_2
+
+Dataset chính của hệ thống vẫn là bộ public reviews đã enrich hiện tại trong repo:
+
+- `raw/ai223_public_reviews_5000_enriched_locations.csv`
+- `processed/seed_real_clean.json`
+
+`Data_2` **không thay thế** dataset chính. Các phần được chuẩn hoá vào
+`auxiliary/data2/` chỉ dùng như auxiliary dataset để:
+
+1. bổ sung synthetic Safety spike cases cho kiểm thử/demo;
+2. thử nghiệm balanced-label training riêng;
+3. tham khảo taxonomy/safety keywords.
+
+Không mô tả các file trong `auxiliary/data2/` là dữ liệu public-review chính vì
+Data_2 có nhiều row mock/synthetic (`FB-MOCK-*`).
 
 ## Trường THẬT vs TỔNG HỢP
 

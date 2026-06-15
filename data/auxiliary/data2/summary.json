@@ -1,0 +1,105 @@
+{
+  "source": "/Users/kenz_de/Downloads/Data_2/data",
+  "purpose": "Auxiliary Data_2 material for Safety spike tests and balanced-label model experiments.",
+  "canonical_runtime_dataset": "data/processed/seed_real_clean.json",
+  "train_balanced": {
+    "seed_train_labeled": {
+      "rows": 4948,
+      "unique_texts": 3742,
+      "duplicate_texts": 1206,
+      "mock_id_rows": 2706,
+      "topic_distribution": {
+        "Delay": 716,
+        "Other": 712,
+        "Pricing": 712,
+        "Payment": 710,
+        "App Issue": 710,
+        "Safety": 709,
+        "Driver Behavior": 679
+      },
+      "sentiment_distribution": {
+        "negative": 1758,
+        "positive": 1629,
+        "neutral": 1561
+      },
+      "severity_distribution": {
+        "1": 1642,
+        "2": 1390,
+        "3": 994,
+        "4": 467,
+        "5": 455
+      }
+    },
+    "train_split": {
+      "rows": 3958,
+      "unique_texts": 3090,
+      "duplicate_texts": 868,
+      "mock_id_rows": 2181,
+      "topic_distribution": {
+        "Safety": 573,
+        "Payment": 571,
+        "Delay": 571,
+        "Pricing": 571,
+        "App Issue": 570,
+        "Other": 555,
+        "Driver Behavior": 547
+      },
+      "sentiment_distribution": {
+        "negative": 1361,
+        "positive": 1307,
+        "neutral": 1290
+      },
+      "severity_distribution": {
+        "1": 1316,
+        "2": 1147,
+        "3": 762,
+        "5": 374,
+        "4": 359
+      }
+    },
+    "test_split": {
+      "rows": 990,
+      "unique_texts": 909,
+      "duplicate_texts": 81,
+      "mock_id_rows": 525,
+      "topic_distribution": {
+        "Other": 157,
+        "Delay": 145,
+        "Pricing": 141,
+        "App Issue": 140,
+        "Payment": 139,
+        "Safety": 136,
+        "Driver Behavior": 132
+      },
+      "sentiment_distribution": {
+        "negative": 397,
+        "positive": 322,
+        "neutral": 271
+      },
+      "severity_distribution": {
+        "1": 326,
+        "2": 243,
+        "3": 232,
+        "4": 108,
+        "5": 81
+      }
+    }
+  },
+  "synthetic": {
+    "safety_spike_cases": {
+      "rows": 30,
+      "unique_texts": 30,
+      "duplicate_texts": 0,
+      "mock_id_rows": 26,
+      "topic_distribution": {
+        "Safety": 30
+      },
+      "sentiment_distribution": {
+        "negative": 30
+      },
+      "severity_distribution": {
+        "5": 30
+      }
+    }
+  }
+}
