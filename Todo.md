@@ -92,7 +92,58 @@
 - [ ] Them rate limit cho guest upload feedback de tranh spam.
 - [ ] Them test cho cac truong hop tai khoan khach truy cap sai quyen.
 
-## 9. Frontend can cai thien
+## 9. Gom ticket thanh task va bao cao truong phong
+
+- [ ] Thiet ke bang/logic `tasks` de gom nhieu ticket lien quan thanh mot viec can xu ly.
+- [ ] Them co che cluster ticket theo team, area, topic, severity, thoi gian va root cause.
+- [ ] Moi task can co title, summary, related_ticket_ids, assigned_team, owner, priority, due_at, status.
+- [ ] Them logic tu dong gan ticket moi vao task dang mo neu cung van de, thay vi tao task moi.
+- [ ] Tao summary cho tung nhom ticket: diem chung, so luong case, muc anh huong, khu vuc, khung gio, quote dai dien.
+- [ ] Them report theo phong ban hang ngay/hang tuan cho truong phong.
+- [ ] Report can co: top van de, task uu tien, SLA risk, ticket qua han, root cause, action plan, owner de xuat.
+- [ ] Cho truong phong duyet/sua task va report truoc khi chia viec cho nhan su.
+- [ ] Them trang Department Report de xem bao cao theo team va export Markdown/PDF neu can.
+- [ ] Them audit log khi agent gom ticket, tao task, cap nhat task hoac sinh bao cao.
+
+## 10. Kiem soat LLM rate limit va chi phi
+
+- [ ] Them LLM gateway/wrapper dung chung cho tat ca agent va chatbot.
+- [ ] Them retry voi exponential backoff khi gap 429/rate limit.
+- [ ] Them queue cho job LLM de khong goi dong loat khi co nhieu ticket.
+- [ ] Them cache theo input_hash cho cac prompt phan tich giong nhau.
+- [ ] Gom nhieu ticket thanh batch truoc khi goi LLM, tranh goi tung ticket rieng le.
+- [ ] Uu tien heuristic/model local cho cac viec don gian; chi goi LLM khi can root cause/report/action plan.
+- [ ] Dat budget theo ngay/thang: max requests, max tokens, max cost cho demo va production.
+- [ ] Them circuit breaker: khi LLM loi lien tiep thi tam dung agent LLM va dung fallback.
+- [ ] Log token usage, latency, provider, model, cost estimate, status cho moi request.
+- [ ] Them man hinh/admin log de xem LLM usage va loi rate limit.
+
+## 11. Cham diem feedback ro rang hon
+
+- [ ] Thiet ke rubric cham diem feedback theo cac truc: do nguy hiem, an toan, thai do, anh huong dich vu, do khan cap, do tin cay.
+- [ ] Tach `severity` khoi cac score chi tiet de tranh mot cot severity phai ganh qua nhieu y nghia.
+- [ ] Them cac truong diem goi y: `safety_score`, `attitude_score`, `urgency_score`, `impact_score`, `confidence_score`.
+- [ ] Dinh nghia thang diem 1-5 hoac 0-100 va mapping sang priority/ticket severity.
+- [ ] Viet rule-based override cho cac keyword nghiem trong: tai nan, say xin, de doa, quay roi, gian lan, mat an toan.
+- [ ] Cho staff/admin sua diem AI cham sai va luu correction log.
+- [ ] Dung correction log de danh gia lai model/rule va cai thien prompt.
+- [ ] Hien thi score breakdown trong feedback detail va ticket detail.
+- [ ] Them test cho cac case feedback nghiem trong, feedback mo ho, feedback tich cuc nhung co keyword rui ro.
+
+## 12. Dashboard support khach hang online
+
+- [ ] Tao dashboard rieng cho support/CS online de theo doi feedback/ticket dang can phan hoi.
+- [ ] Hien hang doi feedback moi theo do khan cap, SLA, kenh gui va khu vuc.
+- [ ] Them trang chi tiet khach hang/feedback voi lich su ticket lien quan neu co quyen.
+- [ ] Them mau phan hoi/canned response cho cac van de lap lai.
+- [ ] Them trang thai support: new, reviewing, replied, waiting_customer, escalated, resolved.
+- [ ] Them assignment cho nhan vien support va filter theo nguoi phu trach.
+- [ ] Them metric support: first response time, resolution time, backlog, overdue, reopen rate.
+- [ ] Tich hop voi ticket/task workflow de support co the escalate len phong ban lien quan.
+- [ ] Dam bao dashboard support khong hien PII cho role khong duoc phep.
+- [ ] Them realtime update khi feedback moi hoac ticket support doi trang thai.
+
+## 13. Frontend can cai thien
 
 - [ ] AppShell hien menu theo role, khong hien route guest khong duoc vao.
 - [ ] Them guard cho route theo role, khong chi dua vao sidebar.
@@ -103,17 +154,19 @@
 - [ ] Them toast/log UI khi agent run loi hoac ticket trigger bi fail.
 - [ ] Kiem tra responsive mobile cho dashboard, upload feedback va ticket triage.
 
-## 10. Database va Supabase
+## 14. Database va Supabase
 
 - [ ] Cap nhat migration cho roles, tickets, ticket_trigger_events, agent_run_logs neu chua co.
+- [ ] Cap nhat migration cho tasks, task_ticket_links, department_reports, feedback_scores neu can.
 - [ ] Them index cho feedback: created_at, area, topic, sentiment, severity, upload_batch_id.
 - [ ] Them index cho tickets: status, assigned_team, severity, due_at, dedup_key.
+- [ ] Them index cho tasks: assigned_team, owner, priority, due_at, status.
 - [ ] Them unique constraint hoac dedup_key de tranh ticket trung.
 - [ ] Bat RLS cho cac bang co du lieu nguoi dung.
 - [ ] Viet policy guest chi insert feedback cua minh va chi read dashboard view duoc phep.
 - [ ] Tao view rieng cho dashboard guest neu can an du lieu raw.
 
-## 11. Kiem thu
+## 15. Kiem thu
 
 - [ ] Test dang nhap bang tai khoan guest.
 - [ ] Test guest xem dashboard.
@@ -125,16 +178,144 @@
 - [ ] Test ticket trigger: manual, scheduler, feedback P5, spike theo area/topic, duplicate trigger.
 - [ ] Test RLS bang Supabase client voi role guest/user/admin.
 - [ ] Test build frontend va smoke test backend truoc khi deploy.
+- [ ] Test gom ticket thanh task va sinh department report.
+- [ ] Test LLM rate limit: retry, queue, cache, fallback, circuit breaker.
+- [ ] Test feedback scoring voi bo case nghiem trong/khong nghiem trong.
+- [ ] Test dashboard support voi role support, manager, guest.
 
-## 12. Tai lieu va demo
+## 16. Tai lieu va demo
 
 - [ ] Cap nhat `README.md` theo flow moi: role guest, 6 agent, ticket trigger, deploy URL.
 - [ ] Cap nhat `MASTER_BLUEPRINT.md` theo kien truc 6 agent moi.
 - [ ] Cap nhat `RUN.md` voi lenh chay backend/frontend/Supabase va cach trigger demo.
 - [ ] Cap nhat demo script: guest upload feedback -> agent xu ly -> ticket/alert hien realtime -> staff resolve.
+- [ ] Cap nhat demo script them flow: nhieu ticket -> gom thanh task -> sinh report gui truong phong.
+- [ ] Ghi ro chien luoc giam goi LLM/rate limit trong tai lieu ky thuat.
+- [ ] Ghi ro rubric cham diem feedback va cach staff sua diem AI.
+- [ ] Ghi ro workflow dashboard support online.
 - [ ] Ghi ro bien moi truong can co trong `.env.example`.
 
-## 13. Dua len URL public de moi nguoi truy cap
+## 17. Chat AI va RAG
+
+- [ ] Xac dinh Chat AI dung de hoi ve dashboard/ticket/feedback hay hoi tai lieu noi bo.
+- [ ] Tach prompt system cho manager, staff va admin neu quyen khac nhau.
+- [ ] Khong cho guest dung Chat AI neu co nguy co lo du lieu noi bo.
+- [ ] Neu giu Chat AI, backend phai lay du lieu theo role va chi dua context duoc phep vao LLM.
+- [ ] Them guard de LLM khong tra ve PII, service_role key, prompt noi bo hoac du lieu raw nhay cam.
+- [ ] Luu chat history theo user va them nut xoa lich su neu can.
+- [ ] Them logging chi phi/token/latency cho moi request LLM.
+- [ ] Them fallback khi LLM timeout hoac het quota.
+
+## 18. Chatbot assistant cho van hanh
+
+- [ ] Dinh nghia chatbot tra loi duoc cac cau hoi nao: "khu vuc nao dang nong", "ticket nao sap qua SLA", "team nao can uu tien".
+- [ ] Them tool/function cho chatbot doc dashboard summary, ticket summary va insight summary thay vi doc truc tiep bang query tuy y.
+- [ ] Gioi han chatbot chi duoc goi cac tool read-only, khong tu y sua ticket hoac tao alert neu chua co confirm.
+- [ ] Neu cho chatbot tao action, bat buoc co confirm step va audit log.
+- [ ] Them citation/nguon du lieu cho cau tra loi chatbot: ticket id, alert id, time range.
+- [ ] Test chatbot voi cau hoi sai, cau hoi ngoai scope, prompt injection va yeu cau xem du lieu khong co quyen.
+
+## 19. Chatbot public cho guest
+
+- [ ] Quyet dinh co can chatbot public cho guest hay khong; neu khong can thi an hoan toan.
+- [ ] Neu co chatbot guest, chi cho tra loi huong dan gui feedback va giai thich dashboard public.
+- [ ] Khong cho chatbot guest truy cap ticket, feedback raw, alert noi bo, agent logs.
+- [ ] Them rate limit rieng cho chatbot guest.
+- [ ] Them canned responses cho cac cau hoi thuong gap de giam chi phi LLM.
+
+## 20. Quan sat he thong va van hanh
+
+- [ ] Them healthcheck endpoint cho backend: DB connection, model loaded, LLM configured, scheduler status.
+- [ ] Them trang hoac log xem trang thai agent run gan nhat.
+- [ ] Theo doi latency cua upload feedback, classification, ticket trigger va agent pipeline.
+- [ ] Theo doi error rate theo module: frontend, backend, Supabase, LLM, scheduler.
+- [ ] Them alert noi bo khi scheduler dung chay hoac agent loi lien tiep.
+- [ ] Ghi ro runbook: khi Supabase loi, LLM loi, deploy loi, RLS chan nham thi xu ly ra sao.
+- [ ] Them backup/restore plan cho Supabase database.
+- [ ] Them data retention policy cho feedback, chat_messages va agent logs.
+
+## 21. CI/CD va chat luong code
+
+- [ ] Them GitHub Actions chay lint/test/build cho frontend.
+- [ ] Them GitHub Actions chay test backend pipeline.
+- [ ] Them check schema/migration Supabase neu co thay doi DB.
+- [ ] Them pre-commit hoac script format cho TypeScript va Python.
+- [ ] Them typecheck frontend va validation cho generated Supabase types.
+- [ ] Them smoke test toi thieu sau deploy.
+- [ ] Tach config dev/staging/prod de tranh dung nham key.
+- [ ] Them convention commit/branch va yeu cau cap nhat `JOURNAL.md`/`WORKLOG.md` truoc PR.
+
+## 22. Docker hoa moi truong phat trien
+
+- [ ] Tao `Dockerfile` cho backend FastAPI/pipeline.
+- [ ] Tao `Dockerfile` cho frontend React/TanStack Start.
+- [ ] Tao `docker-compose.yml` de chay frontend, backend va Supabase/local services neu phu hop.
+- [ ] Chuan hoa bien moi truong qua `.env.example` va `.env.docker.example`.
+- [ ] Dam bao thanh vien moi chi can `docker compose up` la chay duoc app.
+- [ ] Them volume/cache hop ly cho node_modules, Python venv/model files de dev nhanh hon.
+- [ ] Them healthcheck cho container backend va frontend.
+- [ ] Them script seed data demo khi chay Docker lan dau.
+- [ ] Viet huong dan Docker trong `RUN.md` hoac `README.md`: cai Docker Desktop, copy env, start/stop/reset.
+- [ ] Kiem tra Docker tren may thanh vien khac hoac moi truong sach de tranh loi phu thuoc local.
+
+## 23. Quan tri to chuc va team
+
+- [ ] Them mo hinh organization/team neu san pham co nhieu phong ban hoac nhieu cong ty dung chung.
+- [ ] Gan user vao team/department va role cu the: owner, manager, staff, support, guest.
+- [ ] Them man hinh moi thanh vien, khoa tai khoan, doi role va gan team.
+- [ ] Them ownership ro rang cho ticket/task: assigned_team, assignee_id, reviewer_id.
+- [ ] Them rule de manager chi xem du lieu cua team minh neu can.
+- [ ] Them audit log cho thay doi role, team, permission va assignment.
+
+## 24. Notification va tich hop ben ngoai
+
+- [ ] Them notification trong app khi co ticket P4/P5, SLA sap tre hoac task moi duoc assign.
+- [ ] Them email notification cho manager/truong phong khi co report quan trong.
+- [ ] Can nhac tich hop Slack/Discord/Zalo OA neu team van hanh dung kenh do.
+- [ ] Them webhook outbound khi ticket/task doi status de tich hop voi he thong khac.
+- [ ] Them notification preferences theo user/team de tranh spam.
+- [ ] Them digest hang ngay/hang tuan cho truong phong.
+
+## 25. Danh gia chat luong model va agent
+
+- [ ] Tao bo evaluation dataset co label dung cho topic, sentiment, severity va feedback score.
+- [ ] Do metric classification: accuracy, precision/recall theo class, confusion matrix.
+- [ ] Do metric ticket routing: ti le route dung team, ti le P5 ve Safety, ti le ticket trung.
+- [ ] Do metric agent/report: tinh day du, dung schema, co action plan, khong hallucinate du lieu.
+- [ ] Them regression test de model/rule/prompt moi khong lam giam chat luong.
+- [ ] Luu correction cua staff de tao tap evaluation va cai thien model sau nay.
+- [ ] Them dashboard noi bo theo doi model drift va cac nhan hay bi sua lai.
+
+## 26. Data ingestion tu nguon thuc te
+
+- [ ] Xac dinh nguon du lieu production: app review, form feedback, CS ticket, hotline transcript, social comment.
+- [ ] Tao connector/importer rieng cho tung nguon du lieu.
+- [ ] Chuan hoa mapping source fields ve schema feedback canonical.
+- [ ] Them co che incremental sync de khong import trung.
+- [ ] Them validation pipeline cho data thieu area/topic/timestamp/user identifier.
+- [ ] Them trang xem upload/import batches va loi import.
+- [ ] Them co che an danh/ma hoa du lieu nhay cam truoc khi agent xu ly.
+
+## 27. Privacy, compliance va an toan du lieu
+
+- [ ] Xac dinh truong nao la PII: email, so dien thoai, ten, bien so xe, dia chi, noi dung nhay cam.
+- [ ] Mask/redact PII truoc khi dua vao LLM.
+- [ ] Khong gui du lieu raw nhay cam sang LLM neu khong can thiet.
+- [ ] Them data access policy theo role va muc do nhay cam.
+- [ ] Them retention policy: du lieu nao giu bao lau, log nao xoa sau bao lau.
+- [ ] Them export/delete data theo user neu can tuan thu yeu cau privacy.
+- [ ] Kiem tra secret scanning de khong commit API key, service_role key, token.
+
+## 28. Backup, migration va disaster recovery
+
+- [ ] Thiet lap backup Supabase/Postgres dinh ky.
+- [ ] Viet huong dan restore database tu backup.
+- [ ] Them migration strategy: tao migration, review, apply staging, apply production.
+- [ ] Them seed data rieng cho dev/demo/staging.
+- [ ] Them checklist rollback khi deploy backend/frontend/DB loi.
+- [ ] Kiem tra app van hoat dong o che do read-only hoac degraded mode khi agent worker loi.
+
+## 29. Dua len URL public de moi nguoi truy cap
 
 - [ ] Chon phuong an deploy frontend: Vercel/Netlify/Render static.
 - [ ] Chon phuong an deploy backend pipeline/API: Railway/Render/Fly.io hoac Supabase Edge neu phu hop.

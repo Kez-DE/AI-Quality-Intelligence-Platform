@@ -29,5 +29,29 @@ else
   [ -n "$PY" ] || exit 0
 fi
 
+if [ "$#" -gt 0 ]; then
+  SCRIPT="$1"
+  shift
+
+  # Hooks may be launched from outside the repository. If the requested script
+  # path is relative and not found from the current cwd, resolve it relative to
+  # this launcher (repo root/scripts).
+  case "$SCRIPT" in
+    /*) ;;
+    *)
+      if [ ! -f "$SCRIPT" ]; then
+        SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+        REPO_ROOT="$(dirname -- "$SCRIPT_DIR")"
+        if [ -f "$REPO_ROOT/$SCRIPT" ]; then
+          SCRIPT="$REPO_ROOT/$SCRIPT"
+        fi
+      fi
+      ;;
+  esac
+
+  # shellcheck disable=SC2086
+  exec $PY "$SCRIPT" "$@"
+fi
+
 # shellcheck disable=SC2086
-exec $PY "$@"
+exec $PY

@@ -9,8 +9,10 @@ import sys
 import subprocess
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from typing import Optional
 
 VN_TZ = timezone(timedelta(hours=7))
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def git(cmd):
@@ -50,7 +52,7 @@ def detect_tool(data: dict) -> str:
     return "unknown"
 
 
-def normalize(data: dict, tool: str) -> dict | None:
+def normalize(data: dict, tool: str) -> Optional[dict]:
     """Normalize tool-specific payload to common log entry."""
     event = data.get("hook_event_name") or data.get("event", "")
     ts = datetime.now(VN_TZ).isoformat()
@@ -156,6 +158,8 @@ def normalize(data: dict, tool: str) -> dict | None:
 
 
 def main():
+    os.chdir(REPO_ROOT)
+
     # Read stdin as UTF-8 explicitly. On Windows, sys.stdin defaults to the
     # system code page (e.g. cp1252), which corrupts non-Latin1 prompts
     # (Vietnamese, CJK, emoji) into mojibake. The hook payload is always UTF-8.
@@ -174,6 +178,8 @@ def main():
         sys.exit(0)
 
     log_dir = Path(os.environ.get("AI_LOG_DIR", ".ai-log"))
+    if not log_dir.is_absolute():
+        log_dir = REPO_ROOT / log_dir
     log_dir.mkdir(exist_ok=True)
     log_file = log_dir / "session.jsonl"
 
@@ -185,4 +191,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as exc:
+        # Logging hooks should never block the AI client. Emit valid JSON for
+        # clients that expect it, and exit successfully.
+        print(json.dumps({"status": "skipped", "reason": str(exc)[:200]}))
+        sys.exit(0)
