@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
 import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticated/feedback'
+import { Route as AuthenticatedDepartmentInsightsRouteImport } from './routes/_authenticated/department-insights'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedAlertsRouteImport } from './routes/_authenticated/alerts'
@@ -43,6 +44,12 @@ const AuthenticatedFeedbackRoute = AuthenticatedFeedbackRouteImport.update({
   path: '/feedback',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDepartmentInsightsRoute =
+  AuthenticatedDepartmentInsightsRouteImport.update({
+    id: '/department-insights',
+    path: '/department-insights',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -71,6 +78,7 @@ export interface FileRoutesByFullPath {
   '/alerts': typeof AuthenticatedAlertsRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/department-insights': typeof AuthenticatedDepartmentInsightsRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/insights': typeof AuthenticatedInsightsRoute
 }
@@ -81,6 +89,7 @@ export interface FileRoutesByTo {
   '/alerts': typeof AuthenticatedAlertsRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/department-insights': typeof AuthenticatedDepartmentInsightsRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/insights': typeof AuthenticatedInsightsRoute
 }
@@ -93,6 +102,7 @@ export interface FileRoutesById {
   '/_authenticated/alerts': typeof AuthenticatedAlertsRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/department-insights': typeof AuthenticatedDepartmentInsightsRoute
   '/_authenticated/feedback': typeof AuthenticatedFeedbackRoute
   '/_authenticated/insights': typeof AuthenticatedInsightsRoute
 }
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/chat'
     | '/dashboard'
+    | '/department-insights'
     | '/feedback'
     | '/insights'
   fileRoutesByTo: FileRoutesByTo
@@ -115,6 +126,7 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/chat'
     | '/dashboard'
+    | '/department-insights'
     | '/feedback'
     | '/insights'
   id:
@@ -126,6 +138,7 @@ export interface FileRouteTypes {
     | '/_authenticated/alerts'
     | '/_authenticated/chat'
     | '/_authenticated/dashboard'
+    | '/_authenticated/department-insights'
     | '/_authenticated/feedback'
     | '/_authenticated/insights'
   fileRoutesById: FileRoutesById
@@ -173,6 +186,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFeedbackRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/department-insights': {
+      id: '/_authenticated/department-insights'
+      path: '/department-insights'
+      fullPath: '/department-insights'
+      preLoaderRoute: typeof AuthenticatedDepartmentInsightsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -209,6 +229,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAlertsRoute: typeof AuthenticatedAlertsRoute
   AuthenticatedChatRoute: typeof AuthenticatedChatRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedDepartmentInsightsRoute: typeof AuthenticatedDepartmentInsightsRoute
   AuthenticatedFeedbackRoute: typeof AuthenticatedFeedbackRoute
   AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
 }
@@ -218,6 +239,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAlertsRoute: AuthenticatedAlertsRoute,
   AuthenticatedChatRoute: AuthenticatedChatRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedDepartmentInsightsRoute: AuthenticatedDepartmentInsightsRoute,
   AuthenticatedFeedbackRoute: AuthenticatedFeedbackRoute,
   AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
 }
