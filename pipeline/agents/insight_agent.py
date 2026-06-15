@@ -6,8 +6,11 @@ Khác bản origin: import phẳng (insight_agent nằm trong pipeline/agents/).
 from datetime import datetime, timedelta
 from typing import Any, Dict
 
-from agents.common import get_db
+import time
+
+from agents.common import get_db, log_agent_run
 from agents.router_agent import route_ticket
+from agents.schemas import InsightOutput, TopTopic, RecentSample
 
 
 def _severity_to_int(sev: Any) -> int:
@@ -50,16 +53,28 @@ def generate_department_insights(team: str, hours: int = 24) -> Dict[str, Any]:
         if route_ticket(f.get("topic", ""), f.get("severity", 3))["team"] == team
     ]
 
+    start_time = time.time()
     total_feedback = len(team_feedback)
+    
     if total_feedback == 0:
-        return {
-            "team": team,
-            "period_hours": hours,
-            "total_feedback": 0,
-            "severity_distribution": {"CRITICAL": 0, "WARNING": 0, "WATCH": 0, "INFO": 0},
-            "top_topics": [],
-            "recent_samples": [],
-        }
+        output = InsightOutput(
+            team=team,
+            period_hours=hours,
+            total_feedback=0,
+            severity_distribution={"CRITICAL": 0, "WARNING": 0, "WATCH": 0, "INFO": 0},
+            top_topics=[],
+            recent_samples=[]
+        )
+        latency_ms = int((time.time() - start_time) * 1000)
+        log_agent_run(
+            run_id=f"insight_{int(time.time())}",
+            agent_name="insight_agent",
+            status="success",
+            latency_ms=latency_ms,
+            output_summary="0 feedback found.",
+            input_hash=f"{team}_{hours}"
+        )
+        return output.model_dump()
 
     severity_dist = {"CRITICAL": 0, "WARNING": 0, "WATCH": 0, "INFO": 0}
     topic_counts: Dict[str, int] = {}
@@ -84,16 +99,28 @@ def generate_department_insights(team: str, hours: int = 24) -> Dict[str, Any]:
         text = str(f.get("text") or "").strip()
         if not text:
             continue
-        samples.append({"id": f.get("id"), "text": text, "area": f.get("area")})
+        samples.append(RecentSample(id=f.get("id"), text=text, area=f.get("area")))
 
-    return {
-        "team": team,
-        "period_hours": hours,
-        "total_feedback": total_feedback,
-        "severity_distribution": severity_dist,
-        "top_topics": [{"topic": t[0], "count": t[1]} for t in sorted_topics[:5]],
-        "recent_samples": samples,
-    }
+    output = InsightOutput(
+        team=team,
+        period_hours=hours,
+        total_feedback=total_feedback,
+        severity_distribution=severity_dist,
+        top_topics=[TopTopic(topic=t[0], count=t[1]) for t in sorted_topics[:5]],
+        recent_samples=samples
+    )
+    
+    latency_ms = int((time.time() - start_time) * 1000)
+    log_agent_run(
+        run_id=f"insight_{int(time.time())}",
+        agent_name="insight_agent",
+        status="success",
+        latency_ms=latency_ms,
+        output_summary=f"{total_feedback} feedbacks aggregated.",
+        input_hash=f"{team}_{hours}"
+    )
+
+    return output.model_dump()
 
 
 if __name__ == "__main__":

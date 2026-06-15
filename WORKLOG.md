@@ -115,3 +115,37 @@ Chưa phân công. TODO: ai làm module nào, deadline nội bộ.
 ### Bảo mật
 - `.gitignore` thêm `.env.*` + `!.env.example` để chặn mọi biến thể env (kể cả backup).
 - `.env` thật (Supabase + OpenRouter) chỉ sống local, KHÔNG commit.
+
+## 2026-06-15
+
+### Nâng cấp Kiến trúc — Chuyển sang Deep Risk Matrix & LLM Scoring Agent
+- **Vấn đề**: Logic cũ chỉ dùng 1 nhãn `severity` (dựa trên sentiment model + rules từ khoá cố định). Điều này làm lọt lưới nhiều feedback rủi ro ẩn giấu vì ngôn ngữ tự nhiên vô hạn, if-else keyword không thể bắt hết các trường hợp phức tạp (như tiếng lóng, mỉa mai).
+- **Giải pháp (Thay đổi kiến trúc)**:
+  1. Cập nhật `MASTER_BLUEPRINT.md` chính thức hóa chiến lược **Tối ưu Ingestion (Phễu Lọc 3 Tầng Vàng)** để đưa LLM vào chấm điểm mà vẫn giữ chi phí API = ~0đ.
+  2. Tạo Database Migration (`20260615000000_deep_risk_matrix.sql`) bổ sung 5 cột rủi ro (thang 0-10): `risk_safety`, `risk_fraud`, `risk_attitude`, `risk_vehicle`, `risk_compliance` vào bảng `feedback`.
+  3. Code mới `pipeline/agents/scoring_agent.py`: Agent chuyên bóc tách 5 vector rủi ro bằng LLM (Llama 3) kèm thuật toán tính điểm Waterfall (overall_risk từ 1-5).
+  4. Sửa cơ chế Fallback: Nếu LLM gặp sự cố (Rate Limit, Timeout), tự động gán cờ `needs_review = True` đưa vào Review Queue cho con người duyệt (Human-in-the-loop), tuyệt đối không dùng rule-based thay thế để tránh sai lệch dữ liệu.
+- **Quyết định Tối ưu Chi phí / Tốc độ (Đang thi công phần Ingestion)**:
+  - **Tầng 1 (Lọc ML)**: Dùng `.joblib` gạt bỏ 100% feedback positive/neutral (gán risk=0).
+  - **Tầng 2 (Batching)**: Gom cụm các feedback negative lại gọi API LLM 1 lần duy nhất để giải quyết triệt để rủi ro nghẽn mạng lúc Demo Day.
+  - **Tầng 3 (Caching)**: Dùng In-memory Hash Cache để tái sử dụng kết quả nếu review bị trùng lặp.
+
+### Hoàn thiện Phase 1 — Xây dựng lại hệ thống 6 Agent & Tối ưu LLM
+- **Vấn đề**: Hệ thống trước đây chỉ chạy gom nhóm insight cơ bản, thiếu sự liên kết thành một chu trình khép kín, và chưa có cơ chế kiểm soát lỗi hay quản lý chi phí LLM (dễ bị Rate Limit 429).
+- **Giải pháp (Thay đổi kiến trúc)**:
+  1. **Áp dụng Pydantic Schema**: Chuyển đổi toàn bộ 6 Agent sang dùng `schemas.py` để kiểm soát chặt chẽ cấu trúc Input/Output.
+  2. **Orchestrator 7 Bước**: Viết lại `orchestrator.py` tạo vòng lặp khép kín: Quét P4/P5 -> Alert Agent (Dedup) -> Root Cause -> Router Agent (Định tuyến đội ban) -> Ticket Agent (Tạo ticket) -> Insight -> Analyst.
+  3. **Tối ưu LLM & Cost**: Thiết kế thuật toán **Exponential Backoff** tự động chờ và thử lại khi gặp mã lỗi 429. Bổ sung **Memory Cache** hash nội dung để tái sử dụng phản hồi LLM trong cùng một mẻ (batch) quét.
+  4. **System Observability**: Thêm `log_agent_run` lưu lại toàn bộ vết thực thi của Agent (thời gian, status, hash, usage) vào bảng `agent_run_logs` mới.
+  5. **Fallback Heuristic**: Xây dựng giá trị dự phòng hợp lệ (fallback object) cho tất cả Agent để không làm chết hệ thống khi LLM gặp sự cố.
+- **Kết quả**: Vòng lặp Multi-Agent đã sẵn sàng, tích hợp hoàn toàn qua endpoint `/api/agent/run` và cronjob APScheduler.
+
+### Hoàn thiện Phase 2 — Triển khai Phân quyền (Role-based Access) & Tối ưu UI/UX
+- **Vấn đề**: Toàn bộ tính năng đang mở cho tất cả người dùng, chưa có khái niệm Guest (Tài khoản khách) và Admin phân biệt, dẫn đến rò rỉ dữ liệu nội bộ (PII, Alert, Ticket).
+- **Giải pháp**:
+  1. Thêm cơ chế bảo vệ đường dẫn (Route Guard) trong `route.tsx`, tự động chặn `guest` truy cập `/alerts`, `/insights`, `/admin`.
+  2. Cập nhật `AppShell.tsx` tự động co giãn thanh điều hướng (Sidebar) theo quyền của người dùng (Progressive Disclosure).
+  3. Áp dụng UI Pattern 2 (Upload) cho màn hình Phản hồi của Guest: chỉ hiển thị form gửi. Áp dụng Pattern 6 (Queue + Approval) cho Staff/Admin: hiển thị Review Queue và luồng dữ liệu sống.
+  4. Chỉnh sửa Dashboard (`QualityCockpit.tsx`): ẩn các thành phần Ticket, Alerts, Live Feed đối với Guest, và thay thế bằng `SecurityNotice` (khu vực hạn chế).
+  5. Cấu hình lại Chat AI cho Guest thành "Hỗ trợ trực tuyến" (CSKH), giới hạn câu hỏi gợi ý để hướng dẫn sử dụng app, trong khi Admin tiếp tục dùng Ops Assistant.
+- **Kết quả**: Hệ thống đã tách bạch quyền hạn giao diện an toàn, đáp ứng chuẩn thiết kế UX/UI cho Guest và Staff.

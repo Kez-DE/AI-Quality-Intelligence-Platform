@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { chatWithAI } from "@/lib/ai.functions";
 import { Sparkles, Send, Loader2, Bot, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
+import { useMe } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/chat")({
   component: ChatPage,
@@ -25,6 +26,22 @@ function ChatPage() {
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const chatFn = useServerFn(chatWithAI);
+  const { data: me } = useMe();
+  
+  const isGuest = me?.role === "guest";
+  const suggestions = isGuest 
+    ? [
+        "Làm sao để gửi phản hồi về tài xế?",
+        "Làm sao để biết khiếu nại đã được xử lý chưa?",
+        "Làm thế nào để tải nhiều phản hồi cùng lúc?",
+        "Tôi muốn báo cáo sự cố an toàn"
+      ]
+    : SUGGESTED;
+  
+  const title = isGuest ? "Hỗ trợ Trực tuyến (CSKH)" : "AI Assistant";
+  const subtitle = isGuest 
+    ? "Hỗ trợ giải đáp các thắc mắc và hướng dẫn gửi khiếu nại."
+    : "Trợ lý AI giúp diễn giải dữ liệu phản hồi và đề xuất hành động vận hành.";
 
   useEffect(() => {
     supabase
@@ -84,10 +101,10 @@ function ChatPage() {
       <div className="mb-4">
         <h1 className="font-display text-3xl font-bold flex items-center gap-2">
           <Sparkles className="h-6 w-6 text-xanh-green" />
-          AI Assistant
+          {title}
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Trợ lý AI giúp diễn giải dữ liệu phản hồi và đề xuất hành động vận hành.
+          {subtitle}
         </p>
       </div>
 
@@ -101,12 +118,14 @@ function ChatPage() {
               >
                 <Bot className="h-7 w-7" />
               </div>
-              <h3 className="font-display font-semibold mt-3">Hỏi gì AI cũng đáp</h3>
+              <h3 className="font-display font-semibold mt-3">
+                {isGuest ? "Xin chào! Tôi có thể giúp gì cho bạn?" : "Hỏi gì AI cũng đáp"}
+              </h3>
               <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
                 Bắt đầu bằng một trong các gợi ý dưới đây hoặc gõ câu hỏi của bạn.
               </p>
               <div className="grid sm:grid-cols-2 gap-2 max-w-xl mx-auto mt-5">
-                {SUGGESTED.map((s) => (
+                {suggestions.map((s) => (
                   <button
                     key={s}
                     onClick={() => send(s)}

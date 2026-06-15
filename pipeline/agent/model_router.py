@@ -161,7 +161,17 @@ def _extract_chat_content(response: object) -> str:
     content = getattr(message, "content", None)
     if content is None:
         raise ValueError("LLM response message has no content")
-    return str(content)
+        
+    usage = getattr(response, "usage", None)
+    token_usage = {}
+    if usage:
+        token_usage = {
+            "prompt_tokens": getattr(usage, "prompt_tokens", 0),
+            "completion_tokens": getattr(usage, "completion_tokens", 0),
+            "total_tokens": getattr(usage, "total_tokens", 0),
+        }
+        
+    return str(content), token_usage
 
 
 def _call_provider(
@@ -169,55 +179,70 @@ def _call_provider(
     messages: list[ChatMessage],
     response_json: bool,
     temperature: float,
-) -> str:
-    """Gọi đúng 1 provider, trả về content. Raise nếu provider lỗi (để caller failover)."""
+) -> tuple[str, dict]:
+    """Gọi đúng 1 provider, trả về content và usage. Raise nếu provider lỗi (để caller failover)."""
     model_name = provider_model(provider)
 
     if provider == "mock":
-        return mock_chat(messages)
-    if provider == "openrouter":
-        client = OpenAI(
-            api_key=OPENROUTER_API_KEY,
-            base_url="https://openrouter.ai/api/v1",
-            default_headers={
-                "HTTP-Referer": os.getenv("OPENROUTER_SITE_URL", "http://localhost:8000"),
-                "X-Title": os.getenv("OPENROUTER_APP_NAME", "AI Quality Intelligence Platform"),
-            },
-        )
-        kwargs = {"messages": messages, "model": model_name, "temperature": temperature}
-        if response_json:
-            kwargs["response_format"] = {"type": "json_object"}
-        response = client.chat.completions.create(**kwargs)
-        return _extract_chat_content(response)
-    if provider == "openai":
-        client = OpenAI(api_key=OPENAI_API_KEY)
-        kwargs = {"messages": messages, "model": model_name, "temperature": temperature}
-        if response_json:
-            kwargs["response_format"] = {"type": "json_object"}
-        response = client.chat.completions.create(**kwargs)
-        return _extract_chat_content(response)
-    if provider == "gemini":
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
-            import google.generativeai as genai
-
-        genai.configure(api_key=GEMINI_API_KEY)
-        generation_config = {"temperature": temperature}
-        if response_json:
-            generation_config["response_mime_type"] = "application/json"
-        model = genai.GenerativeModel(model_name, generation_config=generation_config)
-        response = model.generate_content(gemini_messages_to_prompt(messages))
-        content = getattr(response, "text", None)
-        if content is None:
-            raise ValueError("Gemini response has no text")
-        return str(content)
-    # groq
-    client = Groq(api_key=GROQ_API_KEY)
-    kwargs = {"messages": messages, "model": model_name, "temperature": temperature}
-    if response_json:
-        kwargs["response_format"] = {"type": "json_object"}
-    response = client.chat.completions.create(**kwargs)
-    return _extract_chat_content(response)
+        return mock_chat(messages), {}
+    
+    import time
+    max_retries = 3
+    base_delay = 1
+    
+    for attempt in range(max_retries):
+        try:
+            if provider == "openrouter":
+                client = OpenAI(
+                    api_key=OPENROUTER_API_KEY,
+                    base_url="https://openrouter.ai/api/v1",
+                    default_headers={
+                        "HTTP-Referer": os.getenv("OPENROUTER_SITE_URL", "http://localhost:8000"),
+                        "X-Title": os.getenv("OPENROUTER_APP_NAME", "AI Quality Intelligence Platform"),
+                    },
+                )
+                kwargs = {"messages": messages, "model": model_name, "temperature": temperature}
+                if response_json:
+                    kwargs["response_format"] = {"type": "json_object"}
+                response = client.chat.completions.create(**kwargs)
+                return _extract_chat_content(response)
+            if provider == "openai":
+                client = OpenAI(api_key=OPENAI_API_KEY)
+                kwargs = {"messages": messages, "model": model_name, "temperature": temperature}
+                if response_json:
+                    kwargs["response_format"] = {"type": "json_object"}
+                response = client.chat.completions.create(**kwargs)
+                return _extract_chat_content(response)
+            if provider == "gemini":
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
+                    import google.generativeai as genai
+        
+                genai.configure(api_key=GEMINI_API_KEY)
+                generation_config = {"temperature": temperature}
+                if response_json:
+                    generation_config["response_mime_type"] = "application/json"
+                model = genai.GenerativeModel(model_name, generation_config=generation_config)
+                response = model.generate_content(gemini_messages_to_prompt(messages))
+                content = getattr(response, "text", None)
+                if content is None:
+                    raise ValueError("Gemini response has no text")
+                return str(content), {}
+            # groq
+            client = Groq(api_key=GROQ_API_KEY)
+            kwargs = {"messages": messages, "model": model_name, "temperature": temperature}
+            if response_json:
+                kwargs["response_format"] = {"type": "json_object"}
+            response = client.chat.completions.create(**kwargs)
+            return _extract_chat_content(response)
+            
+        except Exception as e:
+            error_str = str(e).lower()
+            if "429" in error_str or "rate limit" in error_str:
+                if attempt < max_retries - 1:
+                    time.sleep(base_delay * (2 ** attempt))
+                    continue
+            raise
 
 
 def chat_completion(
@@ -240,7 +265,7 @@ def chat_completion(
         model_name = provider_model(provider)
         started = perf_counter()
         try:
-            content = _call_provider(provider, messages, response_json, temperature)
+            content, usage = _call_provider(provider, messages, response_json, temperature)
             latency_ms = round((perf_counter() - started) * 1000)
             write_agent_log({
                 "event": "chat_completion",
@@ -249,12 +274,14 @@ def chat_completion(
                 "ok": True,
                 "latency_ms": latency_ms,
                 "prompt_preview": first_user[:160],
+                "usage": usage,
             })
             return {
                 "content": content,
                 "provider": provider,
                 "model": model_name,
                 "latency_ms": latency_ms,
+                "usage": usage,
             }
         except Exception as exc:
             last_exc = exc

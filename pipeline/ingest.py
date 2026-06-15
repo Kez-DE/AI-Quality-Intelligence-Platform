@@ -1,16 +1,23 @@
 import os
 import json
+import hashlib
 from time import perf_counter
+import concurrent.futures
 from supabase import create_client, Client
 from clean import clean_text
 from env_config import get_supabase_config, has_supabase_admin_key
 
 SUPABASE_URL, SUPABASE_KEY = get_supabase_config()
 
+# Caching In-memory cho LLM: text_hash -> dict_of_risks (Tầng 3)
+_llm_cache = {}
+
+def get_hash(text: str) -> str:
+    return hashlib.md5(text.encode('utf-8')).hexdigest()
+
 def get_supabase() -> Client:
     if not SUPABASE_URL or not SUPABASE_KEY:
         raise ValueError("Thiếu cấu hình SUPABASE_URL và SUPABASE key trong .env")
-    # Supabase clients are not shared across scheduler/request threads.
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def build_feedback_payload(row: dict, user_id: str) -> dict | None:
@@ -19,37 +26,91 @@ def build_feedback_payload(row: dict, user_id: str) -> dict | None:
         return None
 
     cleaned_text = clean_text(raw_text)
-    has_labels = row.get("topic") and row.get("sentiment") and row.get("severity") is not None
-    if has_labels:
-        prediction = {
-            "topic": row.get("topic"),
-            "sentiment": row.get("sentiment"),
-            "severity": row.get("severity"),
-            "confidence": row.get("confidence", 0.95),
-        }
-    else:
-        # Lazy import keeps startup and labeled dataset ingest fast.
-        from classifier import predict_feedback
+    
+    # Lọc ML (Tầng 1)
+    from classifier import predict_feedback
+    prediction = predict_feedback(cleaned_text)
 
-        prediction = predict_feedback(cleaned_text)
-
-    severity = row.get("severity", prediction["severity"])
-    if isinstance(severity, str) and severity.upper().startswith("P"):
-        severity_value = severity.upper()
-    else:
-        severity_value = f"P{int(severity)}"
-
-    return {
+    # Khởi tạo Payload mặc định (Rủi ro 0, an toàn)
+    payload = {
         "user_id": user_id,
         "text": cleaned_text,
         "topic": row.get("topic") or prediction["topic"],
         "sentiment": row.get("sentiment") or prediction["sentiment"],
-        "severity": severity_value,
-        "confidence": prediction["confidence"],
+        "severity": prediction["severity"], # Tạm lấy từ ML/Rule, sẽ bị ghi đè nếu là negative
+        "confidence": prediction.get("confidence", 0.95),
         "area": row.get("area") or row.get("area_label") or row.get("city_label") or "Unknown",
         "source": row.get("source", "app_store"),
         "channel": "app",
+        # Default Deep Risk Matrix = 0
+        "risk_safety": 0,
+        "risk_fraud": 0,
+        "risk_attitude": 0,
+        "risk_vehicle": 0,
+        "risk_compliance": 0,
+        "needs_review": prediction.get("needs_review", False),
+        "review_reason": prediction.get("review_reason", None)
     }
+    return payload
+
+def _process_and_insert_batch(db: Client, payload_batch: list[dict]):
+    if not payload_batch:
+        return
+        
+    # 1. Lọc ra các feedback Negative cần gọi LLM
+    negative_payloads = [p for p in payload_batch if p["sentiment"] == "negative"]
+    
+    # 2. Xử lý Caching (Tầng 3)
+    to_score_llm = []
+    for p in negative_payloads:
+        h = get_hash(p["text"])
+        if h in _llm_cache:
+            p.update(_llm_cache[h])
+            # Ghi đè severity bằng overall_risk từ Cache
+            if "overall_risk" in p:
+                p["severity"] = f"P{p['overall_risk']}"
+        else:
+            to_score_llm.append(p)
+            
+    # 3. Chạy LLM Batching bằng Multi-threading (Tầng 2)
+    if to_score_llm:
+        from agents.scoring_agent import score_feedback_batch
+        
+        # Chia nhỏ thành các lô 20 records để tránh quá tải Context Window của LLM
+        chunk_size = 20
+        chunks = [to_score_llm[i:i + chunk_size] for i in range(0, len(to_score_llm), chunk_size)]
+        
+        print(f"Gom {len(to_score_llm)} feedbacks vào {len(chunks)} LLM API Call(s)...")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            # score_feedback_batch sẽ sửa trực tiếp vào các dict trong chunks
+            list(executor.map(score_feedback_batch, chunks))
+            
+        # Cập nhật lại Cache sau khi LLM xử lý xong
+        for p in to_score_llm:
+            h = get_hash(p["text"])
+            if "overall_risk" in p:
+                p["severity"] = f"P{p['overall_risk']}"
+                
+            _llm_cache[h] = {
+                "risk_safety": p.get("risk_safety", 0),
+                "risk_fraud": p.get("risk_fraud", 0),
+                "risk_attitude": p.get("risk_attitude", 0),
+                "risk_vehicle": p.get("risk_vehicle", 0),
+                "risk_compliance": p.get("risk_compliance", 0),
+                "overall_risk": p.get("overall_risk", 3),
+                "severity": p.get("severity", "P3"),
+                "needs_review": p.get("needs_review", False),
+                "review_reason": p.get("review_reason", None),
+            }
+
+    # Đảm bảo không truyền overall_risk vào DB nếu cột đó ko tồn tại (chúng ta chỉ dùng 5 cột vector + severity)
+    # Tuy nhiên, nếu cột ko có trong schema Supabase thì nó có thể bị lỗi, nên ta pop nó ra.
+    for p in payload_batch:
+        p.pop("overall_risk", None)
+
+    # 4. Lưu toàn bộ lô (cả positive, neutral, negative) vào DB
+    db.table("feedback").insert(payload_batch).execute()
+
 
 def ingest_dataset(json_path: str, limit: int | None = None, batch_size: int = 150, offset: int = 0):
     if not has_supabase_admin_key():
@@ -67,7 +128,6 @@ def ingest_dataset(json_path: str, limit: int | None = None, batch_size: int = 1
     with open(json_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
         
-    # Lấy 1 user_id bất kỳ trong bảng profiles để làm mock_user_id (vì bảng feedback yêu cầu user_id NOT NULL)
     profiles_res = db.table("profiles").select("id").limit(1).execute()
     mock_user_id = None
     if profiles_res.data:
@@ -94,7 +154,7 @@ def ingest_dataset(json_path: str, limit: int | None = None, batch_size: int = 1
                 continue
             payload_batch.append(payload)
             if len(payload_batch) >= batch_size:
-                db.table("feedback").insert(payload_batch).execute()
+                _process_and_insert_batch(db, payload_batch)
                 inserted_count += len(payload_batch)
                 batch_count += 1
                 payload_batch = []
@@ -103,9 +163,13 @@ def ingest_dataset(json_path: str, limit: int | None = None, batch_size: int = 1
             failed_count += 1
 
     if payload_batch:
-        db.table("feedback").insert(payload_batch).execute()
-        inserted_count += len(payload_batch)
-        batch_count += 1
+        try:
+            _process_and_insert_batch(db, payload_batch)
+            inserted_count += len(payload_batch)
+            batch_count += 1
+        except Exception as e:
+             print(f"Error inserting final batch: {e}")
+             failed_count += len(payload_batch)
 
     duration_seconds = perf_counter() - started_at
     print(f"Successfully processed and inserted {inserted_count} records into Supabase!")

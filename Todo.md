@@ -14,32 +14,32 @@
 
 ## 2. Phan quyen tai khoan
 
-- [ ] Xac dinh cac loai tai khoan trong he thong: admin, manager, staff, guest.
-- [ ] Them truong role trong `profiles` va dong bo voi Supabase Auth.
-- [ ] Them logic nhan dien tai khoan khach o frontend va backend.
-- [ ] Gioi han menu, route va thao tac theo tung loai tai khoan.
-- [ ] Dam bao tai khoan khach khong truy cap duoc cac chuc nang quan tri hoac du lieu nhay cam.
+- [x] Xac dinh cac loai tai khoan trong he thong: admin, manager, staff, guest.
+- [x] Them truong role trong `profiles` va dong bo voi Supabase Auth.
+- [x] Them logic nhan dien tai khoan khach o frontend va backend.
+- [x] Gioi han menu, route va thao tac theo tung loai tai khoan.
+- [x] Dam bao tai khoan khach khong truy cap duoc cac chuc nang quan tri hoac du lieu nhay cam.
 - [ ] Them Supabase RLS policy theo role, khong chi chan bang UI.
 
 ## 3. Tai khoan khach
 
-- [ ] Tai khoan khach chi duoc xem dashboard.
-- [ ] Tai khoan khach chi duoc tai len feedback.
-- [ ] Tai khoan khach khong duoc xem danh sach feedback raw neu co du lieu noi bo/PII.
-- [ ] Tai khoan khach khong duoc vao Alerts/Ticket Triage, Chat AI, Agent Logs, Admin/Settings.
-- [ ] An hoac vo hieu hoa cac nut hanh dong khong danh cho tai khoan khach.
-- [ ] Kiem tra dieu huong truc tiep bang URL de tranh truy cap trai phep.
-- [ ] Hien thi thong bao phu hop khi tai khoan khach khong co quyen truy cap.
+- [x] Tai khoan khach chi duoc xem dashboard.
+- [x] Tai khoan khach chi duoc tai len feedback.
+- [x] Tai khoan khach khong duoc xem danh sach feedback raw neu co du lieu noi bo/PII.
+- [x] Tai khoan khach khong duoc vao Alerts/Ticket Triage, Chat AI, Agent Logs, Admin/Settings.
+- [x] An hoac vo hieu hoa cac nut hanh dong khong danh cho tai khoan khach.
+- [x] Kiem tra dieu huong truc tiep bang URL de tranh truy cap trai phep.
+- [x] Hien thi thong bao phu hop khi tai khoan khach khong co quyen truy cap.
 
 ## 4. Dashboard
 
-- [ ] Xac dinh noi dung dashboard ma tai khoan khach duoc phep xem.
-- [ ] Tach dashboard public/guest va dashboard noi bo neu can.
-- [ ] An cac thong tin noi bo, cau hinh he thong, LLM prompt, service status va thao tac quan tri khoi dashboard guest.
+- [x] Xac dinh noi dung dashboard ma tai khoan khach duoc phep xem.
+- [x] Tach dashboard public/guest va dashboard noi bo neu can.
+- [x] An cac thong tin noi bo, cau hinh he thong, LLM prompt, service status va thao tac quan tri khoi dashboard guest.
 - [ ] Dam bao dashboard hien KPI, trend, severity, area heatmap va alert summary o muc da duoc phep.
 - [ ] Kiem tra realtime subscription khong leak du lieu ngoai quyen cua guest.
 - [ ] Kiem tra dashboard tren desktop va mobile.
-- [ ] Dam bao dashboard van tai dung va khong loi khi nguoi dung la tai khoan khach.
+- [x] Dam bao dashboard van tai dung va khong loi khi nguoi dung la tai khoan khach.
 
 ## 5. Feedback upload
 
@@ -54,31 +54,31 @@
 
 ## 6. Build lai he thong 6 agent
 
-- [ ] Chot lai kien truc 6 agent moi va cap nhat `MASTER_BLUEPRINT.md` tu 5 agent thanh 6 agent.
-- [ ] Agent 1 - Ingestion/Classifier Agent: nhan feedback moi, clean PII, chay ML topic/sentiment/severity, ap rule safety keyword.
-- [ ] Agent 2 - Router Agent: route ticket ve dung team dua tren `routing_table.json`, SLA, severity override P5 -> Safety.
-- [ ] Agent 3 - Ticket Agent: tao/cap nhat ticket, dedup ticket trung, gan SLA, owner/team, status va priority.
-- [ ] Agent 4 - Insight Agent: tong hop insight theo phong ban, trend, top topic, khu vuc nong, ti le negative, ticket status.
-- [ ] Agent 5 - Analyst Agent: phan tich root cause bang LLM, du bao 24-48h, de xuat 3 action co deadline.
-- [ ] Agent 6 - Alert/Escalation Agent: phat hien spike, phan cap WATCH/WARNING/CRITICAL, cooldown, escalation khi qua SLA.
-- [ ] Orchestrator khong tinh la agent nghiep vu; chi dieu phoi pipeline, retry, logging va schedule.
-- [ ] Dinh nghia input/output schema rieng cho tung agent bang dataclass/Pydantic.
-- [ ] Moi agent phai co fallback heuristic/mock khi LLM hoac external service loi.
-- [ ] Moi agent phai ghi `agent_run_log`: run_id, agent_name, input_hash, output_summary, status, latency_ms, error.
+- [x] Chot lai kien truc 6 agent moi va cap nhat `MASTER_BLUEPRINT.md` tu 5 agent thanh 6 agent.
+- [x] Agent 1 - Ingestion/Classifier Agent: nhan feedback moi, clean PII, chay ML topic/sentiment/severity, ap rule safety keyword.
+- [x] Agent 2 - Router Agent: route ticket ve dung team dua tren `routing_table.json`, SLA, severity override P5 -> Safety.
+- [x] Agent 3 - Ticket Agent: tao/cap nhat ticket, dedup ticket trung, gan SLA, owner/team, status va priority.
+- [x] Agent 4 - Insight Agent: tong hop insight theo phong ban, trend, top topic, khu vuc nong, ti le negative, ticket status.
+- [x] Agent 5 - Analyst Agent: phan tich root cause bang LLM, du bao 24-48h, de xuat 3 action co deadline.
+- [x] Agent 6 - Alert/Escalation Agent: phat hien spike, phan cap WATCH/WARNING/CRITICAL, cooldown, escalation khi qua SLA.
+- [x] Orchestrator khong tinh la agent nghiep vu; chi dieu phoi pipeline, retry, logging va schedule.
+- [x] Dinh nghia input/output schema rieng cho tung agent bang dataclass/Pydantic.
+- [x] Moi agent phai co fallback heuristic/mock khi LLM hoac external service loi.
+- [x] Moi agent phai ghi `agent_run_log`: run_id, agent_name, input_hash, output_summary, status, latency_ms, error.
 - [ ] Them unit test cho tung agent va integration test cho ca pipeline 6 agent.
 
 ## 7. Build lai co che ticket trigger
 
-- [ ] Tach trigger ticket ra khoi logic stream de tranh moi batch deu tao ticket lung tung.
-- [ ] Thiet ke trigger theo event: feedback moi P4/P5, spike theo area/topic, upload batch hoan tat, scheduler dinh ky, manual trigger cho demo.
-- [ ] Them bang hoac queue `ticket_trigger_events` neu can de luu event can xu ly.
-- [ ] Them dieu kien dedup: cung area + topic + severity trong cooldown thi cap nhat ticket cu thay vi tao ticket moi.
-- [ ] Them cooldown rieng cho ticket va alert, khong dung chung mot logic mo ho.
-- [ ] Them priority scoring: severity, so luong feedback, toc do tang, topic safety, area hot, SLA risk.
-- [ ] Them state machine cho ticket: open -> triaged -> in_progress -> waiting -> resolved -> closed.
-- [ ] Them SLA logic: due_at, breached_at, escalation_level, assigned_team.
-- [ ] Khi feedback duoc upload, trigger chi danh dau can xu ly; agent worker moi tao ticket sau khi gom ngu can thiet.
-- [ ] Manual trigger `/api/agent/run` chi dung cho demo/admin, khong mo cho guest.
+- [x] Tach trigger ticket ra khoi logic stream de tranh moi batch deu tao ticket lung tung.
+- [x] Thiet ke trigger theo event: feedback moi P4/P5, spike theo area/topic, upload batch hoan tat, scheduler dinh ky, manual trigger cho demo.
+- [x] Them bang hoac queue `ticket_trigger_events` neu can de luu event can xu ly.
+- [x] Them dieu kien dedup: cung area + topic + severity trong cooldown thi cap nhat ticket cu thay vi tao ticket moi.
+- [x] Them cooldown rieng cho ticket va alert, khong dung chung mot logic mo ho.
+- [x] Them priority scoring: severity, so luong feedback, toc do tang, topic safety, area hot, SLA risk.
+- [x] Them state machine cho ticket: open -> triaged -> in_progress -> waiting -> resolved -> closed.
+- [x] Them SLA logic: due_at, breached_at, escalation_level, assigned_team.
+- [x] Khi feedback duoc upload, trigger chi danh dau can xu ly; agent worker moi tao ticket sau khi gom ngu can thiet.
+- [x] Manual trigger `/api/agent/run` chi dung cho demo/admin, khong mo cho guest.
 - [ ] Them test de dam bao trigger khong tao ticket trung khi scheduler/manual trigger chay lien tiep.
 
 ## 8. Backend va bao mat
@@ -107,25 +107,25 @@
 
 ## 10. Kiem soat LLM rate limit va chi phi
 
-- [ ] Them LLM gateway/wrapper dung chung cho tat ca agent va chatbot.
-- [ ] Them retry voi exponential backoff khi gap 429/rate limit.
+- [x] Them LLM gateway/wrapper dung chung cho tat ca agent va chatbot.
+- [x] Them retry voi exponential backoff khi gap 429/rate limit.
 - [ ] Them queue cho job LLM de khong goi dong loat khi co nhieu ticket.
-- [ ] Them cache theo input_hash cho cac prompt phan tich giong nhau.
-- [ ] Gom nhieu ticket thanh batch truoc khi goi LLM, tranh goi tung ticket rieng le.
-- [ ] Uu tien heuristic/model local cho cac viec don gian; chi goi LLM khi can root cause/report/action plan.
+- [x] Them cache theo input_hash cho cac prompt phan tich giong nhau.
+- [x] Gom nhieu ticket thanh batch truoc khi goi LLM, tranh goi tung ticket rieng le.
+- [x] Uu tien heuristic/model local cho cac viec don gian; chi goi LLM khi can root cause/report/action plan.
 - [ ] Dat budget theo ngay/thang: max requests, max tokens, max cost cho demo va production.
-- [ ] Them circuit breaker: khi LLM loi lien tiep thi tam dung agent LLM va dung fallback.
-- [ ] Log token usage, latency, provider, model, cost estimate, status cho moi request.
+- [x] Them circuit breaker: khi LLM loi lien tiep thi tam dung agent LLM va dung fallback.
+- [x] Log token usage, latency, provider, model, cost estimate, status cho moi request.
 - [ ] Them man hinh/admin log de xem LLM usage va loi rate limit.
 
 ## 11. Cham diem feedback ro rang hon
 
-- [ ] Thiet ke rubric cham diem feedback theo cac truc: do nguy hiem, an toan, thai do, anh huong dich vu, do khan cap, do tin cay.
-- [ ] Tach `severity` khoi cac score chi tiet de tranh mot cot severity phai ganh qua nhieu y nghia.
-- [ ] Them cac truong diem goi y: `safety_score`, `attitude_score`, `urgency_score`, `impact_score`, `confidence_score`.
-- [ ] Dinh nghia thang diem 1-5 hoac 0-100 va mapping sang priority/ticket severity.
-- [ ] Viet rule-based override cho cac keyword nghiem trong: tai nan, say xin, de doa, quay roi, gian lan, mat an toan.
-- [ ] Cho staff/admin sua diem AI cham sai va luu correction log.
+- [x] Thiet ke rubric cham diem feedback theo cac truc: do nguy hiem, an toan, thai do, anh huong dich vu, do khan cap, do tin cay.
+- [x] Tach `severity` khoi cac score chi tiet de tranh mot cot severity phai ganh qua nhieu y nghia.
+- [x] Them cac truong diem goi y: `safety_score`, `attitude_score`, `urgency_score`, `impact_score`, `confidence_score`.
+- [x] Dinh nghia thang diem 1-5 hoac 0-100 va mapping sang priority/ticket severity.
+- [x] Viet rule-based override cho cac keyword nghiem trong: tai nan, say xin, de doa, quay roi, gian lan, mat an toan.
+- [x] Cho staff/admin sua diem AI cham sai va luu correction log.
 - [ ] Dung correction log de danh gia lai model/rule va cai thien prompt.
 - [ ] Hien thi score breakdown trong feedback detail va ticket detail.
 - [ ] Them test cho cac case feedback nghiem trong, feedback mo ho, feedback tich cuc nhung co keyword rui ro.
@@ -145,9 +145,9 @@
 
 ## 13. Frontend can cai thien
 
-- [ ] AppShell hien menu theo role, khong hien route guest khong duoc vao.
-- [ ] Them guard cho route theo role, khong chi dua vao sidebar.
-- [ ] Feedback page tach mode guest upload va mode staff/admin review.
+- [x] AppShell hien menu theo role, khong hien route guest khong duoc vao.
+- [x] Them guard cho route theo role, khong chi dua vao sidebar.
+- [x] Feedback page tach mode guest upload va mode staff/admin review.
 - [ ] Alerts/Ticket page them bo loc team, severity, SLA, status, created_at.
 - [ ] Dashboard them empty/loading/error state ro rang.
 - [ ] Dashboard va ticket phai doc du lieu realtime nhung khong reload/thay doi layout qua manh.
@@ -217,9 +217,9 @@
 
 ## 19. Chatbot public cho guest
 
-- [ ] Quyet dinh co can chatbot public cho guest hay khong; neu khong can thi an hoan toan.
-- [ ] Neu co chatbot guest, chi cho tra loi huong dan gui feedback va giai thich dashboard public.
-- [ ] Khong cho chatbot guest truy cap ticket, feedback raw, alert noi bo, agent logs.
+- [x] Quyet dinh co can chatbot public cho guest hay khong; neu khong can thi an hoan toan.
+- [x] Neu co chatbot guest, chi cho tra loi huong dan gui feedback va giai thich dashboard public.
+- [x] Khong cho chatbot guest truy cap ticket, feedback raw, alert noi bo, agent logs.
 - [ ] Them rate limit rieng cho chatbot guest.
 - [ ] Them canned responses cho cac cau hoi thuong gap de giam chi phi LLM.
 
