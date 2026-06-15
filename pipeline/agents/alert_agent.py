@@ -3,9 +3,10 @@
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List
+import time
 
-from agents.common import get_db
+from agents.common import get_db, log_agent_run
+from agents.schemas import AlertOutput
 
 # Taxonomy sống trong data/taxonomy/ ở repo root (layout phẳng: pipeline/agents -> ../../data)
 TAXONOMY_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "taxonomy"
@@ -67,8 +68,19 @@ def process_area_alerts(area: str, recent_feedbacks: List[Dict[str, Any]]) -> Di
     cooldown = rules.get("alert_cooldown_minutes", 60)
     db = get_db()
 
+    start_time = time.time()
+    
     if not area:
-        return {"action": "skip", "reason": "Missing area"}
+        output = AlertOutput(action="skip", reason="Missing area")
+        log_agent_run(
+            run_id=f"alert_{int(time.time())}",
+            agent_name="alert_agent",
+            status="success",
+            latency_ms=int((time.time() - start_time) * 1000),
+            output_summary="Skipped due to missing area",
+            input_hash=""
+        )
+        return output.model_dump()
 
     case_count = len(recent_feedbacks)
     has_p5 = any(str(f.get("severity", "")).upper() in ["P5", "P0"] for f in recent_feedbacks)
@@ -78,18 +90,47 @@ def process_area_alerts(area: str, recent_feedbacks: List[Dict[str, Any]]) -> Di
 
     severity_level = classify_alert_severity(case_count, has_p5)
     if severity_level == "INFO":
-        return {"action": "skip", "reason": "Not enough cases for alert"}
+        output = AlertOutput(action="skip", reason="Not enough cases for alert")
+        log_agent_run(
+            run_id=f"alert_{int(time.time())}",
+            agent_name="alert_agent",
+            status="success",
+            latency_ms=int((time.time() - start_time) * 1000),
+            output_summary=output.reason,
+            input_hash=area
+        )
+        return output.model_dump()
 
     if is_duplicate_alert(db, area, cooldown):
-        return {"action": "skip", "reason": f"Duplicate alert within {cooldown}m cooldown"}
+        output = AlertOutput(action="skip", reason=f"Duplicate alert within {cooldown}m cooldown")
+        log_agent_run(
+            run_id=f"alert_{int(time.time())}",
+            agent_name="alert_agent",
+            status="success",
+            latency_ms=int((time.time() - start_time) * 1000),
+            output_summary=output.reason,
+            input_hash=area
+        )
+        return output.model_dump()
 
-    return {
-        "action": "create",
-        "area": area,
-        "severity": severity_level,
-        "case_count": case_count,
-        "has_p5": has_p5,
-    }
+    output = AlertOutput(
+        action="create",
+        area=area,
+        severity=severity_level,
+        case_count=case_count,
+        has_p5=has_p5,
+    )
+    
+    log_agent_run(
+        run_id=f"alert_{int(time.time())}",
+        agent_name="alert_agent",
+        status="success",
+        latency_ms=int((time.time() - start_time) * 1000),
+        output_summary=f"Created {severity_level} alert for {area}",
+        input_hash=area
+    )
+
+    return output.model_dump()
 
 
 if __name__ == "__main__":

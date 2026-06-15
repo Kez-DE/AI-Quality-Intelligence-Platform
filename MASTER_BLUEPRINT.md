@@ -22,10 +22,11 @@ Bản tài liệu này là Thiết kế Thi công Tổng thể (Master Blueprint
 
 ## 2. Kiến Trúc Multi-Agent (Trái tim của hệ thống)
 
-Hệ thống gồm **5 Agent chuyên trách** đặt tại `backend/pipeline/agents/`, phối hợp qua một Orchestrator trung tâm:
+Hệ thống gồm **6 Agent chuyên trách** đặt tại `pipeline/agents/`, phối hợp qua một Orchestrator trung tâm:
 
 | Agent | File | Nhiệm vụ |
 | :--- | :--- | :--- |
+| 🎯 **Scoring Agent** | `scoring_agent.py` | Sử dụng LLM (Llama 3) chấm điểm rủi ro đa chiều (Deep Risk Matrix 5 vector) ngay lúc Ingestion. Tối ưu chi phí bằng phễu lọc ML, Caching, và Batching LLM calls. |
 | 🧭 **Router Agent** | `router_agent.py` | Định tuyến ticket về đúng phòng ban dựa trên `data_real/taxonomy/routing_table.json` (topic → team + SLA). Khớp chuẩn cấu trúc dữ liệu thật. Mức độ P5 **luôn** ép về Safety. Đổi định tuyến chỉ cần sửa JSON, không sửa code. |
 | 📊 **Insight Agent** | `insight_agent.py` | Tổng hợp insight cho **từng phòng ban**: tổng feedback, tỷ lệ tiêu cực, phân bố severity, top topic/khu vực, **xu hướng % so kỳ trước**, trạng thái ticket, trích dẫn tiêu biểu. |
 | 🔬 **Analyst Agent** | `analyst_agent.py` | Phân tích sâu insight bằng LLM: nguyên nhân gốc rễ **xuyên nhiều ticket**, mức rủi ro (LOW→CRITICAL), dự báo 24-48h, 3 hành động ưu tiên kèm deadline. Fallback heuristic khi không có API key. |
@@ -39,6 +40,55 @@ Hệ thống gồm **5 Agent chuyên trách** đặt tại `backend/pipeline/age
 - **Tiết kiệm quota:** Analyst Agent chỉ phân tích sâu các phòng có feedback tiêu cực hoặc ticket đang mở.
 - **Tương thích ngược:** Format alert giữ chuẩn `**Action Plan:** / **Assigned Team:**` nên Frontend không cần sửa.
 
+### 2.1. Hệ Thống Chấm Điểm Đa Chiều & Ma Trận Rủi Ro (Deep Risk Matrix)
+
+**Bài toán:** Việc sử dụng một nhãn `severity` chung chung hoặc tính điểm trung bình (average) là một **lỗ hổng nghiêm trọng** trong nghiệp vụ Vận tải. Một chuyến xe sạch sẽ, đúng giờ nhưng tài xế có hành vi quấy rối thì điểm trung bình vẫn cao, dẫn đến lọt rủi ro khẩn cấp. 
+
+**Giải pháp:** Chuyển đổi từ `Single Severity` sang `Multi-dimensional Risk Vector` (Vector 5 chiều) bóc tách trực tiếp bằng **LLM (Scoring Agent)**. Sau đó tính điểm tổng hợp (Thang 1-5) bằng **Thuật toán Max-Pooling Rule-based Waterfall (Thác rơi ưu tiên rủi ro cao nhất)**. Tuyệt đối KHÔNG cộng trung bình.
+
+> 💡 **Chiến lược Tối ưu Ingestion (Phễu Lọc 3 Tầng Vàng):** Để không tốn chi phí API cho 100% data, hệ thống áp dụng 3 lớp lọc:
+> 1. **Lọc ML (Tầng 1):** Mô hình `.joblib` quét siêu tốc 100% data. Chỉ các feedback `negative` mới được xem xét. Khen/Bình thường auto rủi ro = 0.
+> 2. **LLM Batching (Tầng 2):** Gom 20-50 feedback tiêu cực vào 1 cụm gửi lên API trong 1 lần duy nhất, tiết kiệm 95% số lần gọi API và token cấu trúc prompt.
+> 3. **Caching (Tầng 3):** Lưu bộ đệm (Hash) các câu review giống nhau. Lặp lại là tốn 0 token. Dùng cơ chế **Review Queue** làm Fallback khi gọi API thất bại.
+
+#### 1. Định nghĩa Vector 5 Chiều (Chấm rủi ro từ 0-10)
+| Tiêu chí | Biến số | Định nghĩa (Độ nguy hiểm 0 ➔ 10) | Từ khóa đặc trưng (Ví dụ) |
+| :--- | :--- | :--- | :--- |
+| **An toàn** | `risk_safety` | Đe dọa tính mạng, thân thể, quấy rối, tai nạn. | "Tai nạn", "tông xe", "sờ đùi", "cướp", "say xỉn". |
+| **Gian lận** | `risk_fraud` | Hành vi chiếm đoạt tài sản, gian lận cước, vòi vĩnh. | "Thu thêm tiền", "đòi thêm", "chuyển khoản riêng". |
+| **Thái độ** | `risk_attitude` | Hành vi cư xử không chuẩn mực, chửi bới, xúc phạm. | "Chửi", "thái độ lồi lõm", "vô văn hóa". |
+| **Phương tiện**| `risk_vehicle` | Xuống cấp phương tiện, hỏng hóc, mất vệ sinh. | "Xe hôi", "bẩn", "máy lạnh hỏng", "ồn". |
+| **Tuân thủ** | `risk_compliance`| Vi phạm quy trình dịch vụ, đi sai đường, trễ giờ. | "Cao su", "đón sai", "đi lòng vòng", "ép hủy". |
+
+#### 2. Thuật toán Tính điểm chung (Overall Risk Score: Thang 1-5)
+Hệ thống duyệt tuần tự từ bậc Khẩn cấp nhất (5) xuống An toàn (1). **Thỏa mãn ở đâu, chốt điểm ở đó.**
+
+```python
+def calculate_overall_risk(risk_safety, risk_fraud, risk_attitude, risk_vehicle, risk_compliance):
+    # BẬC 5: KHẨN CẤP (🚨) - Cảnh sát, Khóa tài khoản
+    if risk_safety >= 8 or risk_fraud >= 8: return 5
+
+    # BẬC 4: NGUY HIỂM (🔴) - Team Ops can thiệp khẩn
+    if risk_safety >= 5 or risk_fraud >= 5 or risk_attitude >= 8: return 4
+
+    # BẬC 3: RỦI RO TRUNG BÌNH (🟠) - CSKH gọi xin lỗi, Trừ điểm
+    count_medium = sum(1 for x in [risk_safety, risk_fraud, risk_attitude, risk_vehicle, risk_compliance] if x >= 4)
+    if risk_vehicle >= 6 or risk_compliance >= 6 or risk_attitude >= 6 or count_medium >= 3: return 3
+
+    # BẬC 2: RỦI RO THẤP (🟡) - Gửi voucher tự động
+    if max(risk_safety, risk_fraud, risk_attitude, risk_vehicle, risk_compliance) >= 3: return 2
+
+    # BẬC 1: AN TOÀN / BÌNH THƯỜNG (🟢) - Ghi nhận
+    return 1
+```
+
+#### 3. Phân tích Tình huống (Edge Cases)
+- **Tài xế biến thái:** Xe xịn (`risk_vehicle=0`), đúng giờ (`risk_compliance=0`), không gian lận (`risk_fraud=0`), sàm sỡ khách (`risk_safety=9`). 
+  - *Average:* Tổng 9/50 -> Trung bình < 2. Hệ thống báo An toàn. ❌
+  - *Waterfall:* `risk_safety >= 8` -> **BẬC 5 KHẨN CẤP**. ✅
+- **Tài xế chửi tục:** Đúng quy trình (`risk_compliance=0`), chửi mắng khách (`risk_attitude=8`).
+  - *Waterfall:* `risk_attitude >= 8` -> **BẬC 4 NGUY HIỂM**. ✅
+
 ---
 
 ## 3. Luồng Xử Lý End-to-End (Quy trình khép kín)
@@ -46,6 +96,10 @@ Hệ thống gồm **5 Agent chuyên trách** đặt tại `backend/pipeline/age
 Hệ thống được thiết kế linh hoạt với **2 chế độ chạy**:
 1. **Production:** Orchestrator tự chạy mỗi 10 phút (APScheduler) — phát hiện, phân tích, cảnh báo, tổng hợp insight hoàn toàn tự động.
 2. **Demo Day:** API bắn 150 phản hồi giả lập + `POST /api/agent/run` kích hoạt vòng pipeline ngay lập tức trên sân khấu.
+
+Ngoài ra, luồng xử lý Feedback có sự phân tách rõ ràng (Human-in-the-loop):
+- **Luồng Stream:** Mọi dữ liệu đi vào (từ App) sẽ được đẩy realtime lên UI ngay lập tức.
+- **Luồng Review Queue:** Nếu model chấm điểm độ tin cậy thấp, ticket sẽ được đánh cờ `needs_review` và đưa vào hàng chờ kiểm duyệt. Human Admin sẽ vào Review Queue để sửa nhãn. Nhãn hiển thị trên UI đã được **i18n hoá sang Tiếng Việt** để người dùng dễ thao tác.
 
 ```mermaid
 sequenceDiagram
@@ -118,29 +172,35 @@ sequenceDiagram
 
 ---
 
-## 6. Cấu Trúc Backend (Đã hiện thực)
+## 6. Cấu Trúc Repo Mới (Sau khi Refactor)
+
+Cấu trúc thư mục theo chuẩn One-Repo Blueprint:
 
 ```
-backend/pipeline/
+pipeline/                    # HỆ THỐNG BACKEND & MULTI-AGENT
 ├── main.py                  # FastAPI + APScheduler (agent pipeline mỗi 10 phút)
 ├── clean.py                 # Làm sạch text, giấu PII (SĐT, Email)
 ├── classifier.py            # ML Topic/Sentiment + Rule-based Safety Override
 ├── ingest.py                # Ghi feedback đã gán nhãn vào Supabase
 ├── spike_detector.py        # Spike detection bản cũ (giữ tương thích)
 ├── llm_agent.py             # Gọi Groq Llama 3.3 phân tích root cause (có mock)
+├── ml/                      # Data ML training scripts (train Data_2 balanced)
 └── agents/                  # 🤖 HỆ THỐNG MULTI-AGENT
     ├── common.py            # Supabase client (lazy) + LLM helper dùng chung
+    ├── scoring_agent.py     # LLM chấm điểm rủi ro đa chiều (có Batching & Caching)
     ├── router_agent.py      # Định tuyến ticket theo routing_table.json
     ├── insight_agent.py     # Tổng hợp insight per-department
     ├── analyst_agent.py     # Phân tích sâu LLM (fallback heuristic)
     ├── alert_agent.py       # Cảnh báo phân cấp + dedup
     └── orchestrator.py      # Vòng pipeline khép kín 7 bước
 
-data/taxonomy/
-├── routing_table.json       # Topic → Phòng ban + SLA (P5 override → Safety)
-├── severity_rules.json      # Ngưỡng WATCH/WARNING/CRITICAL + cooldown
-├── taxonomy.json            # Cây phân loại chủ đề
-└── safety_keywords.json     # Từ khóa Rule-based Safety
+data/                        # DỮ LIỆU & TAXONOMY
+├── auxiliary/data2/         # Bộ data mới cân bằng (Balanced Data_2) cho ML
+└── taxonomy/
+    ├── routing_table.json   # Topic → Phòng ban + SLA (P5 override → Safety)
+    ├── severity_rules.json  # Ngưỡng WATCH/WARNING/CRITICAL + cooldown
+    ├── taxonomy.json        # Cây phân loại chủ đề
+    └── safety_keywords.json # Từ khóa Rule-based Safety
 ```
 
 ---
@@ -161,18 +221,14 @@ data/taxonomy/
 ### 7.2. Cấu trúc Routes & Màn hình
 
 ```
-UI/src/routes/
+app/src/routes/
 ├── index.tsx                    # Landing page
 ├── auth.tsx                     # Đăng nhập / Đăng ký (Supabase Auth)
 └── _authenticated/              # 🔒 Layout có Auth Guard
     ├── route.tsx                #    beforeLoad: chưa đăng nhập → redirect /auth
-    ├── dashboard.tsx            ### 3.1 Giao Diện (Frontend - React/Vite)
-- **Dashboard / Quality Cockpit:** Tổng hợp biểu đồ, danh sách ticket mới.
-- **Feedback Collection (T-C-R):**
-  - **Auto-Tagging (AI-in-the-middle):** Form phản hồi cho khách hàng chỉ chứa Text và Area. Khách hàng không cần tự đánh giá nhãn. Khi gửi, giao diện sẽ đẩy Text về Backend API để AI tự động phân tích (Topic, Sentiment, Severity) trước khi lưu.
-  - Chức năng sửa nhãn thủ công (Control) cho Admin và Hoàn tác (Recovery).
-- **Department Insights:** Báo cáo root cause do LLM Analyst viết cho riêng từng phòng ban.
-    ├── feedback.tsx             # 📝 Danh sách phản hồi + sửa nhãn (Human-in-the-loop)
+    ├── dashboard.tsx            # Tổng hợp biểu đồ, danh sách ticket mới.
+    ├── department-insights.tsx  # Báo cáo root cause do LLM Analyst viết cho riêng từng phòng ban.
+    ├── feedback.tsx             # 📝 Phân tách Stream (Live) & Review Queue (Lọc needs_review HITL)
     └── chat.tsx                 # 💬 AI Assistant (Groq Llama 3.3)
 ```
 
@@ -183,9 +239,9 @@ UI/src/routes/
 | Màn hình | Thành phần chính | Nguồn dữ liệu |
 | :--- | :--- | :--- |
 | **Dashboard** (`QualityCockpit.tsx`) | KPI Strip, Trend Chart, Category Breakdown, **Live Feed (realtime)**, Alerts Panel, **Heatmap khu vực × giờ** | Bảng `feedback` + `alerts`, subscribe realtime channel `dashboard-live-feedback` |
-| **Alerts / Ticket Triage** (`alerts.tsx`) | Tab lọc theo phòng ban (Tất cả/Vận Hành/CSKH/Safety/IT/Driver Mgmt), thẻ alert có icon + màu riêng từng team, nút chuyển trạng thái `open → in_progress → resolved` | Bảng `alerts`, realtime subscription — alert mới từ Agent **tự hiện không cần F5**. Parse `assigned_team` từ format `**Assigned Team:**` trong description |
-| **Feedback** (`feedback.tsx`) | Danh sách 100 phản hồi mới nhất + form nhập tay + **sửa nhãn AI sai** (topic/sentiment/severity) → update thẳng Supabase | Bảng `feedback` — đây là vòng lặp **Human-in-the-loop** |
-| **Chat AI** (`chat.tsx` + `ai.functions.ts`) | Chat với AI Assistant chuyên về quality ops, có câu hỏi gợi ý sẵn, lưu lịch sử | **Server Function** (TanStack Start) gọi Groq API phía server — API key không bao giờ lộ ra browser. Lịch sử lưu bảng `chat_messages` |
+| **Alerts / Ticket Triage** (`alerts.tsx`) | Tab lọc theo phòng ban, thẻ alert có icon + màu riêng từng team, nút chuyển trạng thái `open → in_progress → resolved` | Bảng `alerts`, realtime subscription. Parse `assigned_team` từ format `**Assigned Team:**` |
+| **Feedback** (`feedback.tsx`) | **Split 2 luồng:** <br/> 1. **Stream:** Toàn bộ feedback đổ về realtime. <br/> 2. **Review Queue:** Hàng đợi dành riêng cho các feedback có cờ `needs_review` cần con người duyệt và sửa nhãn sai (Human-in-the-loop). Hiển thị **i18n Tiếng Việt** cho các nhãn. | Bảng `feedback` với RLS và filter theo `needs_review` |
+| **Chat AI** (`chat.tsx` + `ai.functions.ts`) | Chat với AI Assistant chuyên về quality ops, có câu hỏi gợi ý sẵn, lưu lịch sử | **Server Function** (TanStack Start) gọi Groq API phía server |
 
 ### 7.4. Hai đường dữ liệu của Frontend
 
@@ -266,14 +322,14 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.feedback;
 
 ### 8.5. Migrations & Biến môi trường
 
-Schema quản lý bằng SQL migrations tại `UI/supabase/migrations/` (3 file: tạo bảng + RLS, policies bổ sung, bật realtime). Áp dụng bằng Supabase CLI hoặc dán vào SQL Editor trên dashboard Supabase.
+Schema quản lý bằng SQL migrations tại `supabase/migrations/` (các file: tạo bảng + RLS, policies bổ sung, bật realtime, correction logs). Áp dụng bằng Supabase CLI (đã đẩy ra root) hoặc dán vào SQL Editor.
 
-| Biến | Frontend (UI/.env) | Backend (.env gốc hoặc backend/.env) |
+| Biến | Frontend (`app/.env`) | Backend (`pipeline/.env` hoặc `.env` gốc) |
 | :--- | :---: | :---: |
 | `VITE_SUPABASE_URL` | ✅ | ✅ |
 | Anon key (public) | ✅ | — |
 | `SUPABASE_SERVICE_ROLE_KEY` | ❌ KHÔNG BAO GIỜ | ✅ |
-| `GROQ_API_KEY` | ✅ (chỉ server function đọc qua `process.env`) | ✅ |
+| `GROQ_API_KEY` | ✅ (chỉ server function đọc) | ✅ |
 | `GROQ_MODEL_NAME` | ✅ | ✅ |
 
 ---

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database as DatabaseSchema } from "@/integrations/supabase/types";
+import { useMe } from "@/lib/api";
 import {
   Activity,
   AlertTriangle,
@@ -226,6 +227,9 @@ function HeroStats() {
    ============================================================ */
 
 function CockpitView() {
+  const { data: me } = useMe();
+  const isGuest = me?.role === "guest";
+
   return (
     <div className="mt-6 space-y-6">
       <KpiStrip />
@@ -233,15 +237,27 @@ function CockpitView() {
         <div className="lg:col-span-8 space-y-6">
           <TrendCard />
           <CategoryBreakdown />
-          <LiveFeed />
+          {!isGuest ? <LiveFeed /> : <SecurityNotice />}
         </div>
         <aside className="lg:col-span-4 space-y-6">
-          <AlertsPanel />
+          {!isGuest && <AlertsPanel />}
           <Heatmap />
-          <DriverWatchlist />
+          {!isGuest && <DriverWatchlist />}
         </aside>
       </div>
-      <TicketBoard />
+      {!isGuest && <TicketBoard />}
+    </div>
+  );
+}
+
+function SecurityNotice() {
+  return (
+    <div className="rounded-2xl border border-dashed border-border bg-muted/50 p-6 text-center">
+      <Shield className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
+      <h3 className="text-sm font-semibold text-foreground">Khu vực hạn chế</h3>
+      <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+        Một số dữ liệu nội bộ (Luồng phản hồi trực tiếp, Cảnh báo, Quản lý tài xế, Ticket) đã được ẩn vì quyền bảo mật của tài khoản Khách.
+      </p>
     </div>
   );
 }

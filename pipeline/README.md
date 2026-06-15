@@ -56,4 +56,62 @@ curl -X POST "http://localhost:8000/api/trigger-spike-detect"
 - **Severity P5 = nghiêm trọng nhất**, P1 = nhẹ nhất. Safety keyword (tai nạn, cướp, sàm sỡ...) luôn ép `Safety`/P5 và hạ confidence → buộc Human-in-the-Loop review.
 - `feedback.user_id` NOT NULL ref `auth.users`, nên ingest cần ít nhất một tài khoản đã đăng ký trên frontend, và cần `SUPABASE_SERVICE_ROLE_KEY` (admin) để ghi.
 - Không có key LLM nào → agent chạy chế độ **mock** (vẫn sinh alert mẫu, không gọi mạng). Đặt `LLM_PROVIDER` hoặc một API key trong `.env` để bật agent thật.
-- Đây là **batch thủ công cho demo**, không phải real-time. Phần production (micro-batch/scheduler) nằm ngoài phạm vi đồ án — xem `docs/architecture.md`.
+- **Đây là batch thủ công cho demo**, không phải real-time. Phần production (micro-batch/scheduler) nằm ngoài phạm vi đồ án — xem `docs/architecture.md`.
+
+## Test nhanh tính năng (Demo / Admin)
+
+### a) Lấy token admin (dùng cho các lệnh curl bên dưới)
+```bash
+cd pipeline
+TOKEN=$(.venv/bin/python - <<'PY'
+import os; from dotenv import load_dotenv; load_dotenv("../.env")
+from supabase import create_client
+c=create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_PUBLISHABLE_KEY"])
+r=c.auth.sign_in_with_password({"email":"demo.20260606180215@example.com","password":"Admin@12345"})
+print(r.session.access_token)
+PY
+)
+echo "${TOKEN:0:20}..."
+```
+
+### b) Streaming 50 review/giây (luồng chính)
+```bash
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+ "http://127.0.0.1:8000/api/live-stream/start?batch_size=50&interval_seconds=1&loop=false&reset=true&auto_ticket=true&ticket_every_batches=10"
+
+# theo dõi tiến độ (chạy lại nhiều lần để thấy số tăng):
+curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/live-stream/status
+
+# dừng giữa chừng nếu cần:
+curl -s -X POST -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/live-stream/stop
+```
+
+### c) Nút "bắn 1 lô" demo an toàn (không cần streaming)
+```bash
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+ "http://127.0.0.1:8000/api/ingest-real-dataset?limit=150&batch_size=150"
+```
+
+### d) Trigger ticket thủ công (gọi LLM thật, ~10–25s)
+```bash
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+ "http://127.0.0.1:8000/api/trigger-spike-detect?max_feedback=1000&max_spikes=3"
+```
+
+### e) Multi-agent — insight theo phòng ban
+```bash
+# 1 phòng ban (kèm phân tích root cause của LLM):
+curl -s -H "Authorization: Bearer $TOKEN" \
+ "http://127.0.0.1:8000/api/insights/departments/Safety?with_analysis=true"
+
+# toàn bộ 6 phòng ban (chạy ~2 phút vì gọi LLM nhiều lần):
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+ "http://127.0.0.1:8000/api/agent/run?hours=24"
+```
+
+### f) Chat AI (test trực tiếp backend)
+```bash
+curl -s -X POST -H "Content-Type: application/json" \
+ -d '{"messages":[{"role":"user","content":"Khu vực nào tiêu cực nhất?"}]}' \
+ http://127.0.0.1:8000/api/agent/chat
+```

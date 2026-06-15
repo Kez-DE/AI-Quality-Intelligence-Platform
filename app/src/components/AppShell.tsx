@@ -21,7 +21,7 @@ const NAV = [
   { to: "/feedback", label: "Phản hồi", icon: MessageSquare },
   { to: "/insights", label: "Phân tích phòng ban", icon: Building2 },
   { to: "/chat", label: "AI Chat", icon: Sparkles },
-] as const;
+];
 
 // Link chỉ hiện với admin.
 const ADMIN_NAV = { to: "/admin", label: "Quản lý người dùng", icon: Shield } as const;
@@ -32,8 +32,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [email, setEmail] = useState<string>("");
   const { data: me } = useMe();
 
-  // Admin thấy thêm link quản lý người dùng.
-  const navItems = me?.role === "admin" ? [...NAV, ADMIN_NAV] : NAV;
+  const role = me?.role || "guest";
+
+  const navItems = NAV.map(n => {
+    if (n.to === "/chat" && role === "guest") {
+      return { ...n, label: "Hỗ trợ CSKH" };
+    }
+    return n;
+  }).filter(n => {
+    if (role === "guest" && ["/alerts", "/insights"].includes(n.to)) return false;
+    return true;
+  });
+
+  if (role === "admin") {
+    navItems.push(ADMIN_NAV);
+  }
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {

@@ -5,6 +5,7 @@ import { Loader2, MessageSquarePlus, MapPin, Tag, AlertCircle, Pencil, ShieldAle
 import { toast } from "sonner";
 import { AREAS, regionLabel } from "@/lib/regions";
 import { sentimentLabel, topicLabel, channelLabel, severityLabel } from "@/lib/labels";
+import { useMe } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/feedback")({
   component: FeedbackPage,
@@ -49,6 +50,9 @@ function FeedbackPage() {
   const [submitting, setSubmitting] = useState(false);
   const seenIdsRef = useRef<Set<string>>(new Set());
   const initializedRef = useRef(false);
+
+  const { data: me } = useMe();
+  const isGuest = me?.role === "guest";
 
   const [form, setForm] = useState({
     text: "",
@@ -136,6 +140,10 @@ function FeedbackPage() {
   }
 
   async function load() {
+    if (isGuest) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       // 2 nguồn riêng: Review Queue lấy đúng từ server (không sót ca cũ),
@@ -167,10 +175,12 @@ function FeedbackPage() {
   }
 
   useEffect(() => {
-    load();
-    const id = window.setInterval(load, REFRESH_INTERVAL_MS);
-    return () => window.clearInterval(id);
-  }, []);
+    if (me?.role && !isGuest) {
+      load();
+      const id = window.setInterval(load, REFRESH_INTERVAL_MS);
+      return () => window.clearInterval(id);
+    }
+  }, [me?.role]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -279,16 +289,19 @@ function FeedbackPage() {
       </section>
 
       {/* 2. Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Tổng phản hồi" value={stats.total} icon={Inbox} tone="deep" />
-        <StatCard label="Cần duyệt" value={stats.review} icon={ShieldAlert} tone="coral" />
-        <StatCard label="P4 / P5" value={stats.critical} icon={AlertCircle} tone="amber" />
-        <StatCard label="Confidence thấp" value={stats.lowConf} icon={AlertCircle} tone="mint" />
-      </div>
+      {!isGuest && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatCard label="Tổng phản hồi" value={stats.total} icon={Inbox} tone="deep" />
+          <StatCard label="Cần duyệt" value={stats.review} icon={ShieldAlert} tone="coral" />
+          <StatCard label="P4 / P5" value={stats.critical} icon={AlertCircle} tone="amber" />
+          <StatCard label="Confidence thấp" value={stats.lowConf} icon={AlertCircle} tone="mint" />
+        </div>
+      )}
 
       {/* 3. Hai cột: Luồng phản hồi (trái) | Cần duyệt (phải) */}
-      <div className="grid lg:grid-cols-2 gap-4 items-start">
-        {/* Cột trái: Luồng phản hồi */}
+      {!isGuest && (
+        <div className="grid lg:grid-cols-2 gap-4 items-start">
+          {/* Cột trái: Luồng phản hồi */}
         <section className="rounded-2xl border border-border bg-white shadow-[var(--shadow-card)]">
           <div className="p-5 border-b border-border flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -364,6 +377,7 @@ function FeedbackPage() {
           )}
         </section>
       </div>
+      )}
     </div>
   );
 }
