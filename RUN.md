@@ -23,7 +23,7 @@ Sau khi chạy xong `supabase start`, hãy copy các link API, `anon key` và `s
 ## 1. Chạy BACKEND (FastAPI, cổng 8000)
 
 ```bash
-cd ~/projects/C2-App-116/pipeline
+cd ~/C2-App-116/pipeline
 .venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
@@ -39,7 +39,7 @@ curl -s http://127.0.0.1:8000/api/agent/status
 ## 2. Chạy FRONTEND (React/TanStack, cổng 5174) — MỞ TERMINAL THỨ 2
 
 ```bash
-cd ~/projects/C2-App-116/app
+cd ~/C2-App-116/app
 set -a && . ../.env && set +a          
 node node_modules/vite/bin/vite.js dev --port 5174 --host 127.0.0.1
 ```
@@ -59,7 +59,7 @@ Mở trình duyệt: **http://localhost:5174**
 
 ### a) Lấy token admin (dùng cho các lệnh curl bên dưới)
 ```bash
-cd ~/projects/C2-App-116/pipeline
+cd ~/C2-App-116/pipeline
 TOKEN=$(.venv/bin/python - <<'PY'
 import os; from dotenv import load_dotenv; load_dotenv("../.env")
 from supabase import create_client
