@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Car, Loader2, Mail, Lock, User, ArrowRight, CircleCheck } from "lucide-react";
+import { Car, Loader2, Mail, Lock, User, ArrowRight, CircleCheck, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/auth")({
@@ -252,18 +252,33 @@ function Field({
   required?: boolean;
   minLength?: number;
 }) {
+  const [showPassword, setShowPassword] = useState(false);
+  const isPassword = type === "password";
+  const inputType = isPassword ? (showPassword ? "text" : "password") : type;
+
   return (
     <label className="relative block">
       <Icon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
       <input
-        type={type}
+        type={inputType}
         required={required}
         minLength={minLength}
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full h-11 pl-10 pr-3 rounded-xl border border-border bg-white focus:outline-none focus:ring-2 focus:ring-xanh-green/40 focus:border-xanh-green/40 transition-all"
+        className={`w-full h-11 pl-10 ${isPassword ? "pr-10" : "pr-3"} rounded-xl border border-border bg-white focus:outline-none focus:ring-2 focus:ring-xanh-green/40 focus:border-xanh-green/40 transition-all`}
       />
+      {isPassword && (
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => setShowPassword((v) => !v)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+          aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+        >
+          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
+      )}
     </label>
   );
 }
