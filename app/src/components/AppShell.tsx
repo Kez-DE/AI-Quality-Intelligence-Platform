@@ -11,25 +11,17 @@ import {
   MessageSquare,
   Shield,
   Sparkles,
-  Upload,
   User as UserIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
-// Nav items theo role
-const FULL_NAV = [
-  { to: "/dashboard", label: "Dashboard", icon: Gauge, roles: ["admin", "manager", "staff", "guest"] },
-  { to: "/alerts", label: "Ticket Triage 🔴", icon: Bell, roles: ["admin", "manager", "staff"] },
-  { to: "/feedback", label: "Phản hồi", icon: MessageSquare, roles: ["admin", "manager", "staff"] },
-  { to: "/insights", label: "Phân tích phòng ban", icon: Building2, roles: ["admin", "manager", "staff"] },
-  { to: "/chat", label: "AI Chat", icon: Sparkles, roles: ["admin", "manager", "staff"] },
-] as const;
-
-// Guest chỉ thấy Dashboard + Upload feedback
-const GUEST_NAV = [
+const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: Gauge },
-  { to: "/feedback-upload", label: "Gửi phản hồi", icon: Upload },
-] as const;
+  { to: "/alerts", label: "Ticket Triage 🔴", icon: Bell },
+  { to: "/feedback", label: "Phản hồi", icon: MessageSquare },
+  { to: "/insights", label: "Phân tích phòng ban", icon: Building2 },
+  { to: "/chat", label: "AI Chat", icon: Sparkles },
+];
 
 // Link chỉ hiện với admin.
 const ADMIN_NAV = { to: "/admin", label: "Quản lý người dùng", icon: Shield } as const;
@@ -41,34 +33,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { data: me } = useMe();
 
   const role = me?.role || "guest";
-  const isGuest = role === "guest";
 
-  // Build nav theo role
-  const navItems = (() => {
-    if (isGuest) return [...GUEST_NAV];
-    const items = FULL_NAV.filter((n) => n.roles.includes(role));
-    if (role === "admin") return [...items, ADMIN_NAV];
-    return items;
-  })();
+  const navItems = NAV.map(n => {
+    if (n.to === "/chat" && role === "guest") {
+      return { ...n, label: "Hỗ trợ CSKH" };
+    }
+    return n;
+  }).filter(n => {
+    if (role === "guest" && ["/alerts", "/insights"].includes(n.to)) return false;
+    return true;
+  });
+
+  if (role === "admin") {
+    navItems.push(ADMIN_NAV);
+  }
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setEmail(data.user?.email ?? "");
     });
   }, []);
-
-  // Guest route guard: chuyển hướng nếu truy cập trang không được phép
-  useEffect(() => {
-    if (!me) return; // chưa load xong
-    if (isGuest) {
-      const allowedPaths = ["/dashboard", "/feedback-upload"];
-      const isAllowed = allowedPaths.some((p) => pathname === p || pathname.startsWith(p + "/"));
-      if (!isAllowed) {
-        toast.error("Tài khoản khách không có quyền truy cập trang này");
-        router.navigate({ to: "/dashboard", replace: true });
-      }
-    }
-  }, [me, pathname, isGuest, router]);
 
   async function signOut() {
     await supabase.auth.signOut();
@@ -128,11 +112,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               )}
             </div>
           </div>
-          {isGuest && (
-            <div className="px-2 py-1 text-[10px] text-amber-600 bg-amber-50 rounded">
-              Tài khoản khách — chỉ xem Dashboard & gửi phản hồi
-            </div>
-          )}
           <button
             onClick={signOut}
             className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-muted-foreground hover:bg-xanh-coral/10 hover:text-xanh-coral transition-colors"
