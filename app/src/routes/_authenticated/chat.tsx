@@ -1,17 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useServerFn } from "@tanstack/react-start";
-import { chatWithAI } from "@/lib/ai.functions";
 import { Sparkles, Send, Loader2, Bot, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
-import { useMe } from "@/lib/api";
+import { apiFetch, useMe } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/chat")({
   component: ChatPage,
 });
 
 type Msg = { id?: string; role: "user" | "assistant"; content: string };
+
+type AgentChatResponse = {
+  data?: {
+    content?: string;
+    provider?: string;
+    model?: string;
+    latency_ms?: number;
+  };
+};
 
 const SUGGESTED = [
   "Tổng hợp 5 vấn đề chất lượng dịch vụ nổi cộm tuần qua",
@@ -25,7 +32,6 @@ function ChatPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const chatFn = useServerFn(chatWithAI);
   const { data: me } = useMe();
   
   const isGuest = me?.role === "guest";
@@ -81,14 +87,20 @@ function ChatPage() {
       .insert({ user_id: u.user.id, role: "user", content });
 
     try {
-      const reply = await chatFn({
-        data: { messages: next.map(({ role, content }) => ({ role, content })) },
+      const reply = await apiFetch<AgentChatResponse>("/api/agent/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          messages: next.map(({ role, content }) => ({ role, content })),
+        }),
       });
-      const aMsg: Msg = { role: "assistant", content: reply.content };
+      const replyContent = reply.data?.content?.trim();
+      if (!replyContent) throw new Error("AI không trả về nội dung.");
+
+      const aMsg: Msg = { role: "assistant", content: replyContent };
       setMessages((m) => [...m, aMsg]);
       await supabase
         .from("chat_messages")
-        .insert({ user_id: u.user.id, role: "assistant", content: reply.content });
+        .insert({ user_id: u.user.id, role: "assistant", content: replyContent });
     } catch (err: any) {
       toast.error(err.message ?? "AI lỗi");
     } finally {
