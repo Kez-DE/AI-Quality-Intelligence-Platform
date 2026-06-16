@@ -7,7 +7,7 @@
 - [ ] Tach ro 3 lop logic: ingestion/classification, agent reasoning, ticket workflow.
 - [ ] Them idempotency key cho feedback va ticket de tranh tao trung khi user upload lai hoac scheduler chay lai.
 - [ ] Chuan hoa severity P1-P5 va escalation WATCH/WARNING/CRITICAL, tranh moi noi tinh mot kieu.
-- [ ] Them audit log cho cac hanh dong quan trong: upload feedback, sua nhan AI, tao ticket, doi status ticket, agent run.
+- [x] Them audit log cho cac hanh dong quan trong: upload feedback, sua nhan AI, tao ticket, doi status ticket, agent run.
 - [ ] Chuan hoa error handling: loi Supabase, loi LLM, loi model ML, loi upload file, loi auth/permission.
 - [ ] Them fallback mode khi thieu API key LLM hoac backend agent loi, de dashboard van chay duoc.
 - [ ] Them test cho cac case nghiep vu quan trong thay vi chi test UI thu cong.
@@ -19,7 +19,7 @@
 - [x] Them logic nhan dien tai khoan khach o frontend va backend.
 - [x] Gioi han menu, route va thao tac theo tung loai tai khoan.
 - [x] Dam bao tai khoan khach khong truy cap duoc cac chuc nang quan tri hoac du lieu nhay cam.
-- [ ] Them Supabase RLS policy theo role, khong chi chan bang UI.
+- [x] Them Supabase RLS policy theo role, khong chi chan bang UI.
 
 ## 3. Tai khoan khach
 
