@@ -1,163 +1,226 @@
 # C2-App-116 — AI Quality Intelligence Platform
 
-Hệ thống phân tích phản hồi khách hàng cho dịch vụ smart mobility/xanhSM. Ứng dụng nhận phản hồi → làm sạch PII → phân loại topic/sentiment/severity → tách Review Queue → phát hiện spike → tạo alert/ticket → phân tích theo phòng ban bằng multi-agent → cho nhân viên duyệt/sửa nhãn AI.
+**xanhSM** | Nền tảng Phân tích Chất lượng Dịch vụ Di chuyển Thông minh bằng AI
 
-Dự án thuộc **AI20K Build Cohort 2 — Team 116**. Dữ liệu review là review công khai từ App Store/Google Play; metadata vận hành như khu vực/chuyến/driver là dữ liệu tổng hợp cho demo. Xem `data/README.md` để biết provenance.
+*AI20K Build Cohort 2 — Team 116*
 
-> Phạm vi local hiện tại: **không Docker, chưa deploy public URL**. Chạy local bằng Supabase cloud/remote + FastAPI + Vite.
+---
 
-## 1. Trạng thái hiện tại
+## Giới thiệu
 
-Đã build và verify các luồng chính:
+**C2-App-116** là nền tảng AI phân tích phản hồi khách hàng cho dịch vụ di chuyển thông minh **xanhSM**. Hệ thống tự động tiếp nhận phản hồi, làm sạch PII, phân loại bằng ML, phát hiện điểm nóng, tạo ticket/alert, và phân tích chuyên sâu theo phòng ban thông qua multi-agent LLM.
 
-- **Auth + RBAC 4 role**: admin, manager, staff, guest.
-- **Feedback intake**: nhập phản hồi text, kênh, khu vực; backend tự phân loại, không cho client tự gán nhãn ML.
-- **Classifier 2 tầng**: TF-IDF/LinearSVC + rule engine tiếng Việt (`pipeline/rules.py`).
-- **Review Queue / Luồng phản hồi**: tách 2 cột rõ ràng; Queue chỉ giữ P5/Safety/confidence thấp/gibberish thật.
-- **Human-in-the-Loop**: nhân viên duyệt/sửa nhãn; mọi correction ghi vào `correction_logs`.
-- **Streaming demo**: bơm review theo batch 50/s, tự trigger spike/alert theo cấu hình.
-- **Alert/Ticket triage**: spike detector + LLM agent tạo root cause/action/team.
-- **Phân tích phòng ban**: trang `/insights` gom metric 6 phòng ban và chỉ gọi LLM khi bấm “Phân tích sâu”.
-- **Giao diện tiếng Việt**: topic/sentiment/severity/channel hiển thị tiếng Việt, canonical value vẫn giữ tiếng Anh trong DB để không phá logic.
-- **Docs/setup**: hướng dẫn macOS + Windows, lệnh chạy local, troubleshooting.
+Mục tiêu: giúp đội ngũ vận hành nắm bắt nhanh vấn đề chất lượng dịch vụ, giảm thời gian xử lý, và đưa ra quyết định dựa trên dữ liệu.
 
-## 2. Kiến trúc tóm tắt
+> **Phạm vi**: chạy local, không Docker, chưa deploy public URL. Sử dụng Supabase cloud + FastAPI + Vite.
 
-```text
-User / Demo data
-   │
-   ▼
-app/ React + TanStack Start ───────┐
-   │                               │ đọc realtime
-   │ gọi API                       ▼
-pipeline/ FastAPI + ML + Agent ─▶ Supabase Postgres/Auth
-   │
-   ├─ clean.py              mask PII
-   ├─ classifier.py         ML topic/sentiment
-   ├─ rules.py              rule override + confidence + needs_review
-   ├─ spike_detector.py     phát hiện điểm nóng P4/P5
-   ├─ llm_agent.py          tạo alert/ticket bằng LLM
-   └─ agents/               router/insight/analyst/alert/orchestrator
-```
+---
 
-Chi tiết: `docs/architecture.md`.
+## Tính năng
 
-## 3. Cấu trúc repo
+| # | Tính năng | Mô tả |
+|---|-----------|-------|
+| 1 | Phân loại tự động | Model TF-IDF/LinearSVC + bộ luật keyword an toàn tiếng Việt |
+| 2 | Che giấu PII | Tự động mask SĐT, email, biển số xe |
+| 3 | Ma trận Rủi ro Sâu | Chấm điểm 5 chiều (safety, fraud, attitude, vehicle, compliance) qua LLM Scoring Agent |
+| 4 | Phát hiện Spike | Nhận diện điểm nóng → tự động tạo alert ticket |
+| 5 | Multi-Agent | 6 agent nghiệp vụ + Orchestrator |
+| 6 | Phân tích phòng ban | Insights 6 phòng ban với phân tích sâu bằng LLM |
+| 7 | Human-in-the-Loop | Hàng đợi duyệt nhãn — nhân viên sửa nhãn AI, ghi correction log |
+| 8 | AI Chat | Hỏi đáp trực tiếp về dữ liệu phản hồi |
+| 9 | Streaming Realtime | Ingest phản hồi theo luồng thời gian thực |
+| 10 | RBAC 4 vai trò | Phân quyền admin, manager, staff, guest |
+
+---
+
+## Kiến trúc tổng quan
 
 ```text
-C2-App-116/
-├── app/                    Frontend React/TanStack Start/Vite
-│   └── src/routes/         dashboard, feedback, alerts, insights, chat, admin
-├── pipeline/               FastAPI backend + ML + agent pipeline
-│   ├── main.py             API chính
-│   ├── classifier.py       ML classifier
-│   ├── rules.py            Rule engine tiếng Việt
-│   ├── agents/             Multi-agent theo phòng ban
-│   └── ml/                 model .joblib + experiment scripts
-├── supabase/               Migration SQL + hướng dẫn CLI
-├── data/                   raw/processed/demo/train/reference/auxiliary
-├── docs/                   Architecture, setup, demo script
-├── scripts/                Cohort AI logging hooks — giữ nguyên
-├── RUN.md                  Lệnh chạy/test local
-├── Todo.md                 Backlog cải tiến sản phẩm
-├── JOURNAL.md              Nhật ký cohort
-└── WORKLOG.md              Quyết định kỹ thuật
+┌─────────────────────────────────────────────────┐
+│            FRONTEND (app/)                       │
+│  React 19 + TanStack Start + Vite 7 + Tailwind  │
+│  shadcn/ui + Recharts                           │
+└──────────────────────┬──────────────────────────┘
+                       │ REST API
+                       ▼
+┌─────────────────────────────────────────────────┐
+│            BACKEND (pipeline/)                   │
+│  FastAPI + scikit-learn + LM Agents             │
+│                                                 │
+│  clean.py → classifier.py → rules.py           │
+│  spike_detector.py → llm_agent.py              │
+│  agents/ (orchestrator, router, insight,        │
+│           analyst, alert, ingestion)            │
+└──────────────────────┬──────────────────────────┘
+                       │ SQL / Realtime
+                       ▼
+┌─────────────────────────────────────────────────┐
+│          SUPABASE (PostgreSQL)                   │
+│       Auth + Database + Realtime                 │
+└─────────────────────────────────────────────────┘
 ```
 
-## 4. Chạy nhanh local
+LLM Providers: OpenRouter, OpenAI, Gemini, Groq (cấu hình qua `LLM_PROVIDER` trong `.env`).
 
-### 4.1 Chuẩn bị `.env`
+---
+
+## Cài đặt nhanh
+
+### Yêu cầu
+
+- Python 3.10+
+- Node.js 18+ (khuyên 20 LTS)
+- Tài khoản Supabase cloud
+- API key LLM (tùy chọn, cần cho agent)
+
+### Bước 1: Cấu hình môi trường
 
 ```bash
+git clone https://github.com/AI20K-Build-Cohort-2/C2-App-116.git
+cd C2-App-116
 cp .env.example .env
 ```
 
-Điền tối thiểu:
+Điền các biến tối thiểu trong `.env`:
 
 ```env
-SUPABASE_URL=...
-SUPABASE_PUBLISHABLE_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...
-VITE_SUPABASE_URL=...
-VITE_SUPABASE_PUBLISHABLE_KEY=...
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+VITE_SUPABASE_URL=https://xxx.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 BACKEND_API_URL=http://127.0.0.1:8000
 VITE_BACKEND_API_URL=http://127.0.0.1:8000
 LLM_PROVIDER=auto
-OPENROUTER_API_KEY=...   # optional nhưng nên có để agent thật chạy
+OPENROUTER_API_KEY=sk-or-...   # tùy chọn
 ```
 
-Không commit `.env` thật.
-
-### 4.2 Backend
+### Bước 2: Backend (Terminal 1)
 
 ```bash
 cd pipeline
 python3 -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\Activate.ps1
+source .venv/bin/activate            # Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-set -a && . ../.env && set +a   # Windows xem docs/setup-windows.md
+set -a && source ../.env && set +a   # Windows: xem docs/setup-windows.md
 python -m uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
-Health check:
+Kiểm tra: `curl http://127.0.0.1:8000/health`
 
-```bash
-curl http://127.0.0.1:8000/health
-```
-
-### 4.3 Frontend
+### Bước 3: Frontend (Terminal 2)
 
 ```bash
 cd app
 npm install
-set -a && . ../.env && set +a
-node node_modules/vite/bin/vite.js dev --port 5174 --host 127.0.0.1
+set -a && source ../.env && set +a
+npx vite dev --port 5174 --host 127.0.0.1
 ```
 
 Mở: [http://localhost:5174](http://localhost:5174)
 
-Chi tiết đầy đủ: `RUN.md`, `docs/setup-macos.md`, `docs/setup-windows.md`.
+### Tài khoản Admin
 
-## 5. Tài khoản demo
+- Email: `manhnguyn1912@gmail.com` / Password: `Admin@12345`
+- Staff/Guest: tạo qua UI hoặc Supabase Auth → gán role trong trang Admin.
 
-- Admin: `manhnguyn1912@gmail.com` / `Admin@12345`
-- Staff/guest: tạo trong UI hoặc Supabase Auth rồi gán role trong Admin page.
+---
 
-Nếu DB reset hoặc tài khoản chưa tồn tại, tạo user trong Supabase Auth trước, sau đó vào bảng `profiles`/Admin page để kiểm tra role.
+## Cấu trúc thư mục
 
-## 6. Luồng demo nên chạy
-
-1. Login admin.
-2. Vào **Phản hồi**: gửi một phản hồi mới; kiểm tra topic/sentiment/severity tự gán.
-3. Xem **Luồng phản hồi** bên trái và **Cần duyệt** bên phải.
-4. Sửa một nhãn sai → kiểm tra correction log.
-5. Chạy streaming hoặc ingest 150 review.
-6. Vào **Ticket Triage** để xem alert/ticket.
-7. Vào **Phân tích phòng ban** → metric 6 team hiện nhanh → bấm phân tích sâu cho Safety/IT.
-8. Vào **AI Chat** hỏi “khu vực nào đang nóng?”.
-
-Kịch bản nói trước hội đồng: `docs/demo-script.md`.
-
-## 7. Có nên train lại model không?
-
-Chưa nên thay model runtime chỉ vì cảm giác imbalance. Quyết định hiện tại:
-
-- Giữ model `.joblib` hiện tại vì sentiment test tốt; đã từng thử augment câu ngắn nhưng làm neutral recall sụp mạnh.
-- Dùng **rule engine + Review Queue + correction_logs** để xử lý lỗi demo và tạo data cải thiện thật.
-- Dữ liệu `data/auxiliary/data2/` dùng cho experiment; chỉ swap model nếu metric held-out tốt hơn rõ ràng trên từng class.
-
-Nói ngắn: **measure first, retrain later**. Agent/routing hiện hưởng lợi nhiều hơn từ rule + HITL hơn là retrain vội.
-
-## 8. Quy tắc làm việc nhóm
-
-- Trước khi PR: cập nhật `JOURNAL.md`, `WORKLOG.md` nếu có quyết định mới.
-- Ghi AI usage log bằng hook hoặc manual log:
-
-```bash
-python3 scripts/log_manual.py --tool "<tool>" --prompt "<việc đã nhờ AI>" --result "<kết quả>"
-python3 scripts/submit_log.py
+```text
+C2-App-116/
+├── app/                    Frontend (React 19 / TanStack Start / Vite 7)
+│   └── src/routes/         dashboard, feedback, alerts, insights, chat, admin
+├── pipeline/               Backend (FastAPI + ML + Agent pipeline)
+│   ├── main.py             API chính
+│   ├── classifier.py       ML classifier (TF-IDF/LinearSVC)
+│   ├── clean.py            PII masking
+│   ├── rules.py            Rule engine tiếng Việt
+│   ├── spike_detector.py   Phát hiện spike P4/P5
+│   ├── llm_agent.py        LLM scoring & ticket generation
+│   ├── agents/             Multi-agent system
+│   └── ml/                 Model .joblib + experiment scripts
+├── supabase/               Migration SQL + cấu hình
+├── data/                   Training data & datasets
+├── docs/                   Tài liệu chi tiết
+├── scripts/                Utility scripts
+├── Todo.md                 Backlog cải tiến
+├── JOURNAL.md              Nhật ký cohort
+└── WORKLOG.md              Quyết định kỹ thuật
 ```
 
-- Commit nhỏ theo phase. Không commit `.env`, `.venv`, `node_modules`, `.ai-log/session.jsonl`, logs runtime.
-- Push GitHub chỉ khi đã build/test và được team thống nhất.
+---
 
+## Phân quyền RBAC
+
+| Trang | Admin | Manager | Staff | Guest |
+|-------|:-----:|:-------:|:-----:|:-----:|
+| Dashboard | ✅ | ✅ | ✅ | ✅ |
+| Ticket Triage (Alerts) | ✅ | ✅ | ❌ | ❌ |
+| Phản hồi (list + HITL) | ✅ | ✅ | ✅ | ✅ |
+| Phân tích phòng ban | ✅ | ✅ | ❌ | ❌ |
+| AI Chat / Hỗ trợ CSKH | ✅ | ✅ | ✅ | ✅ |
+| Quản lý người dùng | ✅ | ❌ | ❌ | ❌ |
+| Trigger Operations | ✅ | ❌ | ❌ | ❌ |
+
+- **Admin**: toàn quyền, quản lý user, trigger ingest/streaming
+- **Manager**: giám sát — alerts, feedback, insights, chat
+- **Staff**: công việc hàng ngày — feedback, chat
+- **Guest**: dashboard, feedback, chat hỗ trợ CSKH
+
+---
+
+## Luồng demo
+
+1. Login admin
+2. Gửi phản hồi mới → kiểm tra topic/sentiment/severity tự gán
+3. Xem Luồng phản hồi + Cần duyệt (HITL)
+4. Sửa một nhãn sai → correction log
+5. Chạy streaming hoặc ingest 150 review
+6. Vào Ticket Triage xem alert
+7. Phân tích phòng ban → bấm "Phân tích sâu"
+8. AI Chat: hỏi "khu vực nào đang nóng?"
+
+Kịch bản chi tiết: [`docs/demo-script.md`](docs/demo-script.md)
+
+---
+
+## Tài liệu
+
+| File | Nội dung |
+|------|----------|
+| [`docs/setup-macos.md`](docs/setup-macos.md) | Cài đặt trên macOS |
+| [`docs/setup-windows.md`](docs/setup-windows.md) | Cài đặt trên Windows |
+| [`docs/setup-supabase.md`](docs/setup-supabase.md) | Cấu hình Supabase |
+| [`docs/architecture.md`](docs/architecture.md) | Kiến trúc hệ thống |
+| [`docs/agents-guide.md`](docs/agents-guide.md) | Hệ thống multi-agent |
+| [`docs/demo-script.md`](docs/demo-script.md) | Kịch bản demo 5-7 phút |
+| [`docs/guest-account.md`](docs/guest-account.md) | Cơ chế tài khoản khách |
+| [`pipeline/README.md`](pipeline/README.md) | Hướng dẫn backend/ML pipeline |
+
+---
+
+## Tech Stack
+
+| Layer | Công nghệ |
+|-------|-----------|
+| Frontend | React 19, TanStack Start/Router/Query, Vite 7, Tailwind CSS 4, shadcn/ui, Recharts |
+| Backend | FastAPI, Python 3.10+, scikit-learn (TF-IDF + LinearSVC) |
+| LLM | OpenRouter / OpenAI / Gemini / Groq (multi-provider) |
+| Database | Supabase (PostgreSQL + Auth + Realtime) |
+
+---
+
+## Quy tắc làm việc nhóm
+
+- Trước khi PR: cập nhật `JOURNAL.md`, `WORKLOG.md` nếu có quyết định mới
+- Ghi AI usage log: `python3 scripts/log_manual.py --tool "<tool>" --prompt "<việc>" --result "<kết quả>"`
+- Commit nhỏ theo phase, không commit `.env`, `.venv`, `node_modules`
+- Push GitHub khi đã build/test thành công
+
+---
+
+## License
+
+Dự án phục vụ mục đích học tập và demo trong khuôn khổ AI20K Build Cohort 2.
