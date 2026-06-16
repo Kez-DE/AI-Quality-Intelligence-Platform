@@ -3,21 +3,32 @@ FROM node:20-slim AS builder
 
 WORKDIR /app
 
-# Copy package files from app/ and root .env.example for VITE_ vars
+# Railway automatically passes service env vars as Docker build args.
+# Declare them so Vite can embed VITE_* into the client bundle at build time.
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_PUBLISHABLE_KEY
+ARG VITE_SUPABASE_PROJECT_ID
+ARG VITE_BACKEND_API_URL
+ARG BACKEND_API_URL
+
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_PUBLISHABLE_KEY=$VITE_SUPABASE_PUBLISHABLE_KEY
+ENV VITE_SUPABASE_PROJECT_ID=$VITE_SUPABASE_PROJECT_ID
+ENV VITE_BACKEND_API_URL=$VITE_BACKEND_API_URL
+ENV BACKEND_API_URL=$BACKEND_API_URL
+ENV NITRO_PRESET=node-server
+
+# Copy package files
 COPY app/package.json app/package-lock.json ./
 COPY app/bun.lock ./
-COPY .env.example .env
 
-# Install deps (npm, since bun not guaranteed on Railway)
+# Install deps
 RUN npm ci
 
 # Copy frontend source
 COPY app/ .
 
-# Override vite config to use node-server preset for Railway
-ENV NITRO_PRESET=node-server
-
-# Build (produces dist/server/ with a Node.js entry point)
+# Build (nitro node-server → .output/)
 RUN npm run build
 
 # --- Production stage ---
@@ -25,11 +36,14 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# Copy built output (nitro node-server outputs to .output/)
+# Runtime env vars (Railway injects these at runtime too)
+ENV NODE_ENV=production
+ENV NITRO_HOST=0.0.0.0
+ENV NITRO_PORT=3000
+
+# Copy built output
 COPY --from=builder /app/.output ./.output
-COPY --from=builder /app/package.json ./
 
 EXPOSE 3000
 
-# Nitro node-server entry point
 CMD ["node", ".output/server/index.mjs"]
