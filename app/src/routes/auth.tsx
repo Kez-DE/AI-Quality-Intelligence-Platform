@@ -53,8 +53,9 @@ function AuthPage() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        await supabase.auth.getSession();
         toast.success("Đăng nhập thành công");
-        navigate({ to: "/dashboard" });
+        window.location.assign("/dashboard");
       }
     } catch (err: any) {
       toast.error(getAuthErrorMessage(err));
