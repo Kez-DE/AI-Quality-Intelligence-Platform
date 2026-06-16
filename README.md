@@ -120,7 +120,7 @@ Chi tiết đầy đủ: `RUN.md`, `docs/setup-macos.md`, `docs/setup-windows.md
 
 ## 5. Tài khoản demo
 
-- Admin: `demo.20260606180215@example.com` / `Admin@12345`
+- Admin: `manhnguyn1912@gmail.com` / `Admin@12345`
 - Staff/guest: tạo trong UI hoặc Supabase Auth rồi gán role trong Admin page.
 
 Nếu DB reset hoặc tài khoản chưa tồn tại, tạo user trong Supabase Auth trước, sau đó vào bảng `profiles`/Admin page để kiểm tra role.

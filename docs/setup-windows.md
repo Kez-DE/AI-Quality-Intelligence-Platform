@@ -188,7 +188,7 @@ Mở trình duyệt: **http://localhost:5174**
 
 | Role | Email | Password |
 |------|-------|----------|
-| Admin | `demo.20260606180215@example.com` | `Admin@12345` |
+| Admin | `manhnguyn1912@gmail.com` | `Admin@12345` |
 | Guest | Tự tạo trong Supabase Auth hoặc Admin page | |
 
 ## 7. Script tiện lợi — file `.bat`
