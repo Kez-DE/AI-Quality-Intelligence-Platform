@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Car, Loader2, Mail, Lock, User, ArrowRight, CircleCheck, Eye, EyeOff } from "lucide-react";
@@ -15,7 +15,6 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
-  const navigate = useNavigate();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,9 +24,9 @@ function AuthPage() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/dashboard" });
+      if (data.session) window.location.replace("/dashboard");
     });
-  }, [navigate]);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,7 +44,7 @@ function AuthPage() {
         if (error) throw error;
         if (data.session) {
           toast.success("Đăng ký thành công");
-          navigate({ to: "/dashboard" });
+          window.location.assign("/dashboard");
           return;
         }
         setConfirmationEmail(email);
