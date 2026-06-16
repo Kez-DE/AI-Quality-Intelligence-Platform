@@ -94,16 +94,16 @@
 
 ## 9. Gom ticket thanh task va bao cao truong phong
 
-- [ ] Thiet ke bang/logic `tasks` de gom nhieu ticket lien quan thanh mot viec can xu ly.
-- [ ] Them co che cluster ticket theo team, area, topic, severity, thoi gian va root cause.
-- [ ] Moi task can co title, summary, related_ticket_ids, assigned_team, owner, priority, due_at, status.
-- [ ] Them logic tu dong gan ticket moi vao task dang mo neu cung van de, thay vi tao task moi.
-- [ ] Tao summary cho tung nhom ticket: diem chung, so luong case, muc anh huong, khu vuc, khung gio, quote dai dien.
-- [ ] Them report theo phong ban hang ngay/hang tuan cho truong phong.
-- [ ] Report can co: top van de, task uu tien, SLA risk, ticket qua han, root cause, action plan, owner de xuat.
+- [x] Thiet ke bang/logic `tasks` de gom nhieu ticket lien quan thanh mot viec can xu ly.
+- [x] Them co che cluster ticket theo team, area, topic, severity, thoi gian va root cause.
+- [x] Moi task can co title, summary, related_ticket_ids, assigned_team, owner, priority, due_at, status.
+- [x] Them logic tu dong gan ticket moi vao task dang mo neu cung van de, thay vi tao task moi.
+- [x] Tao summary cho tung nhom ticket: diem chung, so luong case, muc anh huong, khu vuc, khung gio, quote dai dien.
+- [x] Them report theo phong ban hang ngay/hang tuan cho truong phong.
+- [x] Report can co: top van de, task uu tien, SLA risk, ticket qua han, root cause, action plan, owner de xuat.
 - [ ] Cho truong phong duyet/sua task va report truoc khi chia viec cho nhan su.
-- [ ] Them trang Department Report de xem bao cao theo team va export Markdown/PDF neu can.
-- [ ] Them audit log khi agent gom ticket, tao task, cap nhat task hoac sinh bao cao.
+- [x] Them trang Department Report de xem bao cao theo team va export Markdown/PDF neu can.
+- [x] Them audit log khi agent gom ticket, tao task, cap nhat task hoac sinh bao cao.
 
 ## 10. Kiem soat LLM rate limit va chi phi
 
@@ -262,7 +262,7 @@
 
 - [ ] Them mo hinh organization/team neu san pham co nhieu phong ban hoac nhieu cong ty dung chung.
 - [ ] Gan user vao team/department va role cu the: owner, manager, staff, support, guest.
-- [ ] Them man hinh moi thanh vien, khoa tai khoan, doi role va gan team.
+- [x] Them man hinh quan ly thanh vien, duyet/doi role (Guest -> Staff/Manager) va xoa tai khoan.
 - [ ] Them ownership ro rang cho ticket/task: assigned_team, assignee_id, reviewer_id.
 - [ ] Them rule de manager chi xem du lieu cua team minh neu can.
 - [ ] Them audit log cho thay doi role, team, permission va assignment.

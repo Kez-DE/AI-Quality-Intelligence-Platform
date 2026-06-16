@@ -45,11 +45,15 @@ curl -X POST "http://localhost:8000/api/trigger-spike-detect"
 | :--- | :--- |
 | `clean.py` | Làm sạch text, mask SĐT/email (PII) |
 | `classifier.py` | Load model `.joblib`, predict topic+sentiment, suy severity, safety override |
-| `ingest.py` | Đọc dataset → build payload → ghi bảng `feedback` |
-| `spike_detector.py` | Gom feedback P4/P5 theo khu vực, vượt ngưỡng → spike |
-| `llm_agent.py` | Gửi feedback vùng spike cho LLM → JSON alert (root cause, action, team) |
-| `agent/model_router.py` | Chọn provider LLM (openrouter/openai/gemini/groq/mock) + log |
-| `main.py` | FastAPI: endpoints batch, đọc feedback/alerts, chat agent |
+| `ingest.py` | Phễu lọc 3 tầng: Đọc dataset → Lọc ML → Chạy Batch LLM Scoring → Ghi DB |
+| `agents/scoring_agent.py`| **Scoring Agent**: Chấm điểm rủi ro 5 chiều (Deep Risk Matrix) + Waterfall. |
+| `agents/router_agent.py` | **Router Agent**: Định tuyến ticket về đúng team dựa trên `routing_table.json`. |
+| `agents/alert_agent.py`  | **Alert Agent**: Phát hiện spike, phân cấp cảnh báo WATCH/WARNING/CRITICAL. |
+| `agents/insight_agent.py`| **Insight Agent**: Zero-LLM, dùng SQL gom cụm metric cho từng team. |
+| `agents/analyst_agent.py`| **Analyst Agent**: Phân tích nguyên nhân gốc rễ và đưa ra Action Plan. |
+| `agents/task_agent.py`   | **Task Agent**: Gom cụm Alert (Heuristic) → Task lớn & Sinh Báo cáo Markdown. |
+| `agents/orchestrator.py` | **Orchestrator**: Vòng lặp khép kín điều phối các agent định kỳ. |
+| `main.py` | FastAPI: endpoints batch, đọc feedback/alerts/tasks/reports. |
 
 ## Lưu ý quan trọng
 

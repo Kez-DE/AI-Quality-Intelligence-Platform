@@ -12,6 +12,7 @@ from agents.analyst_agent import analyze_root_cause
 from agents.alert_agent import process_area_alerts
 from agents.router_agent import route_ticket
 from agents.ticket_agent import create_or_update_ticket
+from agents.task_agent import cluster_alerts_into_tasks
 from llm_agent import analyze_spike
 
 # Phòng ban khớp với routing_table.json (team đích của router_agent).
@@ -68,6 +69,10 @@ def run_agent_pipeline(hours: int = 24):
                 alerts_created.append(ticket_res)
                 
         results["alerts_created"] = alerts_created
+        
+        # Bước 5.5: Gom cụm Alerts thành Tasks (Cost-Optimized)
+        cluster_res = cluster_alerts_into_tasks()
+        results["tasks_clustered"] = cluster_res
                 
     except Exception as exc:
         print(f"[Orchestrator] Error processing alerts: {exc}")
@@ -78,7 +83,29 @@ def run_agent_pipeline(hours: int = 24):
         try:
             insights = generate_department_insights(team, hours=hours)
             if insights.get("total_feedback", 0) > 0:
-                insights["analysis"] = analyze_root_cause(team, insights)
+                analysis_res = analyze_root_cause(team, insights)
+                insights["analysis"] = analysis_res
+                
+                # Nếu có rủi ro (risk_level >= MEDIUM), lưu báo cáo Markdown
+                analysis = analysis_res.get("analysis")
+                if analysis:
+                    risk_level = analysis.get("risk_level", "MEDIUM")
+                    
+                    # Tạo Markdown
+                    md = f"### 1. Nguyên nhân gốc rễ (Root Cause)\n{analysis.get('root_cause_summary')}\n\n"
+                    md += f"### 2. Mức độ rủi ro hiện tại (Risk Level)\n**{risk_level}**\n\n"
+                    md += f"### 3. Dự báo 24-48h tới (Forecast)\nTheo xu hướng hiện tại, cần theo dõi sát các vấn đề trên.\n\n"
+                    md += "### 4. Đề xuất hành động (Action Plan)\n"
+                    for act in analysis.get("action_items", []):
+                        md += f"- {act.get('action')} (Deadline: {act.get('deadline')})\n"
+                        
+                    # Lưu vào DB
+                    db.table("department_reports").insert({
+                        "team": team,
+                        "report_date": datetime.utcnow().date().isoformat(),
+                        "content": md
+                    }).execute()
+
             results[team] = insights
         except Exception as exc:  # noqa: BLE001
             errors[team] = str(exc)[:300]

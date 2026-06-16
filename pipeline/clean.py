@@ -9,13 +9,16 @@ def mask_pii(text: str) -> str:
         return text
     
     # Mask số điện thoại VN (ví dụ: 0912345678 -> [SĐT_ĐÃ_ẨN])
-    # Regex bắt các chuỗi từ 9 đến 11 số, có thể có dấu chấm/gạch ngang
     phone_pattern = re.compile(r'\b(0|\+84)[-\s\.]?[1-9]\d{2}[-\s\.]?\d{3}[-\s\.]?\d{3}\b')
     text = phone_pattern.sub('[SĐT_ĐÃ_ẨN]', text)
     
     # Mask Email (ví dụ: test@gmail.com -> [EMAIL_ĐÃ_ẨN])
     email_pattern = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b')
     text = email_pattern.sub('[EMAIL_ĐÃ_ẨN]', text)
+
+    # Mask Biển số xe VN (ví dụ: 29A-12345 hoặc 51F-123.45 -> [BIỂN_SỐ_ĐÃ_ẨN])
+    license_plate_pattern = re.compile(r'\b\d{2}[A-ZĐ]\d?[-\s]?\d{3,4}\.?\d{0,2}\b', re.IGNORECASE)
+    text = license_plate_pattern.sub('[BIỂN_SỐ_ĐÃ_ẨN]', text)
     
     return text
 

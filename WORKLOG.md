@@ -149,3 +149,22 @@ Chưa phân công. TODO: ai làm module nào, deadline nội bộ.
   4. Chỉnh sửa Dashboard (`QualityCockpit.tsx`): ẩn các thành phần Ticket, Alerts, Live Feed đối với Guest, và thay thế bằng `SecurityNotice` (khu vực hạn chế).
   5. Cấu hình lại Chat AI cho Guest thành "Hỗ trợ trực tuyến" (CSKH), giới hạn câu hỏi gợi ý để hướng dẫn sử dụng app, trong khi Admin tiếp tục dùng Ops Assistant.
 - **Kết quả**: Hệ thống đã tách bạch quyền hạn giao diện an toàn, đáp ứng chuẩn thiết kế UX/UI cho Guest và Staff.
+
+## 2026-06-16
+
+### Hoàn thiện luồng duyệt tài khoản (Queue + Approval) & Default Guest Role
+- **Vấn đề**: Tài khoản mới đăng ký mặc định là `staff` mang lại rủi ro bảo mật nếu lộ lọt luồng công việc nội bộ. Đồng thời, trang quản lý Admin (`admin.tsx`) có UI cũ gồm một danh sách chung dài, gây Cognitive Load cao và khó nhận biết tài khoản mới chờ duyệt.
+- **Giải pháp**:
+  1. Cập nhật Trigger `handle_new_user` trong Supabase (Migration `20260616000000_default_role_guest.sql`): tài khoản mới mặc định nhận role `guest` (tài khoản đầu tiên bootstrap vẫn là `admin`).
+  2. Tối ưu UX/UI trang Admin theo hướng **Pattern 6: Queue + approval** và phong cách **Data-dense professional** dựa trên UX Audit skills.
+  3. Ứng dụng Chunking chia màn hình thành 2 Tabs riêng biệt: "Chờ duyệt" (guest) và "Đã phân quyền" (staff, manager, admin).
+  4. Cung cấp action duyệt nhanh (1-click) ngay tại tab "Chờ duyệt" (thay thế dạng Dropdown rườm rà), bổ sung Badge hiển thị số lượng chờ xử lý để tạo feedback trực quan.
+- **Kết quả**: Thắt chặt luồng onboarding nội bộ; tối ưu mạnh mẽ tốc độ thao tác duyệt quyền của quản trị viên.
+
+### Hoàn thiện Module 2 & 3 — Cơ chế Task Clustering & Báo cáo Chuyên sâu
+- **Vấn đề**: Các alert rời rạc khiến phòng ban bị choáng ngợp; thiếu báo cáo tổng quan. Việc đánh giá rủi ro còn chung chung dựa trên 1 nhãn duy nhất.
+- **Giải pháp**:
+  1. **Task Clustering (Heuristic-first)**: Gom cụm các alert/ticket đang mở theo `(team, area)` bằng SQL (không tốn LLM token). LLM chỉ được dùng duy nhất 1 lần để sinh Tên & Tóm tắt khi tạo Task mới.
+  2. **Phân tích Báo cáo Chuyên sâu (Analyst/Task Agent)**: Báo cáo định kỳ cho các Trưởng phòng được sinh ra tự động, định dạng Markdown với 4 mục khắt khe: (1) Nguyên nhân gốc rễ, (2) Mức rủi ro (LOW/WARNING/CRITICAL), (3) Dự báo, (4) Đề xuất hành động ưu tiên. Frontend UI tự động "đỏ/cam" (Highlight) dựa trên từ khóa rủi ro.
+  3. **Deep Risk Matrix (Scoring Agent)**: Hoàn thiện chấm điểm rủi ro 5 chiều (An toàn, Gian lận, Thái độ, Phương tiện, Tuân thủ) kết hợp thuật toán Thác rơi (Max-pooling Waterfall) và phễu lọc 3 tầng (Lọc ML -> Batching LLM -> Caching) để tối ưu chi phí.
+- **Kết quả**: Vòng lặp Agent đã hoàn thiện, vừa tiết kiệm API LLM vừa mang lại báo cáo vận hành cực kỳ sắc bén cho người quản lý.
