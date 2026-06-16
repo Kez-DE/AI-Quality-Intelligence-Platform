@@ -121,7 +121,7 @@ Mở: [http://localhost:5174](http://localhost:5174)
 
 ### Tài khoản Admin
 
-- Email: `manhnguyn1912@gmail.com` / Password: `Admin@12345`
+- Email: `manhnguyn1912@gmail.com` / Password: `12345678`
 - Staff/Guest: tạo qua UI hoặc Supabase Auth → gán role trong trang Admin.
 
 ---
