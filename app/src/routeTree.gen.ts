@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/tasks'
+import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
 import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticated/feedback'
 import { Route as AuthenticatedDepartmentInsightsRouteImport } from './routes/_authenticated/department-insights'
@@ -19,6 +21,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedAlertsRouteImport } from './routes/_authenticated/alerts'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedFeedbackUploadRouteImport } from './routes/_authenticated/feedback_.upload'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -33,6 +36,16 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedTasksRoute = AuthenticatedTasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedInsightsRoute = AuthenticatedInsightsRouteImport.update({
   id: '/insights',
@@ -70,6 +83,12 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedFeedbackUploadRoute =
+  AuthenticatedFeedbackUploadRouteImport.update({
+    id: '/feedback_/upload',
+    path: '/feedback/upload',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -81,6 +100,9 @@ export interface FileRoutesByFullPath {
   '/department-insights': typeof AuthenticatedDepartmentInsightsRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/insights': typeof AuthenticatedInsightsRoute
+  '/reports': typeof AuthenticatedReportsRoute
+  '/tasks': typeof AuthenticatedTasksRoute
+  '/feedback/upload': typeof AuthenticatedFeedbackUploadRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -92,6 +114,9 @@ export interface FileRoutesByTo {
   '/department-insights': typeof AuthenticatedDepartmentInsightsRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/insights': typeof AuthenticatedInsightsRoute
+  '/reports': typeof AuthenticatedReportsRoute
+  '/tasks': typeof AuthenticatedTasksRoute
+  '/feedback/upload': typeof AuthenticatedFeedbackUploadRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -105,6 +130,9 @@ export interface FileRoutesById {
   '/_authenticated/department-insights': typeof AuthenticatedDepartmentInsightsRoute
   '/_authenticated/feedback': typeof AuthenticatedFeedbackRoute
   '/_authenticated/insights': typeof AuthenticatedInsightsRoute
+  '/_authenticated/reports': typeof AuthenticatedReportsRoute
+  '/_authenticated/tasks': typeof AuthenticatedTasksRoute
+  '/_authenticated/feedback_/upload': typeof AuthenticatedFeedbackUploadRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -118,6 +146,9 @@ export interface FileRouteTypes {
     | '/department-insights'
     | '/feedback'
     | '/insights'
+    | '/reports'
+    | '/tasks'
+    | '/feedback/upload'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -129,6 +160,9 @@ export interface FileRouteTypes {
     | '/department-insights'
     | '/feedback'
     | '/insights'
+    | '/reports'
+    | '/tasks'
+    | '/feedback/upload'
   id:
     | '__root__'
     | '/'
@@ -141,6 +175,9 @@ export interface FileRouteTypes {
     | '/_authenticated/department-insights'
     | '/_authenticated/feedback'
     | '/_authenticated/insights'
+    | '/_authenticated/reports'
+    | '/_authenticated/tasks'
+    | '/_authenticated/feedback_/upload'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -171,6 +208,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/tasks': {
+      id: '/_authenticated/tasks'
+      path: '/tasks'
+      fullPath: '/tasks'
+      preLoaderRoute: typeof AuthenticatedTasksRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/reports': {
+      id: '/_authenticated/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof AuthenticatedReportsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/insights': {
       id: '/_authenticated/insights'
@@ -221,6 +272,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/feedback_/upload': {
+      id: '/_authenticated/feedback_/upload'
+      path: '/feedback/upload'
+      fullPath: '/feedback/upload'
+      preLoaderRoute: typeof AuthenticatedFeedbackUploadRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -232,6 +290,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDepartmentInsightsRoute: typeof AuthenticatedDepartmentInsightsRoute
   AuthenticatedFeedbackRoute: typeof AuthenticatedFeedbackRoute
   AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
+  AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
+  AuthenticatedTasksRoute: typeof AuthenticatedTasksRoute
+  AuthenticatedFeedbackUploadRoute: typeof AuthenticatedFeedbackUploadRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -242,6 +303,9 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDepartmentInsightsRoute: AuthenticatedDepartmentInsightsRoute,
   AuthenticatedFeedbackRoute: AuthenticatedFeedbackRoute,
   AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
+  AuthenticatedReportsRoute: AuthenticatedReportsRoute,
+  AuthenticatedTasksRoute: AuthenticatedTasksRoute,
+  AuthenticatedFeedbackUploadRoute: AuthenticatedFeedbackUploadRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
