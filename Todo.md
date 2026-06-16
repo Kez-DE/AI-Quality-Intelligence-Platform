@@ -187,7 +187,7 @@
 
 - [ ] Cap nhat `README.md` theo flow moi: role guest, 6 agent, ticket trigger, deploy URL.
 - [ ] Cap nhat `MASTER_BLUEPRINT.md` theo kien truc 6 agent moi.
-- [ ] Cap nhat `RUN.md` voi lenh chay backend/frontend/Supabase va cach trigger demo.
+- [x] Cap nhat `README.md` voi lenh chay backend/frontend/Supabase va cach trigger demo.
 - [ ] Cap nhat demo script: guest upload feedback -> agent xu ly -> ticket/alert hien realtime -> staff resolve.
 - [ ] Cap nhat demo script them flow: nhieu ticket -> gom thanh task -> sinh report gui truong phong.
 - [ ] Ghi ro chien luoc giam goi LLM/rate limit trong tai lieu ky thuat.
@@ -255,7 +255,7 @@
 - [ ] Them volume/cache hop ly cho node_modules, Python venv/model files de dev nhanh hon.
 - [ ] Them healthcheck cho container backend va frontend.
 - [ ] Them script seed data demo khi chay Docker lan dau.
-- [ ] Viet huong dan Docker trong `RUN.md` hoac `README.md`: cai Docker Desktop, copy env, start/stop/reset.
+- [ ] Viet huong dan Docker trong `README.md`: cai Docker Desktop, copy env, start/stop/reset.
 - [ ] Kiem tra Docker tren may thanh vien khac hoac moi truong sach de tranh loi phu thuoc local.
 
 ## 23. Quan tri to chuc va team
@@ -326,4 +326,4 @@
 - [ ] Kiem tra scheduler/worker agent chay tren moi truong deploy, khong phu thuoc may local.
 - [ ] Tao URL public cho frontend de moi nguoi co the vao dung.
 - [ ] Smoke test tren URL public: login guest, xem dashboard, upload feedback, agent/ticket chay dung.
-- [ ] Cap nhat `README.md` va `RUN.md` voi link URL public va cach van hanh production.
+- [ ] Cap nhat `README.md` voi link URL public va cach van hanh production.

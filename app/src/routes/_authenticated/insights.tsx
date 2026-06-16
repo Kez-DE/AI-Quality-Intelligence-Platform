@@ -1,16 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Building2, AlertCircle, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Loader2, Building2, AlertCircle, Sparkles, RefreshCw, BarChart3, MessageSquare, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/api";
+import { topicLabel } from "@/lib/labels";
+import { regionLabel } from "@/lib/regions";
 
 export const Route = createFileRoute("/_authenticated/insights")({
   component: InsightsPage,
 });
 
-const API_BASE = import.meta.env.VITE_BACKEND_API_URL ?? "http://127.0.0.1:8000";
+const TEAMS = ["IT", "Safety", "CSKH", "Vận hành", "Pricing", "Marketing"] as const;
 
-// Nhãn phòng ban tiếng Việt (khớp team trong orchestrator).
 const TEAM_LABEL: Record<string, string> = {
   IT: "Kỹ thuật / IT",
   Safety: "An toàn",
@@ -20,7 +21,15 @@ const TEAM_LABEL: Record<string, string> = {
   Marketing: "Marketing",
 };
 
-// Nhãn mức rủi ro tiếng Việt (analyst trả LOW/MEDIUM/HIGH/CRITICAL).
+const TEAM_HINT: Record<string, string> = {
+  IT: "Lỗi ứng dụng, bản đồ, thanh toán trong app",
+  Safety: "Tai nạn, đe doạ, hành hung, rủi ro an toàn",
+  CSKH: "Khiếu nại chung, trải nghiệm dịch vụ, cần phản hồi khách",
+  "Vận hành": "Tài xế, thiếu cuốc, chậm trễ, khu vực nóng",
+  Pricing: "Giá cước, mã giảm giá, cảm nhận chi phí",
+  Marketing: "Nhận diện thương hiệu, cảm nhận tích cực/tiêu cực thị trường",
+};
+
 const RISK_LABEL: Record<string, string> = {
   LOW: "Thấp",
   MEDIUM: "Trung bình",
@@ -28,11 +37,18 @@ const RISK_LABEL: Record<string, string> = {
   CRITICAL: "Nghiêm trọng",
 };
 
-type ActionItem = { action: string; deadline?: string };
+const SEVERITY_LABEL: Record<string, string> = {
+  CRITICAL: "Nghiêm trọng",
+  WARNING: "Cảnh báo",
+  WATCH: "Theo dõi",
+  INFO: "Thông tin",
+};
 
-// analyst_agent trả: { status, analysis: { root_cause_summary, risk_level, action_items[] } }
+type ActionItem = { action: string; deadline?: string | null };
+
 type Analysis = {
   status?: string;
+  reason?: string;
   analysis?: {
     root_cause_summary?: string;
     risk_level?: string;
@@ -40,56 +56,83 @@ type Analysis = {
   } | null;
 };
 
-// insight_agent trả: { team, total_feedback, severity_distribution, top_topics[], analysis? }
 type Department = {
   team: string;
+  period_hours?: number;
   total_feedback: number;
   severity_distribution?: Record<string, number>;
   top_topics?: { topic: string; count: number }[];
+  recent_samples?: { id?: string; text?: string; area?: string | null }[];
   analysis?: Analysis;
+  error?: string;
 };
 
+type ApiResponse<T> = { status: string; data: T };
+
 function InsightsPage() {
-  // orchestrator trả data dạng object { [team]: Department } -> chuyển thành mảng.
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [ran, setRan] = useState(false);
+  const [loadingMetrics, setLoadingMetrics] = useState(false);
+  const [analyzingTeam, setAnalyzingTeam] = useState<string | null>(null);
+  const [lastLoadedAt, setLastLoadedAt] = useState<string | null>(null);
 
-  async function authToken(): Promise<string | null> {
-    const { data } = await supabase.auth.getSession();
-    return data.session?.access_token ?? null;
-  }
-
-  async function runPipeline() {
-    setLoading(true);
-    const token = await authToken();
-    if (!token) {
-      toast.error("Chưa đăng nhập");
-      setLoading(false);
-      return;
-    }
+  async function loadMetrics() {
+    setLoadingMetrics(true);
     try {
-      const res = await fetch(`${API_BASE}/api/insights/departments?hours=720`, {
-        headers: { Authorization: `Bearer ${token}` },
+      // Load nhanh: KHÔNG gọi LLM. Mỗi team dùng Insight Agent để gom số liệu.
+      const results = await Promise.allSettled(
+        TEAMS.map((team) =>
+          apiFetch<ApiResponse<Department>>(
+            `/api/insights/departments/${encodeURIComponent(team)}?hours=720&with_analysis=false`,
+          ).then((json) => json.data),
+        ),
+      );
+
+      const rows = results.map((res, idx) => {
+        const team = TEAMS[idx];
+        if (res.status === "fulfilled") return res.value;
+        return {
+          team,
+          total_feedback: 0,
+          severity_distribution: { CRITICAL: 0, WARNING: 0, WATCH: 0, INFO: 0 },
+          top_topics: [],
+          recent_samples: [],
+          error: res.reason instanceof Error ? res.reason.message : "Không tải được dữ liệu",
+        } satisfies Department;
       });
-      if (!res.ok) {
-        const detail = await res.text();
-        throw new Error(`${res.status}: ${detail.slice(0, 200)}`);
-      }
-      // shape: { status, data: { departments_processed, data: { IT: {...}, Safety: {...} } } }
-      const json = (await res.json()) as {
-        data?: { data?: Record<string, Department> };
-      };
-      const deptMap = json.data?.data ?? {};
-      setDepartments(Object.values(deptMap));
-      setRan(true);
-      toast.success("Đã chạy phân tích đa tác tử");
+
+      setDepartments(rows);
+      setLastLoadedAt(new Date().toLocaleTimeString("vi-VN"));
+      toast.success("Đã tải số liệu 6 phòng ban");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Không chạy được phân tích");
+      toast.error(err instanceof Error ? err.message : "Không tải được phân tích phòng ban");
     } finally {
-      setLoading(false);
+      setLoadingMetrics(false);
     }
   }
+
+  async function analyzeTeam(team: string) {
+    setAnalyzingTeam(team);
+    try {
+      // Gọi Analyst Agent + LLM chỉ cho team người dùng chọn → tiết kiệm credit, phản hồi nhanh hơn.
+      const json = await apiFetch<ApiResponse<Department>>(
+        `/api/insights/departments/${encodeURIComponent(team)}?hours=720&with_analysis=true`,
+      );
+      setDepartments((prev) => prev.map((d) => (d.team === team ? json.data : d)));
+      toast.success(`Đã phân tích sâu: ${TEAM_LABEL[team] ?? team}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không chạy được Analyst Agent");
+    } finally {
+      setAnalyzingTeam(null);
+    }
+  }
+
+  useEffect(() => {
+    void loadMetrics();
+  }, []);
+
+  const totalFeedback = departments.reduce((sum, d) => sum + (d.total_feedback || 0), 0);
+  const teamsWithData = departments.filter((d) => d.total_feedback > 0).length;
+  const criticalCount = departments.reduce((sum, d) => sum + (d.severity_distribution?.CRITICAL ?? 0), 0);
 
   return (
     <div className="space-y-6">
@@ -99,44 +142,53 @@ function InsightsPage() {
             <Building2 className="h-6 w-6 text-xanh-green" />
             Phân tích phòng ban
           </h1>
-          <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-            Hệ đa tác tử (multi-agent) gom phản hồi theo từng phòng ban, định tuyến,
-            rồi dùng AI phân tích nguyên nhân gốc và đề xuất hành động.
+          <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
+            Trang này biến 6 agent thành tính năng thật: Insight Agent gom số liệu nhanh theo phòng ban,
+            Router Agent giải thích vì sao phản hồi đi về team đó, Analyst Agent chỉ gọi LLM khi cần phân tích sâu.
           </p>
         </div>
         <button
-          onClick={runPipeline}
-          disabled={loading}
+          onClick={loadMetrics}
+          disabled={loadingMetrics}
           className="h-11 px-5 rounded-xl text-white font-semibold flex items-center gap-2 shadow-[var(--shadow-green)] disabled:opacity-60"
           style={{ background: "var(--gradient-green)" }}
         >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          {loading ? "Đang chạy agent (~1-2 phút)..." : ran ? "Chạy lại" : "Chạy phân tích"}
+          {loadingMetrics ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          {loadingMetrics ? "Đang tải..." : "Tải lại số liệu"}
         </button>
       </div>
 
-      {loading && (
+      <div className="grid sm:grid-cols-3 gap-3">
+        <SummaryCard label="Tổng phản hồi" value={totalFeedback} icon={MessageSquare} />
+        <SummaryCard label="Phòng ban có dữ liệu" value={`${teamsWithData}/6`} icon={Building2} />
+        <SummaryCard label="Ca nghiêm trọng" value={criticalCount} icon={ShieldCheck} tone="coral" />
+      </div>
+
+      <div className="rounded-2xl border border-border bg-white p-4 text-sm text-muted-foreground">
+        <div className="font-semibold text-foreground mb-1">Cách hoạt động</div>
+        <ol className="list-decimal ml-5 space-y-1">
+          <li>Feedback đã được classifier + rule engine gán topic/sentiment/severity.</li>
+          <li>Router Agent route từng feedback về đúng phòng ban theo topic + P5 Safety override.</li>
+          <li>Insight Agent tổng hợp số lượng, mức độ, top chủ đề, ví dụ phản hồi.</li>
+          <li>Bấm “Phân tích sâu bằng AI” để Analyst Agent gọi LLM cho riêng phòng ban đó.</li>
+        </ol>
+        {lastLoadedAt && <div className="mt-2 text-xs font-mono">Cập nhật lúc {lastLoadedAt}</div>}
+      </div>
+
+      {loadingMetrics && departments.length === 0 ? (
         <div className="rounded-2xl border border-border bg-white p-10 text-center shadow-[var(--shadow-card)]">
           <Loader2 className="h-6 w-6 animate-spin inline text-xanh-green" />
-          <p className="text-sm text-muted-foreground mt-3">
-            6 tác tử đang phân tích từng phòng ban bằng LLM thật. Việc này mất khoảng 1-2 phút.
-          </p>
+          <p className="text-sm text-muted-foreground mt-3">Đang gom metric từ 6 phòng ban...</p>
         </div>
-      )}
-
-      {!loading && !ran && (
-        <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-10 text-center">
-          <Building2 className="h-8 w-8 inline text-muted-foreground" />
-          <p className="text-sm text-muted-foreground mt-3">
-            Bấm "Chạy phân tích" để hệ đa tác tử tổng hợp tình hình theo phòng ban.
-          </p>
-        </div>
-      )}
-
-      {!loading && ran && (
-        <div className="grid md:grid-cols-2 gap-4 items-start">
+      ) : (
+        <div className="grid xl:grid-cols-2 gap-4 items-start">
           {departments.map((d) => (
-            <DepartmentCard key={d.team} dept={d} />
+            <DepartmentCard
+              key={d.team}
+              dept={d}
+              analyzing={analyzingTeam === d.team}
+              onAnalyze={() => analyzeTeam(d.team)}
+            />
           ))}
         </div>
       )}
@@ -144,7 +196,39 @@ function InsightsPage() {
   );
 }
 
-function DepartmentCard({ dept }: { dept: Department }) {
+function SummaryCard({
+  label,
+  value,
+  icon: Icon,
+  tone = "green",
+}: {
+  label: string;
+  value: number | string;
+  icon: React.ComponentType<{ className?: string }>;
+  tone?: "green" | "coral";
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-white p-4 shadow-[var(--shadow-card)] flex items-center gap-3">
+      <div className={`h-10 w-10 rounded-xl grid place-items-center ${tone === "coral" ? "bg-xanh-coral/10 text-xanh-coral" : "bg-xanh-mint text-xanh-deep"}`}>
+        <Icon className="h-5 w-5" />
+      </div>
+      <div>
+        <div className="text-xs text-muted-foreground">{label}</div>
+        <div className="font-display text-2xl font-bold">{value}</div>
+      </div>
+    </div>
+  );
+}
+
+function DepartmentCard({
+  dept,
+  analyzing,
+  onAnalyze,
+}: {
+  dept: Department;
+  analyzing: boolean;
+  onAnalyze: () => void;
+}) {
   const inner = dept.analysis?.analysis ?? null;
   const risk = inner?.risk_level;
   const riskTone =
@@ -153,66 +237,111 @@ function DepartmentCard({ dept }: { dept: Department }) {
       : risk === "HIGH"
         ? "bg-amber-100 text-amber-800 border-amber-300"
         : "bg-xanh-mint text-xanh-deep border-xanh-green/30";
+  const severity = dept.severity_distribution ?? {};
 
   return (
-    <section className="rounded-2xl border border-border bg-white p-5 shadow-[var(--shadow-card)] space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="font-display font-semibold flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-xanh-deep" />
-          {TEAM_LABEL[dept.team] ?? dept.team}
-        </h2>
-        <span className="text-xs font-mono text-muted-foreground">
+    <section className="rounded-2xl border border-border bg-white p-5 shadow-[var(--shadow-card)] space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="font-display font-semibold flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-xanh-deep" />
+            {TEAM_LABEL[dept.team] ?? dept.team}
+          </h2>
+          <p className="text-xs text-muted-foreground mt-1">{TEAM_HINT[dept.team] ?? "Phân tích theo phòng ban"}</p>
+        </div>
+        <span className="text-xs font-mono text-muted-foreground whitespace-nowrap">
           {dept.total_feedback} phản hồi
         </span>
       </div>
 
-      {dept.total_feedback === 0 ? (
-        <p className="text-sm text-muted-foreground">Không có phản hồi trong kỳ.</p>
+      {dept.error && (
+        <div className="rounded-xl border border-xanh-coral/30 bg-xanh-coral/10 p-3 text-sm text-xanh-coral flex gap-2">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {dept.error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-4 gap-2">
+        {(["CRITICAL", "WARNING", "WATCH", "INFO"] as const).map((level) => (
+          <div key={level} className="rounded-xl bg-muted/50 p-2 text-center">
+            <div className="text-[10px] text-muted-foreground">{SEVERITY_LABEL[level]}</div>
+            <div className="font-mono font-bold">{severity[level] ?? 0}</div>
+          </div>
+        ))}
+      </div>
+
+      {dept.top_topics && dept.top_topics.length > 0 ? (
+        <div>
+          <div className="text-[11px] font-mono text-muted-foreground uppercase mb-2 flex items-center gap-1">
+            <BarChart3 className="h-3 w-3" /> Chủ đề nổi bật
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {dept.top_topics.slice(0, 5).map((t) => (
+              <span key={t.topic} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                {topicLabel(t.topic)} · {t.count}
+              </span>
+            ))}
+          </div>
+        </div>
       ) : (
-        <>
-          {risk && (
-            <span className={`inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded border ${riskTone}`}>
-              <AlertCircle className="h-3 w-3" />
-              Rủi ro: {RISK_LABEL[risk] ?? risk}
-            </span>
-          )}
+        <p className="text-sm text-muted-foreground">Chưa có phản hồi thuộc phòng ban này trong kỳ.</p>
+      )}
 
-          {dept.top_topics && dept.top_topics.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {dept.top_topics.slice(0, 4).map((t) => (
-                <span key={t.topic} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                  {t.topic} · {t.count}
+      {dept.recent_samples && dept.recent_samples.length > 0 && (
+        <div>
+          <div className="text-[11px] font-mono text-muted-foreground uppercase mb-2">Ví dụ gần nhất</div>
+          <div className="space-y-2">
+            {dept.recent_samples.slice(0, 2).map((s, idx) => (
+              <div key={s.id ?? idx} className="rounded-xl bg-slate-50 border border-slate-100 p-2 text-xs leading-relaxed">
+                “{s.text}”
+                {s.area && <span className="block mt-1 text-[10px] font-mono text-muted-foreground">{regionLabel(s.area)}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="pt-2 border-t border-border flex flex-wrap items-center justify-between gap-2">
+        {risk ? (
+          <span className={`inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded border ${riskTone}`}>
+            <AlertCircle className="h-3 w-3" />
+            Rủi ro: {RISK_LABEL[risk] ?? risk}
+          </span>
+        ) : (
+          <span className="text-xs text-muted-foreground">Chưa chạy phân tích sâu bằng LLM.</span>
+        )}
+        <button
+          onClick={onAnalyze}
+          disabled={analyzing || dept.total_feedback === 0}
+          className="h-9 px-3 rounded-lg border border-xanh-green/40 text-xanh-deep bg-xanh-mint hover:bg-xanh-green/20 text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
+        >
+          {analyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+          {analyzing ? "Đang phân tích..." : inner ? "Phân tích lại" : "Phân tích sâu bằng AI"}
+        </button>
+      </div>
+
+      {inner?.root_cause_summary && (
+        <div className="rounded-xl bg-xanh-mint/60 border border-xanh-green/20 p-3">
+          <div className="text-[11px] font-mono text-muted-foreground uppercase mb-1">Nguyên nhân gốc</div>
+          <p className="text-sm">{inner.root_cause_summary}</p>
+        </div>
+      )}
+
+      {inner?.action_items && inner.action_items.length > 0 && (
+        <div>
+          <div className="text-[11px] font-mono text-muted-foreground uppercase mb-1">Hành động đề xuất</div>
+          <ul className="text-sm space-y-1">
+            {inner.action_items.map((act, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <span className="text-xanh-green mt-0.5">•</span>
+                <span>
+                  {act.action}
+                  {act.deadline && <span className="text-[10px] font-mono text-muted-foreground ml-1">({act.deadline})</span>}
                 </span>
-              ))}
-            </div>
-          )}
-
-          {inner?.root_cause_summary && (
-            <div>
-              <div className="text-[11px] font-mono text-muted-foreground uppercase mb-1">Nguyên nhân gốc</div>
-              <p className="text-sm">{inner.root_cause_summary}</p>
-            </div>
-          )}
-
-          {inner?.action_items && inner.action_items.length > 0 && (
-            <div>
-              <div className="text-[11px] font-mono text-muted-foreground uppercase mb-1">Hành động đề xuất</div>
-              <ul className="text-sm space-y-1">
-                {inner.action_items.map((act, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="text-xanh-green mt-0.5">•</span>
-                    <span>
-                      {act.action}
-                      {act.deadline && (
-                        <span className="text-[10px] font-mono text-muted-foreground ml-1">({act.deadline})</span>
-                      )}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </section>
   );

@@ -71,7 +71,7 @@ TOKEN=$(.venv/bin/python - <<'PY'
 import os; from dotenv import load_dotenv; load_dotenv("../.env")
 from supabase import create_client
 c=create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_PUBLISHABLE_KEY"])
-r=c.auth.sign_in_with_password({"email":"demo.20260606180215@example.com","password":"Admin@12345"})
+r=c.auth.sign_in_with_password({"email":"manhnguyn1912@gmail.com","password":"Admin@12345"})
 print(r.session.access_token)
 PY
 )
