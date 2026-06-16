@@ -146,11 +146,13 @@ function FeedbackPage() {
     }
     setLoading(true);
     try {
+      const token = await authToken();
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
       // 2 nguồn riêng: Review Queue lấy đúng từ server (không sót ca cũ),
       // Stream lấy danh sách chung gần nhất.
       const [streamRes, queueRes] = await Promise.all([
-        fetch(`${API_BASE}/api/feedback/recent?limit=200`),
-        fetch(`${API_BASE}/api/feedback/recent?limit=200&needs_review=true&reviewed=false`),
+        fetch(`${API_BASE}/api/feedback/recent?limit=200`, { headers }),
+        fetch(`${API_BASE}/api/feedback/recent?limit=200&needs_review=true&reviewed=false`, { headers }),
       ]);
       if (!streamRes.ok) throw new Error(`${streamRes.status} ${streamRes.statusText}`);
       const streamJson = (await streamRes.json()) as { data?: Feedback[] };
