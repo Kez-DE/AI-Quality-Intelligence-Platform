@@ -2,11 +2,15 @@ import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useMe, ROLE_LABELS } from "@/lib/api";
+import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
+import NotificationPanel from "@/components/NotificationPanel";
 import {
   Bell,
   Building2,
   Car,
+  FileText,
   Gauge,
+  Kanban,
   LogOut,
   MessageSquare,
   Shield,
@@ -18,7 +22,9 @@ import { toast } from "sonner";
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: Gauge },
   { to: "/alerts", label: "Ticket Triage 🔴", icon: Bell },
+  { to: "/tasks", label: "Task Manager", icon: Kanban },
   { to: "/feedback", label: "Phản hồi", icon: MessageSquare },
+  { to: "/reports", label: "Báo cáo AI", icon: FileText },
   { to: "/insights", label: "Phân tích phòng ban", icon: Building2 },
   { to: "/chat", label: "AI Chat", icon: Sparkles },
 ];
@@ -33,6 +39,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { data: me } = useMe();
 
   const role = me?.role || "guest";
+  const { notifications, unreadCount, markAsRead, markAllRead } = useRealtimeNotifications();
 
   const navItems = NAV.map(n => {
     if (n.to === "/chat" && role === "guest") {
@@ -40,7 +47,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
     return n;
   }).filter(n => {
-    if (role === "guest" && ["/alerts", "/insights"].includes(n.to)) return false;
+    if (role === "guest" && ["/alerts", "/insights", "/tasks", "/reports"].includes(n.to)) return false;
+    if (role === "staff" && ["/reports"].includes(n.to)) return false;
     return true;
   });
 
@@ -80,6 +88,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </Link>
         </div>
+        {role !== "guest" && (
+          <div className="px-3 pt-3">
+            <NotificationPanel
+              notifications={notifications}
+              unreadCount={unreadCount}
+              onMarkRead={markAsRead}
+              onMarkAllRead={markAllRead}
+            />
+          </div>
+        )}
         <nav className="p-3 flex-1 space-y-1">
           {navItems.map((n) => {
             const Icon = n.icon;
@@ -134,9 +152,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <span className="font-display font-bold text-sm">xanhSM</span>
           </div>
-          <button onClick={signOut} className="text-xs font-mono text-muted-foreground">
-            <LogOut className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {role !== "guest" && (
+              <NotificationPanel
+                notifications={notifications}
+                unreadCount={unreadCount}
+                onMarkRead={markAsRead}
+                onMarkAllRead={markAllRead}
+              />
+            )}
+            <button onClick={signOut} className="text-xs font-mono text-muted-foreground">
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
         </div>
         <div className="flex overflow-x-auto px-2 pb-2 gap-1">
           {navItems.map((n) => {

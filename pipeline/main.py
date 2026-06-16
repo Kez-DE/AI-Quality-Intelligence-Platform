@@ -12,7 +12,11 @@ from ingest import ingest_dataset
 from ingest import get_supabase
 from agent import chat_completion, get_agent_status
 from auth_guard import AuthUser, get_current_user, require_admin, require_ops_staff
-from users_admin import router as users_router
+from users_admin import router as users_router, audit_router
+from rate_limiter import RateLimiter, check_rate_limit
+
+feedback_rate_limit = RateLimiter(max_requests=10, window_seconds=3600, scope="feedback_submit")
+chat_rate_limit = RateLimiter(max_requests=20, window_seconds=3600, scope="agent_chat")
 
 PIPELINE_DIR = os.path.dirname(__file__)
 PROJECT_ROOT = os.path.abspath(os.path.join(PIPELINE_DIR, ".."))
@@ -281,6 +285,7 @@ app.add_middleware(
 
 # User-management (admin only) — định danh + RBAC ở tầng API vì service role bypass RLS.
 app.include_router(users_router)
+app.include_router(audit_router)
 
 
 @app.get("/api/me")
@@ -349,27 +354,32 @@ def recent_feedback(
     limit: int = Query(default=100, ge=1, le=500),
     needs_review: bool | None = Query(default=None),
     reviewed: bool | None = Query(default=None),
+    user: AuthUser = Depends(get_current_user),
 ):
     """Đọc feedback gần nhất.
 
-    needs_review=true  -> chỉ Review Queue (ca cần duyệt).
-    reviewed=false     -> chỉ ca chưa duyệt.
-    Không truyền filter  -> toàn bộ (Feedback Stream).
+    - Guest: chỉ xem feedback của chính mình.
+    - Staff/Manager/Admin: xem toàn bộ + filter review queue.
     """
     try:
         db = get_supabase()
         q = db.table("feedback").select("*")
-        if needs_review is not None:
-            q = q.eq("needs_review", needs_review)
-        if reviewed is not None:
-            q = q.eq("reviewed", reviewed)
+        if user.role == "guest":
+            # Guest chỉ xem feedback do chính mình gửi
+            q = q.eq("user_id", user.id)
+        else:
+            if needs_review is not None:
+                q = q.eq("needs_review", needs_review)
+            if reviewed is not None:
+                q = q.eq("reviewed", reviewed)
         data = q.order("created_at", desc=True).limit(limit).execute().data or []
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot read feedback: {str(exc)[:300]}") from exc
     return {"status": "success", "data": data}
 
 @app.get("/api/alerts/recent")
-def recent_alerts(limit: int = Query(default=100, ge=1, le=500)):
+def recent_alerts(limit: int = Query(default=100, ge=1, le=500), _: AuthUser = Depends(require_ops_staff)):
+    """Alerts chỉ dành cho ops staff (staff/manager/admin). Guest không được xem."""
     try:
         db = get_supabase()
         data = db.table("alerts") \
@@ -383,21 +393,90 @@ def recent_alerts(limit: int = Query(default=100, ge=1, le=500)):
     return {"status": "success", "data": data}
 
 @app.get("/api/tasks")
-def list_tasks(limit: int = Query(default=100, ge=1, le=500)):
+def list_tasks(
+    limit: int = Query(default=100, ge=1, le=500),
+    status: str | None = Query(default=None),
+    team: str | None = Query(default=None),
+    priority: str | None = Query(default=None),
+    area: str | None = Query(default=None),
+    overdue: bool = Query(default=False),
+    _: AuthUser = Depends(require_ops_staff),
+):
     try:
         db = get_supabase()
-        data = db.table("tasks") \
-            .select("*") \
-            .order("created_at", desc=True) \
-            .limit(limit) \
-            .execute() \
-            .data or []
+        q = db.table("tasks").select("*")
+        if status:
+            q = q.eq("status", status)
+        if team:
+            q = q.eq("assigned_team", team)
+        if priority:
+            q = q.eq("priority", priority)
+        if area:
+            q = q.eq("area", area)
+        if overdue:
+            q = q.lt("due_at", datetime.now(timezone.utc).isoformat()).neq("status", "resolved")
+        data = q.order("created_at", desc=True).limit(limit).execute().data or []
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot read tasks: {str(exc)[:300]}") from exc
     return {"status": "success", "data": data}
 
+@app.get("/api/tasks/{task_id}/alerts")
+def list_task_alerts(task_id: str, _: AuthUser = Depends(require_ops_staff)):
+    try:
+        db = get_supabase()
+        data = db.table("alerts") \
+            .select("*") \
+            .eq("task_id", task_id) \
+            .order("created_at", desc=True) \
+            .execute() \
+            .data or []
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Cannot read task alerts: {str(exc)[:300]}") from exc
+    return {"status": "success", "data": data}
+
+@app.patch("/api/tasks/{task_id}/status")
+def update_task_status(task_id: str, payload: dict, _: AuthUser = Depends(require_ops_staff)):
+    new_status = payload.get("status")
+    if new_status not in {"open", "in_progress", "resolved"}:
+        raise HTTPException(status_code=400, detail="Invalid task status")
+    try:
+        db = get_supabase()
+        data = db.table("tasks") \
+            .update({"status": new_status, "updated_at": "now()"}) \
+            .eq("id", task_id) \
+            .execute() \
+            .data or []
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Cannot update task: {str(exc)[:300]}") from exc
+    if not data:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"status": "success", "data": data[0]}
+
+@app.patch("/api/tasks/{task_id}/assign")
+def assign_task(task_id: str, payload: dict, _: AuthUser = Depends(require_ops_staff)):
+    update_fields: dict = {}
+    if "owner_id" in payload:
+        update_fields["owner_id"] = payload["owner_id"]
+    if "due_at" in payload:
+        update_fields["due_at"] = payload["due_at"]
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="Must provide owner_id or due_at")
+    update_fields["updated_at"] = "now()"
+    try:
+        db = get_supabase()
+        data = db.table("tasks") \
+            .update(update_fields) \
+            .eq("id", task_id) \
+            .execute() \
+            .data or []
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Cannot assign task: {str(exc)[:300]}") from exc
+    if not data:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"status": "success", "data": data[0]}
+
 @app.get("/api/reports")
-def list_reports(team: str | None = None, limit: int = Query(default=50, ge=1, le=100)):
+def list_reports(team: str | None = None, limit: int = Query(default=50, ge=1, le=100), _: AuthUser = Depends(require_ops_staff)):
     try:
         db = get_supabase()
         q = db.table("department_reports").select("*")
@@ -409,8 +488,45 @@ def list_reports(team: str | None = None, limit: int = Query(default=50, ge=1, l
     return {"status": "success", "data": data}
 
 
+@app.patch("/api/reports/{report_id}/approve")
+def approve_report(report_id: str, user: AuthUser = Depends(require_ops_staff)):
+    """Trưởng phòng duyệt báo cáo trước khi chia việc."""
+    db = get_supabase()
+    try:
+        data = db.table("department_reports").update({
+            "approved": True,
+            "approved_by": user.id,
+            "approved_at": datetime.now(timezone.utc).isoformat()
+        }).eq("id", report_id).execute().data or []
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Cannot approve report: {str(exc)[:300]}") from exc
+    if not data:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return {"status": "success", "data": data[0]}
+
+
+@app.get("/api/users/assignable")
+def list_assignable_users(_: AuthUser = Depends(require_ops_staff)):
+    """Trả về danh sách user có thể gán task (staff/manager/admin)."""
+    try:
+        db = get_supabase()
+        data = db.table("profiles") \
+            .select("id,email,role") \
+            .in_("role", ["staff", "manager", "admin"]) \
+            .order("role", desc=False) \
+            .order("email", desc=False) \
+            .execute() \
+            .data or []
+        # Sort: admin first, then manager, then staff
+        role_order = {"admin": 0, "manager": 1, "staff": 2}
+        data.sort(key=lambda u: (role_order.get(u.get("role"), 99), (u.get("email") or "")))
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Cannot read assignable users: {str(exc)[:300]}") from exc
+    return {"status": "success", "data": data}
+
 @app.get("/api/alerts/workflow-status")
-def alert_workflow_status():
+def alert_workflow_status(_: AuthUser = Depends(require_ops_staff)):
+    """Trạng thái workflow ticket — chỉ ops staff."""
     return {"status": "success", "data": dict(ticket_workflow_state)}
 
 @app.patch("/api/alerts/{alert_id}/status")
@@ -432,11 +548,11 @@ def update_alert_status(alert_id: str, payload: dict, _: AuthUser = Depends(requ
     return {"status": "success", "data": data[0]}
 
 @app.get("/api/agent/status")
-def agent_status():
+def agent_status(_: AuthUser = Depends(require_ops_staff)):
     return {"status": "success", "data": get_agent_status()}
 
 @app.get("/api/agent/logs")
-def agent_logs(limit: int = Query(default=50, ge=1, le=500)):
+def agent_logs(limit: int = Query(default=50, ge=1, le=500), _: AuthUser = Depends(require_ops_staff)):
     log_file = get_agent_status()["log_file"]
     if not os.path.exists(log_file):
         return {"status": "success", "data": []}
@@ -444,8 +560,34 @@ def agent_logs(limit: int = Query(default=50, ge=1, le=500)):
         lines = f.readlines()[-limit:]
     return {"status": "success", "data": [line.rstrip("\n") for line in lines]}
 
+GUEST_SYSTEM_PROMPT = """You are a customer support chatbot for the AI Quality Intelligence app.
+You can ONLY answer questions about how to use the app and how to submit feedback.
+Do NOT provide any internal data, analytics, metrics, or system information.
+If the user asks about anything else, politely redirect them to use the app's features or contact support."""
+
 @app.post("/api/agent/chat")
-def agent_chat(payload: dict):
+def agent_chat(payload: dict, user: AuthUser = Depends(get_current_user)):
+    if user.role == "guest":
+        check_rate_limit(chat_rate_limit, user.id)
+        # Guests get a restricted customer-support-only chatbot
+        messages = payload.get("messages")
+        if not isinstance(messages, list) or not messages:
+            raise HTTPException(status_code=400, detail="messages must be a non-empty list")
+        normalized = [
+            {"role": "system", "content": GUEST_SYSTEM_PROMPT},
+        ]
+        for message in messages[-30:]:
+            role = message.get("role")
+            content = message.get("content")
+            if role not in {"user", "assistant", "system"} or not isinstance(content, str) or not content.strip():
+                raise HTTPException(status_code=400, detail="Invalid chat message")
+            normalized.append({"role": role, "content": content[:8000]})
+        try:
+            result = chat_completion(normalized, temperature=0.4)
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Agent model error: {str(exc)[:300]}") from exc
+        return {"status": "success", "data": result}
+
     messages = payload.get("messages")
     if not isinstance(messages, list) or not messages:
         raise HTTPException(status_code=400, detail="messages must be a non-empty list")
@@ -520,7 +662,7 @@ def stop_live_feedback_stream(_: AuthUser = Depends(require_admin)):
     return {"status": "success", "data": stop_live_stream()}
 
 @app.get("/api/live-stream/status")
-def live_feedback_stream_status():
+def live_feedback_stream_status(_: AuthUser = Depends(require_ops_staff)):
     return {"status": "success", "data": get_live_stream_status()}
 
 @app.post("/api/run-real-pipeline")
@@ -578,6 +720,9 @@ def submit_feedback(payload: dict, user: AuthUser = Depends(get_current_user)):
     Topic / sentiment / severity / confidence do AI tự phân tích (classifier +
     rule Safety) — KHÔNG cho người gửi tự chọn, tránh làm hỏng dữ liệu nhãn.
     """
+    if user.role == "guest":
+        check_rate_limit(feedback_rate_limit, user.id)
+
     text = (payload.get("text") or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="Thiếu nội dung phản hồi (text)")

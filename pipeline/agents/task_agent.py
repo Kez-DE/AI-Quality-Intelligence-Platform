@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 from datetime import datetime, timedelta
 
 from agents.common import get_db, log_agent_run
-from llm_agent import generate_completion
+from agents.common import call_llm
 
 def cluster_alerts_into_tasks() -> Dict[str, Any]:
     """
@@ -81,7 +81,7 @@ Trả về định dạng JSON:
   "summary": "Tóm tắt tình hình và hành động cần làm (2-3 câu)"
 }}"""
             try:
-                llm_res = generate_completion(prompt, response_format={"type": "json_object"})
+                llm_res = call_llm("You are a helpful assistant.", prompt, "json_object")
                 import json
                 try:
                     task_data = json.loads(llm_res)
@@ -164,7 +164,7 @@ Yêu cầu Báo cáo (Khoảng 150-200 chữ, phải có 4 mục sau):
 ### 4. Đề xuất hành động (Action Plan)
 [3 hành động cụ thể kèm deadline]
 """
-        content = generate_completion(prompt)
+        content = call_llm("You are an AI Analyst.", prompt, "text")
         
         report_data = {
             "team": team,

@@ -90,4 +90,25 @@ def create_or_update_ticket(
         )
         return output.model_dump()
 
-__all__ = ["create_or_update_ticket"]
+def get_overdue_tickets(sla_hours: int = 24) -> list:
+    """Lấy danh sách tickets đã quá SLA (mặc định 24h) và chưa resolved."""
+    from datetime import datetime, timedelta, timezone
+
+    db = get_db()
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=sla_hours)).isoformat()
+
+    try:
+        res = db.table("alerts") \
+            .select("id,title,severity,area,status,created_at") \
+            .in_("status", ["open", "in_progress"]) \
+            .lte("created_at", cutoff) \
+            .order("created_at", desc=False) \
+            .limit(100) \
+            .execute()
+        return res.data or []
+    except Exception as e:
+        print(f"[TicketAgent] Lỗi lấy overdue tickets: {e}")
+        return []
+
+
+__all__ = ["create_or_update_ticket", "get_overdue_tickets"]
