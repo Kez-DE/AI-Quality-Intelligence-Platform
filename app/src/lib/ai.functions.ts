@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
@@ -31,11 +32,14 @@ export const chatWithAI = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => InputSchema.parse(input))
   .handler(async ({ data }) => {
     const apiBase = process.env.BACKEND_API_URL ?? "http://127.0.0.1:8000";
+    const authHeader = getRequest()?.headers.get("authorization");
+    if (!authHeader) throw new Error("Thiếu token đăng nhập khi gọi backend agent.");
 
     const res = await fetch(`${apiBase}/api/agent/chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: authHeader,
       },
       body: JSON.stringify({
         messages: [{ role: "system", content: SYSTEM_PROMPT }, ...data.messages],

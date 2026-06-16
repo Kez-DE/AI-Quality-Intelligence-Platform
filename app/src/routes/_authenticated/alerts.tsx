@@ -17,6 +17,7 @@ import {
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/alerts")({
   component: AlertsPage,
@@ -71,7 +72,6 @@ function getTeamConfig(team: string) {
 }
 
 const TABS = ["Tất cả", "Vận Hành", "CSKH", "Safety", "IT", "Driver Mgmt"];
-const API_BASE = import.meta.env.VITE_BACKEND_API_URL ?? "http://127.0.0.1:8000";
 
 type LiveStreamStatus = {
   running: boolean;
@@ -109,15 +109,11 @@ function AlertsPage() {
   async function fetchAlerts(showLoading = false) {
     if (showLoading) setLoading(true);
     try {
-      const [alertsRes, statusRes, workflowRes] = await Promise.all([
-        fetch(`${API_BASE}/api/alerts/recent?limit=100`),
-        fetch(`${API_BASE}/api/live-stream/status`),
-        fetch(`${API_BASE}/api/alerts/workflow-status`),
+      const [alertsJson, statusJson, workflowJson] = await Promise.all([
+        apiFetch<{ data?: Alert[] }>("/api/alerts/recent?limit=100"),
+        apiFetch<{ data?: LiveStreamStatus }>("/api/live-stream/status"),
+        apiFetch<{ data?: TicketWorkflowStatus }>("/api/alerts/workflow-status"),
       ]);
-      if (!alertsRes.ok || !statusRes.ok || !workflowRes.ok) throw new Error("Backend unavailable");
-      const alertsJson = (await alertsRes.json()) as { data?: Alert[] };
-      const statusJson = (await statusRes.json()) as { data?: LiveStreamStatus };
-      const workflowJson = (await workflowRes.json()) as { data?: TicketWorkflowStatus };
       setAlerts(alertsJson.data ?? []);
       setStream(statusJson.data ?? null);
       setWorkflow(workflowJson.data ?? null);
@@ -145,12 +141,10 @@ function AlertsPage() {
   async function updateStatus(id: string, newStatus: string) {
     setUpdating(id);
     try {
-      const response = await fetch(`${API_BASE}/api/alerts/${id}/status`, {
+      await apiFetch(`/api/alerts/${id}/status`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       });
-      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
       toast.success(newStatus === "in_progress" ? "✅ Đã nhận xử lý!" : "🎉 Đã đánh dấu hoàn thành!");
       fetchAlerts();
     } catch (error) {

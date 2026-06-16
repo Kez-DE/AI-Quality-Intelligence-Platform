@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database as DatabaseSchema } from "@/integrations/supabase/types";
-import { useMe } from "@/lib/api";
+import { apiFetch, useMe } from "@/lib/api";
 import {
   Activity,
   AlertTriangle,
@@ -438,7 +438,6 @@ function LiveFeed() {
   const [newFeedIds, setNewFeedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [streamStatus, setStreamStatus] = useState<"connecting" | "live" | "error">("connecting");
-  const apiBase = import.meta.env.VITE_BACKEND_API_URL ?? "http://127.0.0.1:8000";
   const seenIdsRef = useRef<Set<string>>(new Set());
   const initializedRef = useRef(false);
 
@@ -448,11 +447,9 @@ function LiveFeed() {
 
     async function loadFeed() {
       try {
-        const res = await fetch(`${apiBase}/api/feedback/recent?limit=8`);
-        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-        const json = (await res.json()) as {
+        const json = await apiFetch<{
           data?: DatabaseSchema["public"]["Tables"]["feedback"]["Row"][];
-        };
+        }>("/api/feedback/recent?limit=8");
         if (!active) return;
         const rows = json.data ?? [];
         const incomingIds = rows.map((row) => row.id);

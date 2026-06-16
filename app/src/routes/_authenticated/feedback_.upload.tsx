@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef } from "react";
 import { UploadCloud, X, CheckCircle2, Loader2, FileArchive, Shield } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { apiFetch } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/feedback_/upload")({
   component: UploadFeedbackPage,
@@ -19,8 +19,6 @@ function redactPII(text: string): string {
   redacted = redacted.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, "[EMAIL_ĐÃ_ẨN]");
   return redacted;
 }
-
-const API_BASE = import.meta.env.VITE_BACKEND_API_URL ?? "http://127.0.0.1:8000";
 
 function UploadFeedbackPage() {
   const [dragActive, setDragActive] = useState(false);
@@ -100,16 +98,13 @@ function UploadFeedbackPage() {
   const submitManual = async () => {
     if (!manualText.trim()) return;
     setIsProcessing(true);
-    const token = (await supabase.auth.getSession()).data.session?.access_token;
     
     try {
       const redactedText = redactPII(manualText.trim());
-      const res = await fetch(`${API_BASE}/api/feedback/submit`, {
+      await apiFetch("/api/feedback/submit", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ text: redactedText, channel: "app", area: "HAN" }),
       });
-      if (!res.ok) throw new Error("Lỗi khi gửi phản hồi");
       
       toast.success("Đã gửi phản hồi thành công.");
       setManualText("");
@@ -127,7 +122,6 @@ function UploadFeedbackPage() {
     const id = crypto.randomUUID();
     setBatchId(id);
     abortControllerRef.current = new AbortController();
-    const token = (await supabase.auth.getSession()).data.session?.access_token;
 
     let successCount = 0;
     try {
@@ -137,9 +131,8 @@ function UploadFeedbackPage() {
            break;
         }
         
-        await fetch(`${API_BASE}/api/feedback/submit`, {
+        await apiFetch("/api/feedback/submit", {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ ...csvData[i], batch_id: id }),
           signal: abortControllerRef.current.signal
         });
