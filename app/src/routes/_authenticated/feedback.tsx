@@ -144,10 +144,14 @@ function FeedbackPage() {
       setLoading(false);
       return;
     }
+    const token = await authToken();
+    if (!token) {
+      // Session chưa sẵn sàng — không gọi API để tránh 401 liên tục
+      return;
+    }
     setLoading(true);
     try {
-      const token = await authToken();
-      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+      const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
       // 2 nguồn riêng: Review Queue lấy đúng từ server (không sót ca cũ),
       // Stream lấy danh sách chung gần nhất.
       const [streamRes, queueRes] = await Promise.all([
