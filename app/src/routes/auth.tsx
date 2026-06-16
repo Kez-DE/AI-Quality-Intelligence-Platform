@@ -156,11 +156,11 @@ function AuthPage() {
             <Field
               icon={Lock}
               type="password"
-              placeholder="Mật khẩu mạnh (tối thiểu 8 ký tự)"
+              placeholder={mode === "signin" ? "Mật khẩu" : "Mật khẩu mạnh (tối thiểu 8 ký tự)"}
               value={password}
               onChange={setPassword}
               required
-              minLength={8}
+              minLength={mode === "signup" ? 8 : undefined}
             />
 
             <button
