@@ -382,6 +382,33 @@ def recent_alerts(limit: int = Query(default=100, ge=1, le=500)):
         raise HTTPException(status_code=503, detail=f"Cannot read alerts: {str(exc)[:300]}") from exc
     return {"status": "success", "data": data}
 
+@app.get("/api/tasks")
+def list_tasks(limit: int = Query(default=100, ge=1, le=500)):
+    try:
+        db = get_supabase()
+        data = db.table("tasks") \
+            .select("*") \
+            .order("created_at", desc=True) \
+            .limit(limit) \
+            .execute() \
+            .data or []
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Cannot read tasks: {str(exc)[:300]}") from exc
+    return {"status": "success", "data": data}
+
+@app.get("/api/reports")
+def list_reports(team: str | None = None, limit: int = Query(default=50, ge=1, le=100)):
+    try:
+        db = get_supabase()
+        q = db.table("department_reports").select("*")
+        if team:
+            q = q.eq("team", team)
+        data = q.order("created_at", desc=True).limit(limit).execute().data or []
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Cannot read reports: {str(exc)[:300]}") from exc
+    return {"status": "success", "data": data}
+
+
 @app.get("/api/alerts/workflow-status")
 def alert_workflow_status():
     return {"status": "success", "data": dict(ticket_workflow_state)}
@@ -755,6 +782,19 @@ def run_multi_agent_pipeline(
         result = run_agent_pipeline(hours=hours)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Agent pipeline error: {str(exc)[:300]}") from exc
+    return {"status": "success", "data": result}
+
+@app.post("/api/agent/generate-report")
+def trigger_daily_report(
+    team: str,
+    _: AuthUser = Depends(require_admin),
+):
+    """Kích hoạt sinh báo cáo tự động cho 1 phòng ban (admin only)."""
+    from agents.task_agent import generate_daily_report
+    try:
+        result = generate_daily_report(team)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Report generation error: {str(exc)[:300]}") from exc
     return {"status": "success", "data": result}
 
 if __name__ == "__main__":

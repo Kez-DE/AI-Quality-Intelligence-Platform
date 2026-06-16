@@ -11,7 +11,7 @@
 Orchestrator KHÔNG phải agent nghiệp vụ — chỉ điều phối, retry, logging, schedule.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
 from agents.common import get_db, log_agent_run
@@ -20,6 +20,8 @@ from agents.analyst_agent import analyze_root_cause
 from agents.alert_agent import classify_alert_severity, process_area_alerts
 from agents.router_agent import route_ticket
 from agents.ticket_agent import create_or_update_ticket, TicketInput, get_overdue_tickets
+from agents.task_agent import cluster_alerts_into_tasks
+from llm_agent import analyze_spike
 
 # Phòng ban khớp với routing_table.json (team đích của router_agent).
 TEAMS = ["IT", "Safety", "CSKH", "Vận hành", "Pricing", "Marketing"]
@@ -33,9 +35,9 @@ def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
     2. Alert Agent: phân cấp cảnh báo theo khu vực
     3. Router Agent: xác nhận phòng ban cho từng spike
     4. Ticket Agent: tạo/dedup ticket
-    5. Insight Agent: tổng hợp metric tất cả phòng ban
-    6. Analyst Agent: phân tích sâu phòng có rủi ro
-    7. Kiểm tra ticket quá SLA
+    5. Task Agent: gom cụm alerts thành tasks
+    6. Insight Agent: tổng hợp metric tất cả phòng ban
+    7. Analyst Agent: phân tích sâu phòng có rủi ro + sinh báo cáo
     """
     start_time = datetime.now(timezone.utc)
     print(f"[{start_time.isoformat()}] Bắt đầu chạy Agent Pipeline (6 agents)...")
@@ -43,9 +45,72 @@ def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
     results: Dict[str, Any] = {}
     errors: Dict[str, str] = {}
     pipeline_log: List[str] = []
+    db = get_db()
 
-    # ── Step 1-4: Alert detection + Ticket creation (đã xử lý ở spike_detector flow) ──
-    # Orchestrator gọi lại khi chạy thủ công
+    # ── Step 1-4: Alert detection + Ticket creation ──
+    alerts_created = []
+    try:
+        since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+        response = db.table("feedback") \
+            .select("id, text, area, severity, topic") \
+            .gte("created_at", since) \
+            .in_("severity", ["P4", "P5", 4, 5]) \
+            .order("created_at", desc=True) \
+            .execute()
+
+        feedbacks = response.data or []
+        area_feedbacks: Dict[str, list] = {}
+        for f in feedbacks:
+            area = f.get("area", "Unknown")
+            if area not in area_feedbacks:
+                area_feedbacks[area] = []
+            area_feedbacks[area].append(f)
+
+        for area, fbs in area_feedbacks.items():
+            # Alert Agent đánh giá severity
+            alert_decision = process_area_alerts(area, fbs)
+            if alert_decision.get("action") == "create":
+                # Phân tích root cause cho spike
+                texts = [f.get("text", "") for f in fbs[:20]]
+                spike_analysis = analyze_spike(area, texts)
+
+                # Định tuyến
+                top_topic = fbs[0].get("topic", "Unknown") if fbs else "Unknown"
+                route_res = route_ticket(top_topic, alert_decision.get("severity"))
+
+                # Tạo ticket
+                ticket_res = create_or_update_ticket(
+                    area=area,
+                    title=spike_analysis.get("title", f"Spike tại {area}"),
+                    description=(
+                        spike_analysis.get("description", "")
+                        + f"\n\n**Action Plan:** {spike_analysis.get('action', '')}"
+                        + f"\n**Assigned Team:** {route_res.get('team')}"
+                    ),
+                    severity=alert_decision.get("severity", "CRITICAL"),
+                    team=route_res.get("team"),
+                    sla_hours=route_res.get("sla_hours", 24),
+                )
+                alerts_created.append(ticket_res)
+
+        results["alerts_created"] = alerts_created
+        pipeline_log.append(f"Alerts: {len(alerts_created)} ticket(s) created from {len(feedbacks)} P4/P5 feedbacks")
+
+    except Exception as exc:
+        error_msg = str(exc)[:200]
+        pipeline_log.append(f"Alert processing error: {error_msg}")
+        errors["alerts"] = error_msg
+
+    # ── Step 5: Task Agent — gom cụm alerts thành tasks ──
+    try:
+        cluster_res = cluster_alerts_into_tasks()
+        results["tasks_clustered"] = cluster_res
+        pipeline_log.append(f"Tasks clustered: {cluster_res.get('tasks_created', 0)} task(s)")
+    except Exception as exc:
+        pipeline_log.append(f"Task clustering error: {str(exc)[:100]}")
+        errors["task_clustering"] = str(exc)[:200]
+
+    # ── Step 5.5: Kiểm tra ticket quá SLA ──
     overdue_tickets = []
     try:
         overdue_tickets = get_overdue_tickets(sla_hours=24)
@@ -54,18 +119,42 @@ def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
     except Exception as exc:
         pipeline_log.append(f"Lỗi kiểm tra SLA: {str(exc)[:100]}")
 
-    # ── Step 5-6: Insight + Analyst cho từng phòng ban ──
+    # ── Step 6-7: Insight + Analyst cho từng phòng ban ──
     for team in TEAMS:
         try:
             # Agent 4: Insight Agent
             insights = generate_department_insights(team, hours=hours)
 
             if insights.get("total_feedback", 0) > 0:
-                # Agent 5: Analyst Agent — chỉ phân tích phòng có feedback
-                insights["analysis"] = analyze_root_cause(team, insights)
+                # Agent 5: Analyst Agent — phân tích root cause
+                analysis_res = analyze_root_cause(team, insights)
+                insights["analysis"] = analysis_res
+
+                # Nếu có rủi ro, lưu báo cáo Markdown cho trưởng phòng
+                analysis = analysis_res.get("analysis")
+                if analysis:
+                    risk_level = analysis.get("risk_level", "MEDIUM")
+
+                    md = f"### 1. Nguyên nhân gốc rễ (Root Cause)\n{analysis.get('root_cause_summary', 'N/A')}\n\n"
+                    md += f"### 2. Mức độ rủi ro hiện tại (Risk Level)\n**{risk_level}**\n\n"
+                    md += "### 3. Dự báo 24-48h tới (Forecast)\nTheo xu hướng hiện tại, cần theo dõi sát các vấn đề trên.\n\n"
+                    md += "### 4. Đề xuất hành động (Action Plan)\n"
+                    for act in analysis.get("action_items", []):
+                        md += f"- {act.get('action')} (Deadline: {act.get('deadline')})\n"
+
+                    # Lưu vào DB
+                    try:
+                        db.table("department_reports").insert({
+                            "team": team,
+                            "report_date": datetime.now(timezone.utc).date().isoformat(),
+                            "content": md,
+                        }).execute()
+                    except Exception:
+                        pass  # Bảng chưa tồn tại thì bỏ qua
+
                 pipeline_log.append(
                     f"{team}: {insights['total_feedback']} feedback, "
-                    f"analyzed={'success' if insights.get('analysis', {}).get('status') == 'success' else 'fallback'}"
+                    f"analyzed={'success' if analysis_res.get('status') == 'success' else 'fallback'}"
                 )
             else:
                 insights["analysis"] = None
@@ -98,6 +187,8 @@ def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
         "timestamp": end_time.isoformat(),
         "duration_ms": duration_ms,
         "departments_processed": len(results),
+        "alerts_created": len(alerts_created),
+        "tasks_clustered": results.get("tasks_clustered", {}),
         "overdue_tickets": len(overdue_tickets),
         "errors": errors,
         "pipeline_log": pipeline_log,
@@ -105,6 +196,7 @@ def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
             "ingestion_agent",
             "router_agent",
             "ticket_agent",
+            "task_agent",
             "insight_agent",
             "analyst_agent",
             "alert_agent",
