@@ -37,22 +37,42 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
+  const message = error?.message ?? String(error);
+  const isChunkLoadError =
+    /dynamically imported module|Failed to fetch dynamically imported module|Importing a module script failed|Load failed|ChunkLoadError/i.test(
+      message,
+    );
+
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
+    if (!isChunkLoadError) return;
+
+    const key = "c2-app-chunk-reload";
+    if (sessionStorage.getItem(key) === "1") return;
+    sessionStorage.setItem(key, "1");
+    window.location.reload();
+  }, [error, isChunkLoadError]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
+          Không tải được trang
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+          {isChunkLoadError
+            ? "Ứng dụng vừa được deploy phiên bản mới. Trang sẽ tự tải lại để lấy bundle mới nhất."
+            : "Ứng dụng gặp lỗi khi mở trang dịch vụ. Hãy thử tải lại hoặc quay về trang chủ."}
         </p>
+        {!isChunkLoadError && message && (
+          <pre className="mt-4 max-h-36 overflow-auto rounded-lg border border-border bg-muted p-3 text-left text-xs text-muted-foreground whitespace-pre-wrap">
+            {message}
+          </pre>
+        )}
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
+              sessionStorage.removeItem("c2-app-chunk-reload");
               router.invalidate();
               reset();
             }}
