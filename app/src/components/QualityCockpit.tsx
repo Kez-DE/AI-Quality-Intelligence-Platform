@@ -479,7 +479,7 @@ function LiveFeed() {
       window.clearInterval(polling);
       if (clearNewIdsTimer) window.clearTimeout(clearNewIdsTimer);
     };
-  }, [apiBase]);
+  }, []);
 
   return (
     <Card>
