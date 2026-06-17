@@ -86,9 +86,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex text-foreground">
       {/* Sidebar */}
-      <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border bg-white/80 backdrop-blur sticky top-0 h-screen">
+      <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border bg-card/90 text-card-foreground backdrop-blur sticky top-0 h-screen">
         <div className="p-5 border-b border-border">
           <Link to="/dashboard" className="flex items-center gap-2">
             <div
@@ -165,7 +165,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-40 bg-white/90 backdrop-blur border-b border-border">
+      <div className="md:hidden fixed top-0 inset-x-0 z-40 bg-card/95 text-card-foreground backdrop-blur border-b border-border">
         <div className="flex items-center justify-between px-3 h-14">
           <div className="flex items-center gap-2">
             <div
@@ -216,7 +216,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <main className="flex-1 md:py-6 md:px-8 pt-28 pb-10 px-4 max-w-7xl">{children}</main>
+      <main className="flex-1 md:py-6 md:px-8 pt-28 pb-10 px-4 max-w-7xl text-foreground">{children}</main>
     </div>
   );
 }
