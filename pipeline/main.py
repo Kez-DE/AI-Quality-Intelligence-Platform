@@ -77,10 +77,14 @@ def read_root():
 def health_check():
     from core.paths import DEFAULT_DATA_FILE
     from pathlib import Path
+    agent_info = get_agent_status()
     return {
         "status": "ok",
         "message": "Backend service is running",
         "data_file_exists": Path(DEFAULT_DATA_FILE).exists(),
+        "llm_provider": agent_info.get("provider"),
+        "llm_model": agent_info.get("model"),
+        "llm_has_key": agent_info.get("has_key"),
     }
 
 @app.get("/api/feedback/recent")
