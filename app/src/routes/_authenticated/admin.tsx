@@ -59,6 +59,7 @@ function LiveStreamPanel() {
     },
     onSuccess: () => {
       toast.success("Live stream đã bật");
+      setJustStarted(true);
       qc.invalidateQueries({ queryKey: ["live-stream-status"] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Không thể bật live stream"),
@@ -70,6 +71,7 @@ function LiveStreamPanel() {
     },
     onSuccess: () => {
       toast.success("Live stream đã tắt");
+      setJustStarted(false);
       qc.invalidateQueries({ queryKey: ["live-stream-status"] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Không thể tắt live stream"),
@@ -79,13 +81,17 @@ function LiveStreamPanel() {
   const isRunning = s?.running ?? false;
   const isBusy = startMutation.isPending || stopMutation.isPending;
 
+  // Sau khi start thành công, force hiện nút Dừng cho đến khi status refresh
+  const [justStarted, setJustStarted] = useState(false);
+  const showAsRunning = isRunning || justStarted;
+
   return (
     <div className="space-y-5">
       {/* Status bar */}
-      <div className={`rounded-xl border p-4 flex flex-wrap items-center gap-4 ${isRunning ? "border-emerald-200 bg-emerald-50" : "border-gray-200 bg-gray-50"}`}>
+      <div className={`rounded-xl border p-4 flex flex-wrap items-center gap-4 ${showAsRunning ? "border-emerald-200 bg-emerald-50" : "border-gray-200 bg-gray-50"}`}>
         <div className="flex items-center gap-2">
-          <span className={`h-2.5 w-2.5 rounded-full ${isRunning ? "bg-emerald-500 animate-pulse" : "bg-gray-400"}`} />
-          <span className="text-sm font-semibold">{isRunning ? "Đang chạy" : "Đã dừng"}</span>
+          <span className={`h-2.5 w-2.5 rounded-full ${showAsRunning ? "bg-emerald-500 animate-pulse" : "bg-gray-400"}`} />
+          <span className="text-sm font-semibold">{showAsRunning ? "Đang chạy" : "Đã dừng"}</span>
         </div>
         {s && (
           <>
@@ -120,7 +126,7 @@ function LiveStreamPanel() {
             <input
               type="number" min={10} max={500} value={batchSize}
               onChange={e => setBatchSize(Number(e.target.value))}
-              disabled={isRunning}
+              disabled={showAsRunning}
               className="w-full h-8 px-2 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-xanh-green/40 disabled:opacity-50"
             />
           </label>
@@ -129,7 +135,7 @@ function LiveStreamPanel() {
             <input
               type="number" min={1} max={3600} value={interval}
               onChange={e => setIntervalSec(Number(e.target.value))}
-              disabled={isRunning}
+              disabled={showAsRunning}
               className="w-full h-8 px-2 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-xanh-green/40 disabled:opacity-50"
             />
           </label>
@@ -138,24 +144,24 @@ function LiveStreamPanel() {
             <input
               type="number" min={1} max={100} value={ticketEvery}
               onChange={e => setTicketEvery(Number(e.target.value))}
-              disabled={isRunning}
+              disabled={showAsRunning}
               className="w-full h-8 px-2 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-xanh-green/40 disabled:opacity-50"
             />
           </label>
         </div>
         <div className="flex flex-wrap gap-4">
           <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-            <input type="checkbox" checked={loop} onChange={e => setLoop(e.target.checked)} disabled={isRunning}
+            <input type="checkbox" checked={loop} onChange={e => setLoop(e.target.checked)} disabled={showAsRunning}
               className="rounded border-gray-300 text-xanh-green focus:ring-xanh-green/40" />
             Lặp lại (loop)
           </label>
           <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-            <input type="checkbox" checked={autoTicket} onChange={e => setAutoTicket(e.target.checked)} disabled={isRunning}
+            <input type="checkbox" checked={autoTicket} onChange={e => setAutoTicket(e.target.checked)} disabled={showAsRunning}
               className="rounded border-gray-300 text-xanh-green focus:ring-xanh-green/40" />
             Tự tạo ticket
           </label>
           <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-            <input type="checkbox" checked={reset} onChange={e => setReset(e.target.checked)} disabled={isRunning}
+            <input type="checkbox" checked={reset} onChange={e => setReset(e.target.checked)} disabled={showAsRunning}
               className="rounded border-gray-300 text-xanh-green focus:ring-xanh-green/40" />
             Reset offset khi bật
           </label>
@@ -163,7 +169,7 @@ function LiveStreamPanel() {
 
         {/* Action buttons */}
         <div className="flex items-center gap-3 pt-1">
-          {!isRunning ? (
+          {!showAsRunning ? (
             <button
               disabled={isBusy}
               onClick={() => startMutation.mutate()}
@@ -175,17 +181,14 @@ function LiveStreamPanel() {
           ) : (
             <button
               disabled={isBusy}
-              onClick={() => {
-                if (!window.confirm("Tắt live stream? Dữ liệu đang ingest sẽ dừng lại.")) return;
-                stopMutation.mutate();
-              }}
+              onClick={() => stopMutation.mutate()}
               className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-red-500 text-white text-sm font-semibold hover:bg-red-600 disabled:opacity-50 transition-colors shadow-sm"
             >
               {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />}
               Dừng Live Stream
             </button>
           )}
-          {!isRunning && (
+          {!showAsRunning && (
             <span className="text-xs text-muted-foreground flex items-center gap-1">
               <RotateCcw className="h-3 w-3" />
               {reset ? "Sẽ reset offset về 0 khi bật" : "Tiếp tục từ offset hiện tại"}
