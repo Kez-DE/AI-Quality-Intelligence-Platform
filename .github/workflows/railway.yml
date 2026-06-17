@@ -97,10 +97,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Railway CLI
-        run: npm install -g @railway/cli
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install -g @railway/cli
+          railway_bin="$(npm prefix -g)/bin/railway"
+          echo "$(dirname "$railway_bin")" >> "$GITHUB_PATH"
+          echo "RAILWAY_CLI=$railway_bin" >> "$GITHUB_ENV"
+          "$railway_bin" --version
 
       - name: Deploy frontend to Railway
-        run: railway up --ci --service frontend --environment "$RAILWAY_ENVIRONMENT" --project "$RAILWAY_PROJECT_ID"
+        shell: bash
+        run: '"$RAILWAY_CLI" up --ci --service frontend --environment "$RAILWAY_ENVIRONMENT" --project "$RAILWAY_PROJECT_ID"'
 
   deploy-backend:
     name: Deploy backend
@@ -116,7 +124,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Railway CLI
-        run: npm install -g @railway/cli
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install -g @railway/cli
+          railway_bin="$(npm prefix -g)/bin/railway"
+          echo "$(dirname "$railway_bin")" >> "$GITHUB_PATH"
+          echo "RAILWAY_CLI=$railway_bin" >> "$GITHUB_ENV"
+          "$railway_bin" --version
 
       - name: Deploy backend to Railway
-        run: railway up --ci --service backend --environment "$RAILWAY_ENVIRONMENT" --project "$RAILWAY_PROJECT_ID"
+        shell: bash
+        run: '"$RAILWAY_CLI" up --ci --service backend --environment "$RAILWAY_ENVIRONMENT" --project "$RAILWAY_PROJECT_ID"'
