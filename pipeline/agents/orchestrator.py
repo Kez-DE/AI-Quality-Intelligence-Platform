@@ -142,13 +142,13 @@ def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
                     for act in analysis.get("action_items", []):
                         md += f"- {act.get('action')} (Deadline: {act.get('deadline')})\n"
 
-                    # Lưu vào DB
+                    # Lưu vào DB — upsert theo (team, report_date) để không trùng lặp
                     try:
-                        db.table("department_reports").insert({
+                        db.table("department_reports").upsert({
                             "team": team,
                             "report_date": datetime.now(timezone.utc).date().isoformat(),
                             "content": md,
-                        }).execute()
+                        }, on_conflict="team,report_date").execute()
                     except Exception:
                         pass  # Bảng chưa tồn tại thì bỏ qua
 

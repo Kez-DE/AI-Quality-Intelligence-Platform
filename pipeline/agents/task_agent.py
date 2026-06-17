@@ -171,7 +171,8 @@ Yêu cầu Báo cáo (Khoảng 150-200 chữ, phải có 4 mục sau):
             "report_date": datetime.utcnow().date().isoformat(),
             "content": content
         }
-        db.table("department_reports").insert(report_data).execute()
+        # upsert theo (team, report_date) để không tạo báo cáo trùng trong cùng ngày
+        db.table("department_reports").upsert(report_data, on_conflict="team,report_date").execute()
         
         log_agent_run(
             run_id=f"report_{team}_{int(time.time())}",
