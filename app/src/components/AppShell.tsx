@@ -1,7 +1,7 @@
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useMe, ROLE_LABELS } from "@/lib/api";
+import { useMe, ROLE_LABELS, type Role } from "@/lib/api";
 import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 import { useTheme } from "@/hooks/useTheme";
 import NotificationPanel from "@/components/NotificationPanel";
@@ -25,15 +25,25 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-const NAV = [
-  { to: "/dashboard", label: "Dashboard", icon: Gauge },
-  { to: "/alerts", label: "Ticket Triage 🔴", icon: Bell },
-  { to: "/tasks", label: "Task Manager", icon: Kanban },
-  { to: "/feedback", label: "Phản hồi", icon: MessageSquare },
-  { to: "/support", label: "CSKH Support", icon: Headphones },
-  { to: "/reports", label: "Báo cáo AI", icon: FileText },
-  { to: "/insights", label: "Phân tích phòng ban", icon: Building2 },
-  { to: "/chat", label: "AI Chat", icon: Sparkles },
+type NavItem = {
+  to: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  roles: Role[];
+};
+
+const ALL_ROLES: Role[] = ["admin", "manager", "staff", "guest"];
+const AUTHENTICATED_ROLES: Role[] = ["admin", "manager", "staff"];
+
+const NAV: NavItem[] = [
+  { to: "/dashboard", label: "Dashboard", icon: Gauge, roles: ALL_ROLES },
+  { to: "/alerts", label: "Ticket Triage 🔴", icon: Bell, roles: AUTHENTICATED_ROLES },
+  { to: "/tasks", label: "Task Manager", icon: Kanban, roles: AUTHENTICATED_ROLES },
+  { to: "/feedback", label: "Phản hồi", icon: MessageSquare, roles: ALL_ROLES },
+  { to: "/support", label: "CSKH Support", icon: Headphones, roles: AUTHENTICATED_ROLES },
+  { to: "/reports", label: "Báo cáo AI", icon: FileText, roles: ["admin", "manager"] },
+  { to: "/insights", label: "Phân tích phòng ban", icon: Building2, roles: AUTHENTICATED_ROLES },
+  { to: "/chat", label: "AI Chat", icon: Sparkles, roles: ALL_ROLES },
 ];
 
 // Link chỉ hiện với admin.
@@ -52,15 +62,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { notifications, unreadCount, markAsRead, markAllRead } = useRealtimeNotifications();
   const { theme, toggleTheme } = useTheme();
 
-  const navItems = NAV.filter(n => n.roles.includes(role as NavRole)).map(n => {
+  const navItems = NAV.filter(n => n.roles.includes(role)).map(n => {
     if (n.to === "/chat" && role === "guest") {
       return { ...n, label: "Hỗ trợ CSKH" };
     }
     return n;
-  }).filter(n => {
-    if (role === "guest" && ["/alerts", "/insights", "/tasks", "/reports", "/support"].includes(n.to)) return false;
-    if (role === "staff" && ["/reports"].includes(n.to)) return false;
-    return true;
   });
 
   if (role === "admin") {
