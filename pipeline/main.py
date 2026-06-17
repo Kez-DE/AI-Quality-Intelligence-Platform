@@ -15,7 +15,7 @@ from rate_limiter import RateLimiter, check_rate_limit
 from core.paths import DEFAULT_DATA_FILE
 from services.agent_context import AGENT_SYSTEM_PROMPT, GUEST_SYSTEM_PROMPT, build_agent_data_context
 from services.live_stream import get_live_stream_status, set_scheduler, start_live_stream, stop_live_stream
-from services.ticket_workflow import advance_ticket_workflow, ticket_workflow_state
+from services.ticket_workflow import ticket_workflow_state
 
 feedback_rate_limit = RateLimiter(max_requests=10, window_seconds=3600, scope="feedback_submit")
 chat_rate_limit = RateLimiter(max_requests=20, window_seconds=3600, scope="agent_chat")
@@ -25,30 +25,14 @@ scheduler: BackgroundScheduler | None = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global scheduler
+    # Web API keeps a scheduler ONLY for on-demand manual jobs (e.g.
+    # /api/live-stream/start). Recurring jobs (ticket workflow, auto live
+    # stream) run in their dedicated worker services — NOT here — to avoid
+    # double-scheduling when web + workers run against the same database.
     scheduler = BackgroundScheduler()
     set_scheduler(scheduler)
     scheduler.start()
-    scheduler.add_job(
-        advance_ticket_workflow,
-        "interval",
-        seconds=5,
-        id="auto_ticket_workflow",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-        next_run_time=datetime.now(timezone.utc),
-    )
-    print("APScheduler started successfully.")
-    if os.getenv("LIVE_STREAM_ENABLED", "false").lower() == "true":
-        start_live_stream(
-            batch_size=int(os.getenv("LIVE_STREAM_BATCH_SIZE", "150")),
-            interval_seconds=int(os.getenv("LIVE_STREAM_INTERVAL_SECONDS", "10")),
-            loop=os.getenv("LIVE_STREAM_LOOP", "false").lower() == "true",
-            reset=os.getenv("LIVE_STREAM_RESET_ON_START", "false").lower() == "true",
-            auto_ticket=os.getenv("AUTO_TICKET_ENABLED", "true").lower() == "true",
-            ticket_every_batches=int(os.getenv("AUTO_TICKET_EVERY_BATCHES", "10")),
-            ticket_max_spikes=int(os.getenv("AUTO_TICKET_MAX_SPIKES", "1")),
-        )
+    print("Web API scheduler ready (on-demand only; recurring jobs run in workers).")
     yield
     scheduler.shutdown()
     set_scheduler(None)
