@@ -83,7 +83,6 @@ def health_check():
         "message": "Backend service is running",
         "data_file_exists": Path(DEFAULT_DATA_FILE).exists(),
         "llm_provider": agent_info.get("provider"),
-        "llm_model": agent_info.get("model"),
         "llm_has_key": agent_info.get("has_key"),
     }
 
