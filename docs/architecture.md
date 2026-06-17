@@ -14,6 +14,35 @@ C2-App-116/
 
 Supabase là trục nối: pipeline Python **ghi** kết quả, frontend **đọc** để hiển thị (realtime). Backend FastAPI chịu trách nhiệm xử lý + xác thực; frontend cũng đọc trực tiếp Supabase qua RLS cho realtime subscription.
 
+## Module ownership để dễ fix bug
+
+Không tách thêm Railway service ở giai đoạn demo/free-trial. Hạ tầng vẫn giữ 2 service:
+
+- `frontend` → build từ `app/Dockerfile`
+- `backend` → build từ `pipeline/Dockerfile`
+
+Code bên trong đã được tách theo module để khi lỗi thì sửa đúng phần:
+
+```
+pipeline/
+├── core/                 Path/config dùng chung cho backend
+├── services/             Live stream, ticket workflow, agent context
+├── agents/               Multi-agent phân tích theo phòng ban
+├── agent/                LLM provider routing/failover
+├── main.py               FastAPI app wiring + endpoint handlers
+└── ingest/classifier/... Pipeline xử lý dữ liệu
+
+app/src/
+├── features/             Logic theo feature/domain
+│   └── momo-chat/        Parser, mock contacts, types cho Momo chat demo
+├── components/           UI components
+├── routes/               TanStack route screens
+├── integrations/         Supabase clients/auth middleware
+└── lib/                  Shared frontend helpers/API client
+```
+
+Với Railway free/trial, ưu tiên modular hóa code thay vì tách thêm service để tránh tăng runtime/quota. Khi demo thật cần uptime ổn định hơn, nâng Railway Hobby `$5` trước; chỉ tách thêm service nếu có worker/cron/ML job thật sự cần scale riêng.
+
 ## Luồng xử lý
 
 ```

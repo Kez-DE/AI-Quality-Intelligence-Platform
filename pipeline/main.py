@@ -2,9 +2,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 import os
-from collections import Counter
 from datetime import datetime, timezone
-from threading import Lock
 from apscheduler.schedulers.background import BackgroundScheduler
 from contextlib import asynccontextmanager
 
@@ -14,234 +12,21 @@ from agent import chat_completion, get_agent_status
 from auth_guard import AuthUser, get_current_user, require_admin, require_ops_staff
 from users_admin import router as users_router, audit_router
 from rate_limiter import RateLimiter, check_rate_limit
+from core.paths import DEFAULT_DATA_FILE
+from services.agent_context import AGENT_SYSTEM_PROMPT, GUEST_SYSTEM_PROMPT, build_agent_data_context
+from services.live_stream import get_live_stream_status, set_scheduler, start_live_stream, stop_live_stream
+from services.ticket_workflow import advance_ticket_workflow, ticket_workflow_state
 
 feedback_rate_limit = RateLimiter(max_requests=10, window_seconds=3600, scope="feedback_submit")
 chat_rate_limit = RateLimiter(max_requests=20, window_seconds=3600, scope="agent_chat")
 
-PIPELINE_DIR = os.path.dirname(__file__)
-PROJECT_ROOT = os.path.abspath(os.path.join(PIPELINE_DIR, ".."))
-DEFAULT_DATA_FILE = os.path.join(
-    PROJECT_ROOT,
-    "data",
-    "processed",
-    "seed_real_clean.json",
-)
-
 scheduler: BackgroundScheduler | None = None
-live_stream_lock = Lock()
-live_stream_tick_lock = Lock()
-live_stream_state = {
-    "running": False,
-    "offset": 0,
-    "batch_size": int(os.getenv("LIVE_STREAM_BATCH_SIZE", "150")),
-    "interval_seconds": int(os.getenv("LIVE_STREAM_INTERVAL_SECONDS", "10")),
-    "loop": os.getenv("LIVE_STREAM_LOOP", "false").lower() == "true",
-    "auto_ticket": os.getenv("AUTO_TICKET_ENABLED", "true").lower() == "true",
-    "ticket_every_batches": int(os.getenv("AUTO_TICKET_EVERY_BATCHES", "10")),
-    "ticket_max_feedback": int(os.getenv("AUTO_TICKET_MAX_FEEDBACK", "1000")),
-    "ticket_max_spikes": int(os.getenv("AUTO_TICKET_MAX_SPIKES", "1")),
-    "ticket_running": False,
-    "batches_ingested": 0,
-    "last_ticket_result": None,
-    "last_ticket_error": None,
-    "last_ticket_at": None,
-    "last_ticket_batch": None,
-    "last_result": None,
-    "last_error": None,
-}
-ticket_workflow_state = {
-    "enabled": os.getenv("AUTO_TICKET_WORKFLOW_ENABLED", "true").lower() == "true",
-    "in_progress_after_seconds": int(os.getenv("AUTO_TICKET_IN_PROGRESS_AFTER_SECONDS", "10")),
-    "resolved_after_seconds": int(os.getenv("AUTO_TICKET_RESOLVED_AFTER_SECONDS", "30")),
-    "last_run_at": None,
-    "moved_to_in_progress": 0,
-    "moved_to_resolved": 0,
-    "last_error": None,
-}
-
-def parse_timestamp(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-
-def advance_ticket_workflow():
-    if not ticket_workflow_state["enabled"]:
-        return
-    try:
-        db = get_supabase()
-        rows = db.table("alerts") \
-            .select("id,status,created_at") \
-            .in_("status", ["open", "in_progress"]) \
-            .order("created_at", desc=False) \
-            .limit(200) \
-            .execute() \
-            .data or []
-        now = datetime.now(timezone.utc)
-        moved_to_in_progress = 0
-        moved_to_resolved = 0
-
-        for row in rows:
-            created_at = parse_timestamp(row.get("created_at"))
-            if not created_at:
-                continue
-            age_seconds = (now - created_at.astimezone(timezone.utc)).total_seconds()
-            if row.get("status") == "open" and age_seconds >= ticket_workflow_state["in_progress_after_seconds"]:
-                db.table("alerts").update({"status": "in_progress"}).eq("id", row["id"]).execute()
-                moved_to_in_progress += 1
-            elif row.get("status") == "in_progress" and age_seconds >= ticket_workflow_state["resolved_after_seconds"]:
-                db.table("alerts").update({"status": "resolved"}).eq("id", row["id"]).execute()
-                moved_to_resolved += 1
-
-        ticket_workflow_state["last_run_at"] = now.isoformat()
-        ticket_workflow_state["moved_to_in_progress"] = moved_to_in_progress
-        ticket_workflow_state["moved_to_resolved"] = moved_to_resolved
-        ticket_workflow_state["last_error"] = None
-    except Exception as exc:
-        ticket_workflow_state["last_error"] = str(exc)
-
-def run_auto_ticket_detection():
-    try:
-        from spike_detector import detect_spikes
-
-        with live_stream_lock:
-            max_feedback = int(live_stream_state["ticket_max_feedback"])
-            max_spikes = int(live_stream_state["ticket_max_spikes"])
-            live_stream_state["last_ticket_error"] = None
-
-        result = detect_spikes(max_feedback=max_feedback, max_spikes=max_spikes)
-        with live_stream_lock:
-            live_stream_state["last_ticket_result"] = result
-            live_stream_state["last_ticket_error"] = None
-            live_stream_state["last_ticket_at"] = datetime.now(timezone.utc).isoformat()
-            live_stream_state["last_ticket_batch"] = live_stream_state["batches_ingested"]
-    except Exception as exc:
-        with live_stream_lock:
-            live_stream_state["last_ticket_error"] = str(exc)
-    finally:
-        with live_stream_lock:
-            live_stream_state["ticket_running"] = False
-
-def live_stream_tick():
-    if not live_stream_tick_lock.acquire(blocking=False):
-        return
-    try:
-        _live_stream_tick()
-    finally:
-        live_stream_tick_lock.release()
-
-def _live_stream_tick():
-    dataset_file = os.getenv("REAL_DATA_FILE", DEFAULT_DATA_FILE)
-    with live_stream_lock:
-        if not live_stream_state["running"]:
-            return
-        offset = int(live_stream_state["offset"])
-        batch_size = int(live_stream_state["batch_size"])
-
-    try:
-        result = ingest_dataset(
-            dataset_file,
-            limit=batch_size,
-            batch_size=batch_size,
-            offset=offset,
-        )
-        with live_stream_lock:
-            live_stream_state["last_result"] = result
-            live_stream_state["last_error"] = None
-            if result.get("success"):
-                live_stream_state["batches_ingested"] += 1
-                should_detect = (
-                    live_stream_state["auto_ticket"]
-                    and not live_stream_state["ticket_running"]
-                    and live_stream_state["batches_ingested"] % int(live_stream_state["ticket_every_batches"]) == 0
-                )
-                if should_detect:
-                    live_stream_state["ticket_running"] = True
-                if result.get("complete"):
-                    if live_stream_state["loop"]:
-                        live_stream_state["offset"] = 0
-                    else:
-                        live_stream_state["running"] = False
-                        if scheduler and scheduler.get_job("live_feedback_stream"):
-                            scheduler.remove_job("live_feedback_stream")
-                else:
-                    live_stream_state["offset"] = result.get("next_offset", offset + batch_size)
-            else:
-                live_stream_state["running"] = False
-                should_detect = False
-        if should_detect and scheduler:
-            scheduler.add_job(
-                run_auto_ticket_detection,
-                id="auto_ticket_detection",
-                replace_existing=True,
-                max_instances=1,
-                coalesce=True,
-            )
-    except Exception as exc:
-        with live_stream_lock:
-            live_stream_state["last_error"] = str(exc)
-            live_stream_state["running"] = False
-        if scheduler and scheduler.get_job("live_feedback_stream"):
-            scheduler.remove_job("live_feedback_stream")
-
-def start_live_stream(
-    batch_size: int,
-    interval_seconds: int,
-    loop: bool,
-    reset: bool = False,
-    auto_ticket: bool = True,
-    ticket_every_batches: int = 10,
-    ticket_max_spikes: int = 1,
-):
-    if not scheduler:
-        raise ValueError("Scheduler is not initialized")
-    with live_stream_lock:
-        if reset:
-            live_stream_state["offset"] = 0
-            live_stream_state["batches_ingested"] = 0
-            live_stream_state["last_ticket_result"] = None
-            live_stream_state["last_ticket_error"] = None
-            live_stream_state["last_ticket_at"] = None
-            live_stream_state["last_ticket_batch"] = None
-        live_stream_state["batch_size"] = batch_size
-        live_stream_state["interval_seconds"] = interval_seconds
-        live_stream_state["loop"] = loop
-        live_stream_state["auto_ticket"] = auto_ticket
-        live_stream_state["ticket_every_batches"] = ticket_every_batches
-        live_stream_state["ticket_max_spikes"] = ticket_max_spikes
-        live_stream_state["running"] = True
-        live_stream_state["ticket_running"] = False
-        live_stream_state["last_error"] = None
-
-    scheduler.add_job(
-        live_stream_tick,
-        "interval",
-        seconds=interval_seconds,
-        id="live_feedback_stream",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-        next_run_time=datetime.now(timezone.utc),
-    )
-    return get_live_stream_status()
-
-def stop_live_stream():
-    with live_stream_lock:
-        live_stream_state["running"] = False
-    if scheduler and scheduler.get_job("live_feedback_stream"):
-        scheduler.remove_job("live_feedback_stream")
-    return get_live_stream_status()
-
-def get_live_stream_status():
-    with live_stream_lock:
-        return dict(live_stream_state)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global scheduler
     scheduler = BackgroundScheduler()
+    set_scheduler(scheduler)
     scheduler.start()
     scheduler.add_job(
         advance_ticket_workflow,
@@ -266,6 +51,7 @@ async def lifespan(app: FastAPI):
         )
     yield
     scheduler.shutdown()
+    set_scheduler(None)
 
 app = FastAPI(
     title="AI Quality Intelligence Platform API",
@@ -293,53 +79,6 @@ def whoami(user: AuthUser = Depends(get_current_user)):
     """Trả về danh tính + role của user đang đăng nhập (frontend dùng để render nav theo quyền)."""
     return {"status": "success", "data": {"id": user.id, "email": user.email, "role": user.role}}
 
-
-AGENT_SYSTEM_PROMPT = """Bạn là AI Assistant cho Quality Operation Cockpit của xanhSM.
-Nhiệm vụ: phân tích feedback, alerts, spike, vận hành khu vực, chất lượng tài xế/xe/app/thanh toán/an toàn.
-Trả lời tiếng Việt, ngắn gọn, có cấu trúc, ưu tiên hành động cụ thể và mức độ ưu tiên P0/P1/P2."""
-
-def build_agent_data_context() -> str:
-    try:
-        db = get_supabase()
-        feedback = db.table("feedback") \
-            .select("area,severity,sentiment,topic,created_at") \
-            .order("created_at", desc=True) \
-            .limit(300) \
-            .execute() \
-            .data or []
-        alerts = db.table("alerts") \
-            .select("title,severity,area,status,created_at") \
-            .order("created_at", desc=True) \
-            .limit(20) \
-            .execute() \
-            .data or []
-    except Exception as exc:
-        return f"DATA_CONTEXT_ERROR: Không đọc được Supabase context: {str(exc)[:200]}"
-
-    severity_counts = Counter(row.get("severity") or "unknown" for row in feedback)
-    sentiment_counts = Counter(row.get("sentiment") or "unknown" for row in feedback)
-    topic_counts = Counter(row.get("topic") or "unknown" for row in feedback)
-    area_counts = Counter(row.get("area") or "unknown" for row in feedback)
-    alert_status_counts = Counter(row.get("status") or "unknown" for row in alerts)
-
-    def top(counter: Counter, n: int = 8) -> str:
-        return ", ".join(f"{k}: {v}" for k, v in counter.most_common(n)) or "none"
-
-    return f"""
-DATA_CONTEXT:
-- Nguồn: Supabase feedback/alerts + live stream state.
-- Feedback gần nhất đã đọc: {len(feedback)} records.
-- Severity: {top(severity_counts)}
-- Sentiment: {top(sentiment_counts)}
-- Topic top: {top(topic_counts)}
-- Area top: {top(area_counts)}
-- Alerts gần nhất đã đọc: {len(alerts)} records.
-- Alert status: {top(alert_status_counts)}
-- Live stream: {get_live_stream_status()}
-
-Recent alerts:
-{os.linesep.join([f"- [{a.get('severity')}] {a.get('status')} | {a.get('area')} | {a.get('title')}" for a in alerts[:10]]) or "- none"}
-"""
 
 @app.get("/")
 def read_root():
@@ -559,11 +298,6 @@ def agent_logs(limit: int = Query(default=50, ge=1, le=500), _: AuthUser = Depen
     with open(log_file, "r", encoding="utf-8") as f:
         lines = f.readlines()[-limit:]
     return {"status": "success", "data": [line.rstrip("\n") for line in lines]}
-
-GUEST_SYSTEM_PROMPT = """You are a customer support chatbot for the AI Quality Intelligence app.
-You can ONLY answer questions about how to use the app and how to submit feedback.
-Do NOT provide any internal data, analytics, metrics, or system information.
-If the user asks about anything else, politely redirect them to use the app's features or contact support."""
 
 @app.post("/api/agent/chat")
 def agent_chat(payload: dict, user: AuthUser = Depends(get_current_user)):
