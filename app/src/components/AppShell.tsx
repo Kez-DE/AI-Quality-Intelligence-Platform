@@ -21,19 +21,18 @@ import {
 import { toast } from "sonner";
 
 const NAV = [
-  { to: "/dashboard", label: "Dashboard", icon: Gauge },
-  { to: "/alerts", label: "Ticket Triage 🔴", icon: Bell },
-  { to: "/tasks", label: "Task Manager", icon: Kanban },
-  { to: "/feedback", label: "Phản hồi", icon: MessageSquare },
-  { to: "/reports", label: "Báo cáo AI", icon: FileText },
-  { to: "/insights", label: "Phân tích phòng ban", icon: Building2 },
-  { to: "/chat", label: "AI Chat", icon: Sparkles },
-];
+  { to: "/dashboard", label: "Dashboard", icon: Gauge, roles: ["guest", "staff", "manager", "admin"] },
+  { to: "/alerts", label: "Ticket Triage 🔴", icon: Bell, roles: ["staff", "manager", "admin"] },
+  { to: "/tasks", label: "Task Manager", icon: Kanban, roles: ["staff", "manager", "admin"] },
+  { to: "/feedback", label: "Phản hồi", icon: MessageSquare, roles: ["guest", "staff", "manager", "admin"] },
+  { to: "/reports", label: "Báo cáo AI", icon: FileText, roles: ["manager", "admin"] },
+  { to: "/insights", label: "Phân tích phòng ban", icon: Building2, roles: ["staff", "manager", "admin"] },
+  { to: "/chat", label: "AI Chat", icon: Sparkles, roles: ["guest", "staff", "manager", "admin"] },
+  { to: "/system-health", label: "System Health", icon: HeartPulse, roles: ["staff", "manager", "admin"] },
+  { to: "/admin", label: "Quản lý người dùng", icon: Shield, roles: ["admin"] },
+] as const;
 
-// Link chỉ hiện với admin.
-const ADMIN_NAV = { to: "/admin", label: "Quản lý người dùng", icon: Shield } as const;
-// Link hiện cho ops staff (staff/manager/admin).
-const HEALTH_NAV = { to: "/system-health", label: "System Health", icon: HeartPulse } as const;
+type NavRole = "guest" | "staff" | "manager" | "admin";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -44,23 +43,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const role = me?.role || "guest";
   const { notifications, unreadCount, markAsRead, markAllRead } = useRealtimeNotifications();
 
-  const navItems = NAV.map(n => {
+  const navItems = NAV.filter(n => n.roles.includes(role as NavRole)).map(n => {
     if (n.to === "/chat" && role === "guest") {
       return { ...n, label: "Hỗ trợ CSKH" };
     }
     return n;
-  }).filter(n => {
-    if (role === "guest" && ["/alerts", "/insights", "/tasks", "/reports"].includes(n.to)) return false;
-    if (role === "staff" && ["/reports"].includes(n.to)) return false;
-    return true;
   });
-
-  if (role === "admin") {
-    navItems.push(ADMIN_NAV);
-  }
-  if (["admin", "manager", "staff"].includes(role)) {
-    navItems.push(HEALTH_NAV);
-  }
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {

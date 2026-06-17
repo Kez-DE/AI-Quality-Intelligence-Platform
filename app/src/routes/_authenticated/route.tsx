@@ -24,10 +24,26 @@ export const Route = createFileRoute("/_authenticated")({
       role = "guest";
     }
 
-    // Route Guard for Guests
-    const restrictedForGuests = ["/alerts", "/insights", "/admin", "/tasks", "/reports", "/system-health"];
-    if (role === "guest" && restrictedForGuests.some(p => location.pathname.startsWith(p))) {
-      throw redirect({ to: "/dashboard" });
+    // Routes giới hạn theo role
+    const guestOnly    = ["/dashboard", "/feedback", "/chat", "/auth"];
+    const staffAndUp   = ["/alerts", "/tasks", "/insights", "/system-health"];
+    const managerAndUp = ["/reports"];
+    const adminOnly    = ["/admin"];
+
+    if (role === "guest") {
+      const allowed = ["/dashboard", "/feedback", "/chat"];
+      if (!allowed.some(p => location.pathname.startsWith(p))) {
+        throw redirect({ to: "/dashboard" });
+      }
+    } else if (role === "staff") {
+      if (managerAndUp.some(p => location.pathname.startsWith(p)) ||
+          adminOnly.some(p => location.pathname.startsWith(p))) {
+        throw redirect({ to: "/dashboard" });
+      }
+    } else if (role === "manager") {
+      if (adminOnly.some(p => location.pathname.startsWith(p))) {
+        throw redirect({ to: "/dashboard" });
+      }
     }
 
     return { user: data.user, role };
