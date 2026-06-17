@@ -1,5 +1,4 @@
 import json
-import os
 import warnings
 from datetime import datetime
 from pathlib import Path
@@ -9,9 +8,9 @@ from typing import Literal, TypedDict
 from groq import Groq
 from openai import OpenAI
 
-from env_config import load_project_env
+from env_config import get_settings
 
-load_project_env()
+_s = get_settings()
 
 MessageRole = Literal["system", "user", "assistant"]
 
@@ -25,15 +24,15 @@ PIPELINE_DIR = Path(__file__).resolve().parent.parent
 LOG_DIR = PIPELINE_DIR / "logs"
 LOG_FILE = LOG_DIR / "agent.log"
 
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "auto").strip().lower()
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
-OPENROUTER_MODEL_NAME = os.getenv("OPENROUTER_MODEL_NAME", "openrouter/owl-alpha")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
-OPENAI_MODEL_NAME = os.getenv("OPENAI_MODEL_NAME", "gpt-4o-mini")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
-GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME", "llama-3.3-70b-versatile")
+LLM_PROVIDER        = _s.llm_provider
+OPENROUTER_API_KEY  = _s.openrouter_api_key
+OPENROUTER_MODEL_NAME = _s.openrouter_model_name
+OPENAI_API_KEY      = _s.openai_api_key
+OPENAI_MODEL_NAME   = _s.openai_model_name
+GEMINI_API_KEY      = _s.gemini_api_key
+GEMINI_MODEL_NAME   = _s.gemini_model_name
+GROQ_API_KEY        = _s.groq_api_key
+GROQ_MODEL_NAME     = _s.groq_model_name
 
 
 def resolve_provider() -> str:
@@ -197,8 +196,8 @@ def _call_provider(
                     api_key=OPENROUTER_API_KEY,
                     base_url="https://openrouter.ai/api/v1",
                     default_headers={
-                        "HTTP-Referer": os.getenv("OPENROUTER_SITE_URL", "http://localhost:8000"),
-                        "X-Title": os.getenv("OPENROUTER_APP_NAME", "AI Quality Intelligence Platform"),
+                        "HTTP-Referer": _s.openrouter_site_url,
+                        "X-Title": _s.openrouter_app_name,
                     },
                 )
                 kwargs = {"messages": messages, "model": model_name, "temperature": temperature}

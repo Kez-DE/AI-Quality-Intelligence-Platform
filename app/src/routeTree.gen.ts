@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/tasks'
+import { Route as AuthenticatedSystemHealthRouteImport } from './routes/_authenticated/system-health'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
 import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticated/feedback'
@@ -41,6 +42,12 @@ const AuthenticatedTasksRoute = AuthenticatedTasksRouteImport.update({
   path: '/tasks',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSystemHealthRoute =
+  AuthenticatedSystemHealthRouteImport.update({
+    id: '/system-health',
+    path: '/system-health',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -93,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/insights': typeof AuthenticatedInsightsRoute
   '/reports': typeof AuthenticatedReportsRoute
+  '/system-health': typeof AuthenticatedSystemHealthRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/feedback/upload': typeof AuthenticatedFeedbackUploadRoute
 }
@@ -106,6 +114,7 @@ export interface FileRoutesByTo {
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/insights': typeof AuthenticatedInsightsRoute
   '/reports': typeof AuthenticatedReportsRoute
+  '/system-health': typeof AuthenticatedSystemHealthRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/feedback/upload': typeof AuthenticatedFeedbackUploadRoute
 }
@@ -121,6 +130,7 @@ export interface FileRoutesById {
   '/_authenticated/feedback': typeof AuthenticatedFeedbackRoute
   '/_authenticated/insights': typeof AuthenticatedInsightsRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
+  '/_authenticated/system-health': typeof AuthenticatedSystemHealthRoute
   '/_authenticated/tasks': typeof AuthenticatedTasksRoute
   '/_authenticated/feedback_/upload': typeof AuthenticatedFeedbackUploadRoute
 }
@@ -136,6 +146,7 @@ export interface FileRouteTypes {
     | '/feedback'
     | '/insights'
     | '/reports'
+    | '/system-health'
     | '/tasks'
     | '/feedback/upload'
   fileRoutesByTo: FileRoutesByTo
@@ -149,6 +160,7 @@ export interface FileRouteTypes {
     | '/feedback'
     | '/insights'
     | '/reports'
+    | '/system-health'
     | '/tasks'
     | '/feedback/upload'
   id:
@@ -163,6 +175,7 @@ export interface FileRouteTypes {
     | '/_authenticated/feedback'
     | '/_authenticated/insights'
     | '/_authenticated/reports'
+    | '/_authenticated/system-health'
     | '/_authenticated/tasks'
     | '/_authenticated/feedback_/upload'
   fileRoutesById: FileRoutesById
@@ -201,6 +214,13 @@ declare module '@tanstack/react-router' {
       path: '/tasks'
       fullPath: '/tasks'
       preLoaderRoute: typeof AuthenticatedTasksRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/system-health': {
+      id: '/_authenticated/system-health'
+      path: '/system-health'
+      fullPath: '/system-health'
+      preLoaderRoute: typeof AuthenticatedSystemHealthRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/reports': {
@@ -270,6 +290,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFeedbackRoute: typeof AuthenticatedFeedbackRoute
   AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
+  AuthenticatedSystemHealthRoute: typeof AuthenticatedSystemHealthRoute
   AuthenticatedTasksRoute: typeof AuthenticatedTasksRoute
   AuthenticatedFeedbackUploadRoute: typeof AuthenticatedFeedbackUploadRoute
 }
@@ -282,6 +303,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFeedbackRoute: AuthenticatedFeedbackRoute,
   AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
+  AuthenticatedSystemHealthRoute: AuthenticatedSystemHealthRoute,
   AuthenticatedTasksRoute: AuthenticatedTasksRoute,
   AuthenticatedFeedbackUploadRoute: AuthenticatedFeedbackUploadRoute,
 }

@@ -16,6 +16,7 @@ import {
   Shield,
   Sparkles,
   User as UserIcon,
+  HeartPulse,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -31,6 +32,8 @@ const NAV = [
 
 // Link chỉ hiện với admin.
 const ADMIN_NAV = { to: "/admin", label: "Quản lý người dùng", icon: Shield } as const;
+// Link hiện cho ops staff (staff/manager/admin).
+const HEALTH_NAV = { to: "/system-health", label: "System Health", icon: HeartPulse } as const;
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -54,6 +57,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   if (role === "admin") {
     navItems.push(ADMIN_NAV);
+  }
+  if (["admin", "manager", "staff"].includes(role)) {
+    navItems.push(HEALTH_NAV);
   }
 
   useEffect(() => {

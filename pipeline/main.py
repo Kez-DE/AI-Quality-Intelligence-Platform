@@ -12,13 +12,18 @@ from agent import chat_completion, get_agent_status
 from auth_guard import AuthUser, get_current_user, require_admin, require_ops_staff
 from users_admin import router as users_router, audit_router
 from rate_limiter import RateLimiter, check_rate_limit
+from clean import mask_pii
+from env_config import get_settings
 from core.paths import DEFAULT_DATA_FILE
 from services.agent_context import AGENT_SYSTEM_PROMPT, GUEST_SYSTEM_PROMPT, build_agent_data_context
 from services.live_stream import get_live_stream_status, set_scheduler, start_live_stream, stop_live_stream
 from services.ticket_workflow import ticket_workflow_state
 
-feedback_rate_limit = RateLimiter(max_requests=10, window_seconds=3600, scope="feedback_submit")
-chat_rate_limit = RateLimiter(max_requests=20, window_seconds=3600, scope="agent_chat")
+_s = get_settings()
+
+feedback_rate_limit = RateLimiter(max_requests=_s.rate_limit_feedback_guest, window_seconds=3600, scope="feedback_submit")
+chat_rate_limit = RateLimiter(max_requests=_s.rate_limit_chat_guest, window_seconds=3600, scope="agent_chat")
+chat_rate_limit_staff = RateLimiter(max_requests=_s.rate_limit_chat_staff, window_seconds=3600, scope="agent_chat_staff")
 
 scheduler: BackgroundScheduler | None = None
 
@@ -299,12 +304,20 @@ def agent_chat(payload: dict, user: AuthUser = Depends(get_current_user)):
             content = message.get("content")
             if role not in {"user", "assistant", "system"} or not isinstance(content, str) or not content.strip():
                 raise HTTPException(status_code=400, detail="Invalid chat message")
-            normalized.append({"role": role, "content": content[:8000]})
+            # OWASP LLM: mask PII from user input before injecting into prompt
+            safe_content = mask_pii(content) if role == "user" else content
+            normalized.append({"role": role, "content": safe_content[:8000]})
         try:
             result = chat_completion(normalized, temperature=0.4)
         except Exception as exc:
             raise HTTPException(status_code=502, detail=f"Agent model error: {str(exc)[:300]}") from exc
+        # OWASP LLM: mask PII from LLM output before returning to client
+        if isinstance(result.get("content"), str):
+            result["content"] = mask_pii(result["content"])
         return {"status": "success", "data": result}
+
+    # Staff / manager / admin — apply a higher rate limit to prevent LLM API key abuse
+    check_rate_limit(chat_rate_limit_staff, user.id)
 
     messages = payload.get("messages")
     if not isinstance(messages, list) or not messages:
@@ -318,11 +331,16 @@ def agent_chat(payload: dict, user: AuthUser = Depends(get_current_user)):
         content = message.get("content")
         if role not in {"user", "assistant", "system"} or not isinstance(content, str) or not content.strip():
             raise HTTPException(status_code=400, detail="Invalid chat message")
-        normalized.append({"role": role, "content": content[:8000]})
+        # OWASP LLM: mask PII from user input before injecting into prompt
+        safe_content = mask_pii(content) if role == "user" else content
+        normalized.append({"role": role, "content": safe_content[:8000]})
     try:
         result = chat_completion(normalized, temperature=0.4)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Agent model error: {str(exc)[:300]}") from exc
+    # OWASP LLM: mask PII from LLM output before returning to client
+    if isinstance(result.get("content"), str):
+        result["content"] = mask_pii(result["content"])
     return {"status": "success", "data": result}
 
 @app.post("/api/ingest-real-dataset")
@@ -335,7 +353,7 @@ def ingest_real_dataset(
     """
     Ingest dataset thật từ thư mục /data. Không truyền limit thì chạy toàn bộ file.
     """
-    dataset_file = os.getenv("REAL_DATA_FILE", DEFAULT_DATA_FILE)
+    dataset_file = _s.real_data_file or DEFAULT_DATA_FILE
     try:
         result = ingest_dataset(dataset_file, limit=limit, batch_size=batch_size, offset=offset)
     except ValueError as exc:
@@ -394,7 +412,7 @@ def run_real_pipeline(
     """
     Chạy luồng thật: ingest dataset từ /data rồi detect spike/agent.
     """
-    dataset_file = os.getenv("REAL_DATA_FILE", DEFAULT_DATA_FILE)
+    dataset_file = _s.real_data_file or DEFAULT_DATA_FILE
     try:
         ingest_result = ingest_dataset(dataset_file, limit=limit, batch_size=batch_size)
         if not ingest_result["success"]:
@@ -659,6 +677,57 @@ def trigger_daily_report(
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Report generation error: {str(exc)[:300]}") from exc
     return {"status": "success", "data": result}
+
+@app.get("/api/health/services")
+def health_services(_: AuthUser = Depends(require_ops_staff)):
+    """System health check — trạng thái tất cả services + LLM providers (ops staff+)."""
+    from datetime import datetime, timezone
+
+    # DB connectivity
+    db_status = "ok"
+    db_error = None
+    try:
+        db = get_supabase()
+        db.table("feedback").select("id").limit(1).execute()
+    except Exception as exc:
+        db_status = "error"
+        db_error = str(exc)[:200]
+
+    # LLM provider status
+    agent_info = get_agent_status()
+    llm_configured = agent_info.get("configured", {})
+    active_provider = agent_info.get("provider", "unknown")
+    active_model = agent_info.get("model", "unknown")
+
+    # Worker status via ticket_workflow_state (only backend-worker reports state here)
+    workflow = dict(ticket_workflow_state)
+
+    # Live stream state
+    stream = get_live_stream_status()
+
+    # Rate limit settings (no counts — just config for visibility)
+    rate_limits = {
+        "chat_guest_per_hour": _s.rate_limit_chat_guest,
+        "chat_staff_per_hour": _s.rate_limit_chat_staff,
+        "feedback_guest_per_hour": _s.rate_limit_feedback_guest,
+    }
+
+    return {
+        "status": "success",
+        "data": {
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "database": {"status": db_status, "error": db_error},
+            "llm": {
+                "active_provider": active_provider,
+                "active_model": active_model,
+                "configured_providers": llm_configured,
+            },
+            "ticket_workflow": workflow,
+            "live_stream": stream,
+            "rate_limits": rate_limits,
+        },
+    }
+
 
 if __name__ == "__main__":
     import uvicorn
