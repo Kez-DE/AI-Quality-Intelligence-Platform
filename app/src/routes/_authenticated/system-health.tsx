@@ -4,13 +4,13 @@ import { apiFetch } from "@/lib/api";
 import {
   Activity,
   Database,
-  Bot,
-  Radio,
-  Shield,
+  Cpu,
+  Server,
   CheckCircle2,
   XCircle,
   Loader2,
   RefreshCw,
+  Clock,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/system-health")({
@@ -19,11 +19,14 @@ export const Route = createFileRoute("/_authenticated/system-health")({
 
 type HealthData = {
   checked_at: string;
-  database: { status: string; error: string | null };
+  api_gateway?: { status: string; latency_ms: number; error_rate: number };
+  database: { status: string; error: string | null; latency_ms?: number | null; error_rate?: number };
   llm: {
     active_provider: string;
     active_model: string;
     configured_providers: Record<string, boolean>;
+    has_key?: boolean;
+    latency_ms?: number | null;
   };
   ticket_workflow: {
     enabled: boolean;
@@ -32,7 +35,13 @@ type HealthData = {
     moved_to_resolved: number;
     last_error: string | null;
   };
-  live_stream: Record<string, unknown>;
+  live_stream: {
+    running?: boolean;
+    batches_ingested?: number;
+    interval_seconds?: number;
+    auto_ticket?: boolean;
+    [k: string]: unknown;
+  };
   rate_limits: {
     chat_guest_per_hour: number;
     chat_staff_per_hour: number;
@@ -40,35 +49,78 @@ type HealthData = {
   };
 };
 
-function StatusBadge({ ok, label }: { ok: boolean; label?: string }) {
+/** Card lớn cho service chính: tên + icon + tick trạng thái + latency/error rate */
+function ServiceCard({
+  title,
+  icon: Icon,
+  ok,
+  latencyMs,
+  errorRate,
+  footer,
+}: {
+  title: string;
+  icon: React.ElementType;
+  ok: boolean;
+  latencyMs?: number | null;
+  errorRate?: number | null;
+  footer?: React.ReactNode;
+}) {
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-        ok
-          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-          : "bg-red-50 text-red-700 border border-red-200"
+    <div
+      className={`rounded-2xl border bg-white/70 backdrop-blur-sm p-5 shadow-[var(--shadow-card)] transition-all ${
+        ok ? "border-emerald-200/70" : "border-red-200/70"
       }`}
     >
-      {ok ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
-      {label ?? (ok ? "Online" : "Error")}
-    </span>
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <div
+            className={`h-10 w-10 rounded-xl grid place-items-center ${
+              ok ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
+            }`}
+          >
+            <Icon className="h-5 w-5" />
+          </div>
+          <h3 className="font-display font-semibold text-gray-800 leading-tight">{title}</h3>
+        </div>
+        {ok ? (
+          <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+        ) : (
+          <XCircle className="h-5 w-5 text-red-500" />
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mt-5">
+        <div>
+          <div className="text-[10px] font-mono uppercase tracking-wider text-gray-400">Latency</div>
+          <div className="font-display text-2xl font-bold text-gray-800 mt-0.5">
+            {latencyMs != null ? `${latencyMs}ms` : "—"}
+          </div>
+        </div>
+        <div>
+          <div className="text-[10px] font-mono uppercase tracking-wider text-gray-400">Error Rate</div>
+          <div className="font-display text-2xl font-bold text-gray-800 mt-0.5">
+            {errorRate != null ? `${errorRate}%` : "—"}
+          </div>
+        </div>
+      </div>
+
+      {footer && <div className="mt-4">{footer}</div>}
+    </div>
   );
 }
 
-function Card({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
+/** Hàng key-value cho khối Background Jobs */
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center gap-2 mb-4">
-        <Icon className="h-5 w-5 text-gray-500" />
-        <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
-      </div>
-      {children}
+    <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+      <span className="text-sm font-mono text-gray-500">{label}</span>
+      <span className="text-sm font-mono font-medium text-gray-800">{children}</span>
     </div>
   );
 }
 
 function SystemHealthPage() {
-  const { data, isLoading, isError, error, refetch, dataUpdatedAt } = useQuery({
+  const { data, isLoading, isError, error, refetch, isFetching, dataUpdatedAt } = useQuery({
     queryKey: ["system-health"],
     queryFn: async () => {
       const json = await apiFetch<{ data: HealthData }>("/api/health/services");
@@ -81,7 +133,7 @@ function SystemHealthPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        <Loader2 className="h-8 w-8 animate-spin text-xanh-green" />
       </div>
     );
   }
@@ -89,7 +141,7 @@ function SystemHealthPage() {
   if (isError) {
     return (
       <div className="p-6">
-        <div className="rounded-lg bg-red-50 border border-red-200 p-4 text-red-700 text-sm">
+        <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-red-700 text-sm">
           Không thể tải trạng thái hệ thống: {(error as Error)?.message ?? "Unknown error"}
         </div>
       </div>
@@ -99,142 +151,154 @@ function SystemHealthPage() {
   if (!data) return null;
 
   const dbOk = data.database.status === "ok";
-  const llmOk = Object.values(data.llm.configured_providers).some(Boolean);
-  const workflowOk = data.ticket_workflow.enabled && !data.ticket_workflow.last_error;
+  const apiOk = (data.api_gateway?.status ?? "ok") === "ok";
+  const llmOk = data.llm.has_key ?? Object.values(data.llm.configured_providers).some(Boolean);
+
+  const stream = data.live_stream ?? {};
+  const streamRunning = Boolean(stream.running);
+  const updatedAt = dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString("vi-VN") : "—";
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Activity className="h-6 w-6 text-blue-600" />
+          <h1 className="font-display text-3xl font-bold flex items-center gap-2.5">
+            <Activity className="h-8 w-8 text-xanh-deep" />
             System Health
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Cập nhật lần cuối: {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString("vi-VN") : "—"}
+          <p className="text-sm text-muted-foreground mt-1">
+            Giám sát độ trễ (latency), tỷ lệ lỗi và trạng thái hệ thống.
           </p>
         </div>
-        <button
-          onClick={() => refetch()}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-        >
-          <RefreshCw className="h-4 w-4" />
-          Refresh
-        </button>
-      </div>
-
-      {/* Overall Status */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className={`rounded-xl p-4 border ${dbOk ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Database</span>
-            <StatusBadge ok={dbOk} />
-          </div>
-        </div>
-        <div className={`rounded-xl p-4 border ${llmOk ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">LLM Provider</span>
-            <StatusBadge ok={llmOk} label={llmOk ? data.llm.active_provider : "No key"} />
-          </div>
-        </div>
-        <div className={`rounded-xl p-4 border ${workflowOk ? "border-emerald-200 bg-emerald-50" : "border-yellow-200 bg-yellow-50"}`}>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Ticket Workflow</span>
-            <StatusBadge ok={workflowOk} label={workflowOk ? "Active" : data.ticket_workflow.last_error ? "Error" : "Disabled"} />
-          </div>
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground font-mono">
+            <Clock className="h-4 w-4" />
+            {updatedAt}
+          </span>
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-white px-3.5 py-2 text-sm font-medium text-gray-600 hover:bg-xanh-mint/20 hover:border-xanh-green/40 disabled:opacity-50 transition-colors shadow-sm"
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
         </div>
       </div>
 
-      {/* Detail Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* Database */}
-        <Card title="Database (Supabase)" icon={Database}>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Status</span>
-              <StatusBadge ok={dbOk} />
-            </div>
-            {data.database.error && (
-              <div className="mt-2 p-2 rounded bg-red-50 text-red-600 text-xs font-mono break-all">
+      {/* Service cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <ServiceCard
+          title="API Gateway"
+          icon={Server}
+          ok={apiOk}
+          latencyMs={data.api_gateway?.latency_ms}
+          errorRate={data.api_gateway?.error_rate ?? 0}
+        />
+        <ServiceCard
+          title="PostgreSQL (Supabase)"
+          icon={Database}
+          ok={dbOk}
+          latencyMs={data.database.latency_ms}
+          errorRate={data.database.error_rate ?? (dbOk ? 0 : 100)}
+          footer={
+            data.database.error ? (
+              <div className="p-2 rounded-lg bg-red-50 text-red-600 text-xs font-mono break-all">
                 {data.database.error}
               </div>
-            )}
-          </div>
-        </Card>
-
-        {/* LLM Providers */}
-        <Card title="LLM Providers" icon={Bot}>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Active</span>
-              <span className="font-medium">{data.llm.active_provider} / {data.llm.active_model}</span>
+            ) : undefined
+          }
+        />
+        <ServiceCard
+          title={`LLM Provider (${data.llm.active_provider})`}
+          icon={Cpu}
+          ok={llmOk}
+          latencyMs={data.llm.latency_ms}
+          errorRate={llmOk ? 0 : 100}
+          footer={
+            <div className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2 text-xs font-mono text-gray-600 truncate">
+              Model: {data.llm.active_model}
             </div>
-            <div className="mt-3 space-y-1.5">
-              {Object.entries(data.llm.configured_providers).map(([provider, hasKey]) => (
-                <div key={provider} className="flex items-center justify-between">
-                  <span className="text-gray-600 capitalize">{provider}</span>
-                  <StatusBadge ok={hasKey as boolean} label={hasKey ? "Configured" : "No key"} />
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
-
-        {/* Ticket Workflow */}
-        <Card title="Ticket Workflow (backend-worker)" icon={Radio}>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Enabled</span>
-              <StatusBadge ok={data.ticket_workflow.enabled} label={data.ticket_workflow.enabled ? "Yes" : "No"} />
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Last run</span>
-              <span className="text-gray-700">{data.ticket_workflow.last_run_at ? new Date(data.ticket_workflow.last_run_at).toLocaleTimeString("vi-VN") : "—"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">→ in_progress</span>
-              <span className="font-medium">{data.ticket_workflow.moved_to_in_progress}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">→ resolved</span>
-              <span className="font-medium">{data.ticket_workflow.moved_to_resolved}</span>
-            </div>
-            {data.ticket_workflow.last_error && (
-              <div className="mt-2 p-2 rounded bg-red-50 text-red-600 text-xs font-mono break-all">
-                {data.ticket_workflow.last_error}
-              </div>
-            )}
-          </div>
-        </Card>
-
-        {/* Rate Limits */}
-        <Card title="Rate Limiting" icon={Shield}>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Chat (Guest)</span>
-              <span className="font-medium">{data.rate_limits.chat_guest_per_hour} req/hr</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Chat (Staff)</span>
-              <span className="font-medium">{data.rate_limits.chat_staff_per_hour} req/hr</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Feedback (Guest)</span>
-              <span className="font-medium">{data.rate_limits.feedback_guest_per_hour} req/hr</span>
-            </div>
-          </div>
-        </Card>
+          }
+        />
       </div>
 
-      {/* Live Stream (raw JSON for now) */}
-      {data.live_stream && Object.keys(data.live_stream).length > 0 && (
-        <Card title="Live Stream Status" icon={Radio}>
-          <pre className="text-xs text-gray-600 font-mono bg-gray-50 p-3 rounded-lg overflow-x-auto">
-            {JSON.stringify(data.live_stream, null, 2)}
-          </pre>
-        </Card>
-      )}
+      {/* Background Jobs */}
+      <div>
+        <h2 className="font-display text-xl font-bold text-xanh-deep mb-4">Background Jobs</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* Live Stream */}
+          <div className="rounded-2xl border border-border bg-white p-6 shadow-[var(--shadow-card)]">
+            <h3 className="font-display font-semibold text-gray-800 pb-3 mb-2 border-b border-gray-100">
+              Live Stream (Ingestion)
+            </h3>
+            <Row label="Status:">
+              <span className={streamRunning ? "text-emerald-600 font-bold" : "text-amber-600 font-bold"}>
+                {streamRunning ? "RUNNING" : "STOPPED"}
+              </span>
+            </Row>
+            <Row label="Batches Ingested:">{stream.batches_ingested ?? 0}</Row>
+            <Row label="Interval:">{stream.interval_seconds != null ? `${stream.interval_seconds}s` : "—"}</Row>
+            <Row label="Auto Ticket:">
+              <span className={stream.auto_ticket ? "text-gray-800" : "text-gray-400"}>
+                {stream.auto_ticket ? "ENABLED" : "DISABLED"}
+              </span>
+            </Row>
+          </div>
+
+          {/* Agent Config */}
+          <div className="rounded-2xl border border-border bg-white p-6 shadow-[var(--shadow-card)]">
+            <h3 className="font-display font-semibold text-gray-800 pb-3 mb-2 border-b border-gray-100">
+              Agent Config
+            </h3>
+            <Row label="Provider:">{data.llm.active_provider}</Row>
+            <Row label="Model:">
+              <span className="truncate max-w-[200px] inline-block align-bottom">{data.llm.active_model}</span>
+            </Row>
+            <Row label="Agent Available:">
+              <span className={llmOk ? "text-emerald-600 font-bold" : "text-red-600 font-bold"}>
+                {llmOk ? "AVAILABLE" : "UNAVAILABLE"}
+              </span>
+            </Row>
+          </div>
+        </div>
+      </div>
+
+      {/* Ticket Workflow + Rate Limits */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="rounded-2xl border border-border bg-white p-6 shadow-[var(--shadow-card)]">
+          <h3 className="font-display font-semibold text-gray-800 pb-3 mb-2 border-b border-gray-100">
+            Ticket Workflow (backend-worker)
+          </h3>
+          <Row label="Enabled:">
+            <span className={data.ticket_workflow.enabled ? "text-emerald-600 font-bold" : "text-gray-400"}>
+              {data.ticket_workflow.enabled ? "YES" : "NO"}
+            </span>
+          </Row>
+          <Row label="Last run:">
+            {data.ticket_workflow.last_run_at
+              ? new Date(data.ticket_workflow.last_run_at).toLocaleTimeString("vi-VN")
+              : "—"}
+          </Row>
+          <Row label="→ in_progress:">{data.ticket_workflow.moved_to_in_progress}</Row>
+          <Row label="→ resolved:">{data.ticket_workflow.moved_to_resolved}</Row>
+          {data.ticket_workflow.last_error && (
+            <div className="mt-3 p-2 rounded-lg bg-red-50 text-red-600 text-xs font-mono break-all">
+              {data.ticket_workflow.last_error}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-border bg-white p-6 shadow-[var(--shadow-card)]">
+          <h3 className="font-display font-semibold text-gray-800 pb-3 mb-2 border-b border-gray-100">
+            Rate Limiting
+          </h3>
+          <Row label="Chat (Guest):">{data.rate_limits.chat_guest_per_hour} req/hr</Row>
+          <Row label="Chat (Staff):">{data.rate_limits.chat_staff_per_hour} req/hr</Row>
+          <Row label="Feedback (Guest):">{data.rate_limits.feedback_guest_per_hour} req/hr</Row>
+        </div>
+      </div>
     </div>
   );
 }

@@ -34,6 +34,9 @@ GEMINI_MODEL_NAME   = _s.gemini_model_name
 GROQ_API_KEY        = _s.groq_api_key
 GROQ_MODEL_NAME     = _s.groq_model_name
 
+# Latency của LLM call thành công gần nhất (ms) — dùng cho System Health
+_last_latency_ms: int | None = None
+
 
 def resolve_provider() -> str:
     if LLM_PROVIDER in {"openrouter", "openai", "gemini", "groq", "mock"}:
@@ -97,6 +100,7 @@ def get_agent_status() -> dict:
         "provider": provider,
         "model": provider_model(provider),
         "has_key": provider_has_key(provider),
+        "last_latency_ms": _last_latency_ms,
         "configured": {
             "openrouter": bool(OPENROUTER_API_KEY),
             "openai": bool(OPENAI_API_KEY),
@@ -266,6 +270,8 @@ def chat_completion(
         try:
             content, usage = _call_provider(provider, messages, response_json, temperature)
             latency_ms = round((perf_counter() - started) * 1000)
+            global _last_latency_ms
+            _last_latency_ms = latency_ms
             write_agent_log({
                 "event": "chat_completion",
                 "provider": provider,

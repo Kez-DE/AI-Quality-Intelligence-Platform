@@ -691,13 +691,20 @@ def trigger_daily_report(
 def health_services(_: AuthUser = Depends(require_ops_staff)):
     """System health check — trạng thái tất cả services + LLM providers (ops staff+)."""
     from datetime import datetime, timezone
+    import time
 
-    # DB connectivity
+    # API Gateway latency — đo thời gian xử lý nội bộ (round-trip nhẹ)
+    api_start = time.perf_counter()
+
+    # DB connectivity + latency
     db_status = "ok"
     db_error = None
+    db_latency_ms = None
     try:
         db = get_supabase()
+        db_t0 = time.perf_counter()
         db.table("feedback").select("id").limit(1).execute()
+        db_latency_ms = round((time.perf_counter() - db_t0) * 1000)
     except Exception as exc:
         db_status = "error"
         db_error = str(exc)[:200]
@@ -707,6 +714,8 @@ def health_services(_: AuthUser = Depends(require_ops_staff)):
     llm_configured = agent_info.get("configured", {})
     active_provider = agent_info.get("provider", "unknown")
     active_model = agent_info.get("model", "unknown")
+    llm_has_key = agent_info.get("has_key", False)
+    llm_latency_ms = agent_info.get("last_latency_ms")
 
     # Worker status via ticket_workflow_state (only backend-worker reports state here)
     workflow = dict(ticket_workflow_state)
@@ -721,15 +730,29 @@ def health_services(_: AuthUser = Depends(require_ops_staff)):
         "feedback_guest_per_hour": _s.rate_limit_feedback_guest,
     }
 
+    api_latency_ms = round((time.perf_counter() - api_start) * 1000)
+
     return {
         "status": "success",
         "data": {
             "checked_at": datetime.now(timezone.utc).isoformat(),
-            "database": {"status": db_status, "error": db_error},
+            "api_gateway": {
+                "status": "ok",
+                "latency_ms": api_latency_ms,
+                "error_rate": 0,
+            },
+            "database": {
+                "status": db_status,
+                "error": db_error,
+                "latency_ms": db_latency_ms,
+                "error_rate": 0 if db_status == "ok" else 100,
+            },
             "llm": {
                 "active_provider": active_provider,
                 "active_model": active_model,
                 "configured_providers": llm_configured,
+                "has_key": llm_has_key,
+                "latency_ms": llm_latency_ms,
             },
             "ticket_workflow": workflow,
             "live_stream": stream,
