@@ -100,8 +100,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm install -g @railway/cli
-          railway_bin="$(npm prefix -g)/bin/railway"
+          railway_cli_dir="$RUNNER_TEMP/railway-cli"
+          mkdir -p "$railway_cli_dir"
+          npm install --prefix "$railway_cli_dir" @railway/cli
+          railway_bin="$railway_cli_dir/node_modules/.bin/railway"
           echo "$(dirname "$railway_bin")" >> "$GITHUB_PATH"
           echo "RAILWAY_CLI=$railway_bin" >> "$GITHUB_ENV"
           "$railway_bin" --version
@@ -127,8 +129,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm install -g @railway/cli
-          railway_bin="$(npm prefix -g)/bin/railway"
+          railway_cli_dir="$RUNNER_TEMP/railway-cli"
+          mkdir -p "$railway_cli_dir"
+          npm install --prefix "$railway_cli_dir" @railway/cli
+          railway_bin="$railway_cli_dir/node_modules/.bin/railway"
           echo "$(dirname "$railway_bin")" >> "$GITHUB_PATH"
           echo "RAILWAY_CLI=$railway_bin" >> "$GITHUB_ENV"
           "$railway_bin" --version
