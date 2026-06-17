@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, Send, Loader2, Bot, User as UserIcon, RotateCcw } from "lucide-react";
+import { Sparkles, Send, Loader2, Bot, User as UserIcon, Trash2, Edit2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch, useMe } from "@/lib/api";
 
@@ -31,7 +31,6 @@ function ChatPage() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [resetting, setResetting] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const { data: me } = useMe();
   
@@ -60,6 +59,43 @@ function ChatPage() {
         if (data) setMessages(data as Msg[]);
       });
   }, []);
+
+  async function clearChat() {
+    try {
+      setMessages([]);
+      const { data: u } = await supabase.auth.getUser();
+      if (u?.user) {
+        const { error } = await supabase.from("chat_messages").delete().eq("user_id", u.user.id);
+        if (error) throw error;
+      }
+      toast.success("Đã xóa cuộc trò chuyện, bạn có thể bắt đầu lại!");
+    } catch (err: any) {
+      toast.error("Lỗi khi xóa: " + (err.message || "Không xác định"));
+    }
+  }
+
+  async function editMessage(index: number) {
+    if (loading) return;
+    const targetMsg = messages[index];
+    if (targetMsg.role !== "user") return;
+    
+    const newMessages = messages.slice(0, index);
+    const textToEdit = targetMsg.content;
+    
+    setInput(textToEdit);
+    setMessages(newMessages);
+    
+    const { data: u } = await supabase.auth.getUser();
+    if (u?.user) {
+      const idsToDelete = messages.slice(index).map(m => m.id).filter(Boolean);
+      if (idsToDelete.length > 0) {
+        // @ts-ignore
+        supabase.from("chat_messages").delete().in("id", idsToDelete).then(({error}) => {
+          if (error) console.error("Edit delete error:", error);
+        });
+      }
+    }
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -109,35 +145,9 @@ function ChatPage() {
     }
   }
 
-  async function resetConversation() {
-    if (loading || resetting) return;
-    setResetting(true);
-    try {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) {
-        toast.error("Chưa đăng nhập");
-        return;
-      }
-      // Xoá toàn bộ lịch sử chat của user trong Supabase
-      const { error } = await supabase
-        .from("chat_messages")
-        .delete()
-        .eq("user_id", u.user.id);
-      if (error) throw error;
-
-      setMessages([]);
-      setInput("");
-      toast.success("Đã làm mới cuộc hội thoại");
-    } catch (err: any) {
-      toast.error(err.message ?? "Không thể làm mới cuộc hội thoại");
-    } finally {
-      setResetting(false);
-    }
-  }
-
   return (
     <div className="flex flex-col h-[calc(100vh-7rem)]">
-      <div className="mb-4 flex items-start justify-between gap-3">
+      <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="font-display text-3xl font-bold flex items-center gap-2">
             <Sparkles className="h-6 w-6 text-xanh-green" />
@@ -148,13 +158,11 @@ function ChatPage() {
           </p>
         </div>
         <button
-          onClick={resetConversation}
-          disabled={loading || resetting || messages.length === 0}
-          title="Làm mới cuộc hội thoại — xoá toàn bộ lịch sử chat"
-          className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-border bg-white text-sm font-medium text-muted-foreground hover:text-foreground hover:border-xanh-green/40 hover:bg-xanh-mint/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          onClick={clearChat}
+          type="button"
+          className="relative z-50 cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-white border border-border rounded-lg text-sm font-semibold text-xanh-deep hover:bg-muted transition-colors shadow-sm active:scale-95"
         >
-          {resetting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
-          Làm mới
+          <Trash2 className="h-4 w-4" /> Cuộc trò chuyện mới
         </button>
       </div>
 
@@ -189,7 +197,13 @@ function ChatPage() {
           )}
 
           {messages.map((m, i) => (
-            <Bubble key={m.id ?? i} role={m.role} content={m.content} />
+            <Bubble 
+              key={m.id ?? i} 
+              role={m.role} 
+              content={m.content} 
+              isLast={i === messages.length - 1 || (m.role === "user" && i === messages.length - 2)}
+              onEdit={m.role === "user" ? () => editMessage(i) : undefined}
+            />
           ))}
 
           {loading && (
@@ -230,10 +244,14 @@ function Bubble({
   role,
   content,
   loading,
+  isLast,
+  onEdit,
 }: {
   role: "user" | "assistant";
   content: string;
   loading?: boolean;
+  isLast?: boolean;
+  onEdit?: () => void;
 }) {
   const isUser = role === "user";
   return (
@@ -247,7 +265,7 @@ function Bubble({
         {isUser ? <UserIcon className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
       </div>
       <div
-        className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap leading-relaxed ${
+        className={`relative group max-w-[80%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap leading-relaxed ${
           isUser
             ? "bg-xanh-deep text-white rounded-tr-sm"
             : "bg-xanh-mint/40 text-foreground border border-xanh-green/20 rounded-tl-sm"
@@ -259,6 +277,16 @@ function Bubble({
           </span>
         ) : (
           content
+        )}
+        
+        {isUser && onEdit && isLast && (
+          <button
+            onClick={onEdit}
+            title="Sửa câu hỏi"
+            className="absolute -left-10 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-muted text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-xanh-deep"
+          >
+            <Edit2 className="h-4 w-4" />
+          </button>
         )}
       </div>
     </div>

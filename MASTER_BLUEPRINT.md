@@ -385,5 +385,78 @@ Schema quản lý bằng SQL migrations tại `supabase/migrations/` (các file:
 3. **Kích hoạt Agent:** `POST /api/agent/run` → Orchestrator quét, Alert Agent phân cấp 🔴 CRITICAL, LLM sinh root cause, Router giao về đúng phòng.
 4. **Dashboard đỏ rực** → Ticket Triage hiện alert theo từng phòng ban (realtime, không cần F5).
 5. **Show Insight:** Mở `/api/insights/departments/Safety/deep-analysis` → AI chỉ ra nguyên nhân gốc rễ, dự báo 48h, 3 hành động kèm deadline.
-6. **Human-in-the-loop:** Sửa 1 nhãn AI nhận diện nhầm trên trang Phản hồi.
 7. **Chốt hạ:** Bắn thêm 1 đợt dữ liệu cùng khu vực → hệ thống **không spam alert trùng** (dedup hoạt động) — chứng minh đây là hệ thống production-ready, không phải demo "đốt pháo".
+
+---
+
+## 11. Kế hoạch Triển khai Unified RAG & UI Guideline (Giai đoạn 4)
+
+Bản thiết kế này phục vụ cho Giai đoạn 4: Phát triển RAG (Retrieval-Augmented Generation) để AI Agent có thể truy xuất kiến thức nội bộ XanhSM thay vì "bịa" câu trả lời (Hallucination). Kế hoạch này được xây dựng bám sát theo kỹ năng `prd-to-screens` (UI Pattern 1).
+
+### 11.1 Tài liệu và Xây dựng Dữ liệu RAG
+
+**Cần chuẩn bị những tài liệu gì (Knowledge Base)?**
+Hệ thống RAG cho "AI Quality Intelligence Platform" sẽ cần thu thập các nhóm tài liệu chuyên môn nội bộ:
+- **Cẩm nang Vận hành (SOP - Standard Operating Procedures)**: Quy trình chuẩn để xử lý các vấn đề khẩn cấp (VD: Tai nạn giao thông, Tài xế gian lận, Mất đồ trên xe).
+- **SLA & Chính sách Bồi thường**: Quy định thời gian tối đa để đóng Ticket cho từng mức độ (Severity P1-P5), cũng như mức đền bù chuẩn cho khách.
+- **Hướng dẫn Kỹ thuật (App & System)**: Các tài liệu xử lý lỗi App phổ biến (Lỗi thanh toán thẻ, Lỗi không nhận cuốc).
+- **Lịch sử Ticket Mẫu**: Các Ticket P5 đã giải quyết thành công trước đây dùng làm "Case study" (Few-shot) cho AI học hỏi.
+
+**Xây dựng Data và Vector Database như thế nào?**
+Chúng ta sẽ sử dụng tính năng `pgvector` của **Supabase**.
+
+- **Cấu trúc Bảng `knowledge_chunks` (Tạo qua SQL Migration):**
+  - `id`: UUID.
+  - `document_title`: Tên tài liệu gốc (VD: "Quy trình xử lý mất đồ 2026").
+  - `content`: Đoạn text (chunk) chứa kiến thức.
+  - `embedding`: Cột kiểu `vector(1536)` (Nếu dùng OpenAI `text-embedding-3-small`).
+  - `metadata`: Cột `jsonb` chứa tags (VD: `{"category": "safety", "department": "CSKH"}`).
+
+- **Chiến lược Bóc tách (Chunking Strategy):**
+  - Tránh cắt cứng (Fixed-size chunking) làm đứt gãy ý nghĩa.
+  - **Sử dụng Semantic Chunking**: Cắt theo từng Heading/Section của file Markdown/PDF. Mỗi chunk lý tưởng khoảng 300 - 800 tokens để giữ nguyên ngữ cảnh.
+
+- **Chiến lược Truy vấn (Retrieval Strategy):**
+  - **Hybrid Search**: Kết hợp Vector Semantic Search (để hiểu ngữ nghĩa) + Keyword Filtering (dựa trên `metadata` để tìm đúng phòng ban/thể loại).
+  - Chỉ lấy **Top-3 chunks** có điểm tương đồng cao nhất để nhồi vào prompt (tránh nhiễu context).
+
+### 11.2 UI GUIDELINE — Chat + Context Panel
+
+Dựa trên yêu cầu và `skills/prd-to-screens/SKILL.md`, thiết kế UI cho màn hình Chat AI sẽ theo **UI Pattern 1: Chat + Context Panel**.
+
+> PRD: Áp dụng cho tính năng Chat/Tư vấn của Ops Staff trên hệ thống Quality Cockpit.
+
+**UI Pattern**
+**1. Chat + context panel**
+*Why this pattern:* Người dùng (Ops Staff) cần hỏi AI về cách xử lý một vụ việc phức tạp. Họ không chỉ cần câu trả lời từ AI mà còn cần TẬN MẮT thấy AI đang trích dẫn từ cuốn sổ tay SOP nào để đảm bảo tính chính xác 100%.
+
+**Visual Style**
+**Data-dense professional** (Chuyên nghiệp, nhiều dữ liệu)
+Concrete rules:
+- Dùng layout chia màn hình: 60% bên trái cho giao diện Chat, 40% bên phải cho Context Panel (Source/References).
+- Font chữ sans-serif (Inter/Roboto), kích thước nhỏ (13px - 14px) gọn gàng.
+- Ít vùng trắng thừa, sử dụng các dải màu xám nhạt (low contrast) thay vì màu sặc sỡ. Bo góc nhẹ (rounded-md).
+
+**User Flow (3 Steps)**
+1. **User input action**: Ops Staff gõ câu hỏi vào ô Chat (VD: *"Lái xe tranh cãi với khách và đuổi khách xuống xe, xử lý thế nào theo SOP?"*).
+2. **App processing**: Giao diện hiển thị trạng thái *"Đang tra cứu tài liệu..."*. Backend `rag_engine.py` nhúng câu hỏi thành vector, truy vấn Supabase `pgvector`, lấy ra 3 đoạn SOP phù hợp nhất và gọi LLM để tổng hợp câu trả lời.
+3. **User interacts**: Staff đọc câu trả lời ở bên trái. Ở panel bên phải, màn hình hiển thị trực tiếp 3 thẻ (cards) là 3 đoạn tài liệu gốc (Sources) đã được trích dẫn, kèm link tải/mở file PDF.
+
+**T·C·R Checklist cho Pattern 1**
+* **T — Transparency (Minh bạch)**
+  - [ ] Giao diện hiển thị rõ trạng thái đang thực hiện: "Searching knowledge base..." vs "Generating answer...".
+  - [ ] Trả lời của AI phải có đánh dấu trích dẫn (VD: `[1]`, `[2]`).
+  - [ ] Context Panel luôn bật bên cạnh, liệt kê rõ Tên tài liệu, trang số mấy mà AI dùng để tham khảo.
+* **C — Control (Kiểm soát)**
+  - [ ] Cho phép người dùng tick/chọn để "Lọc" (Filter) chỉ tìm kiếm trong một bộ tài liệu nhất định (VD: "Chỉ tìm trong SOP An Toàn").
+  - [ ] Nút Thumbs up / Thumbs down ở mỗi câu trả lời để đánh giá chất lượng RAG.
+* **R — Recovery (Phục hồi)**
+  - [ ] Khi không tìm thấy tài liệu phù hợp trong DB, AI phải chủ động trả lời: *"Tôi không tìm thấy hướng dẫn nào trong sổ tay. Bạn có muốn tự tạo một Ticket chuyển lên cấp cao hơn không?"* (Tuyệt đối không đoán bừa).
+  - [ ] Hiển thị nút "Tìm lại với từ khóa khác" hoặc "Gửi yêu cầu bổ sung tài liệu" khi RAG fail.
+
+**Hinge Rule**
+Mọi giao tiếp gọi LLM và Vector Database đều phải đi qua tệp `pipeline/agent/rag_engine.py` (chưa có, cần tạo mới) và định tuyến bằng `model_router.py`. Frontend gọi duy nhất một endpoint REST `/api/agent/rag-chat`.
+
+**What NOT to build yet**
+- Chưa xây dựng tính năng Upload file trực tiếp từ Frontend để train AI (Đòi hỏi hệ thống ETL phức tạp). Hãy chuẩn bị tài liệu bằng file JSON/Markdown tĩnh hoặc script ingest nội bộ trước.
+- Chưa làm tính năng chat đa phương tiện (gửi ảnh/voice). Chỉ text base Q&A.

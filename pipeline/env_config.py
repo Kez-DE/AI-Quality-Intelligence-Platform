@@ -88,6 +88,11 @@ class Settings(BaseSettings):
     openrouter_app_name: str = Field(default="AI Quality Intelligence Platform", alias="OPENROUTER_APP_NAME")
 
     # ------------------------------------------------------------------
+    # Webhook notifications
+    # ------------------------------------------------------------------
+    webhook_url: str = Field(default="", alias="WEBHOOK_URL")
+
+    # ------------------------------------------------------------------
     # Data
     # ------------------------------------------------------------------
     real_data_file: str = Field(default="", alias="REAL_DATA_FILE")

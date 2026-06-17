@@ -148,8 +148,8 @@
 - [x] AppShell hien menu theo role, khong hien route guest khong duoc vao.
 - [x] Them guard cho route theo role, khong chi dua vao sidebar.
 - [x] Feedback page tach mode guest upload va mode staff/admin review.
-- [ ] Alerts/Ticket page them bo loc team, severity, SLA, status, created_at.
-- [ ] Dashboard them empty/loading/error state ro rang.
+- [x] Alerts/Ticket page them bo loc team, severity, SLA, status, created_at.
+- [x] Dashboard them empty/loading/error state ro rang.
 - [ ] Dashboard va ticket phai doc du lieu realtime nhung khong reload/thay doi layout qua manh.
 - [ ] Them toast/log UI khi agent run loi hoac ticket trigger bi fail.
 - [ ] Kiem tra responsive mobile cho dashboard, upload feedback va ticket triage.
@@ -181,7 +181,7 @@
 - [ ] Test gom ticket thanh task va sinh department report.
 - [ ] Test LLM rate limit: retry, queue, cache, fallback, circuit breaker.
 - [ ] Test feedback scoring voi bo case nghiem trong/khong nghiem trong.
-- [ ] Test dashboard support voi role support, manager, guest.
+- [x] Test dashboard support voi role support, manager, guest.
 
 ## 16. Tai lieu va demo
 
@@ -192,7 +192,7 @@
 - [ ] Cap nhat demo script them flow: nhieu ticket -> gom thanh task -> sinh report gui truong phong.
 - [ ] Ghi ro chien luoc giam goi LLM/rate limit trong tai lieu ky thuat.
 - [ ] Ghi ro rubric cham diem feedback va cach staff sua diem AI.
-- [ ] Ghi ro workflow dashboard support online.
+- [x] Ghi ro workflow dashboard support online.
 - [ ] Ghi ro bien moi truong can co trong `.env.example`.
 
 ## 17. Chat AI va RAG
@@ -225,19 +225,19 @@
 
 ## 20. Quan sat he thong va van hanh
 
-- [ ] Them healthcheck endpoint cho backend: DB connection, model loaded, LLM configured, scheduler status.
+- [x] Them healthcheck endpoint cho backend: DB connection, model loaded, LLM configured, scheduler status.
 - [ ] Them trang hoac log xem trang thai agent run gan nhat.
-- [ ] Theo doi latency cua upload feedback, classification, ticket trigger va agent pipeline.
-- [ ] Theo doi error rate theo module: frontend, backend, Supabase, LLM, scheduler.
-- [ ] Them alert noi bo khi scheduler dung chay hoac agent loi lien tiep.
+- [x] Theo doi latency cua upload feedback, classification, ticket trigger va agent pipeline.
+- [x] Theo doi error rate theo module: frontend, backend, Supabase, LLM, scheduler.
+- [x] Them alert noi bo khi scheduler dung chay hoac agent loi lien tiep.
 - [ ] Ghi ro runbook: khi Supabase loi, LLM loi, deploy loi, RLS chan nham thi xu ly ra sao.
 - [ ] Them backup/restore plan cho Supabase database.
 - [ ] Them data retention policy cho feedback, chat_messages va agent logs.
 
 ## 21. CI/CD va chat luong code
 
-- [ ] Them GitHub Actions chay lint/test/build cho frontend.
-- [ ] Them GitHub Actions chay test backend pipeline.
+- [x] Them GitHub Actions chay lint/test/build cho frontend.
+- [x] Them GitHub Actions chay test backend pipeline.
 - [ ] Them check schema/migration Supabase neu co thay doi DB.
 - [ ] Them pre-commit hoac script format cho TypeScript va Python.
 - [ ] Them typecheck frontend va validation cho generated Supabase types.

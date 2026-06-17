@@ -1,14 +1,19 @@
 from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 import os
+import time
 from datetime import datetime, timezone
 from apscheduler.schedulers.background import BackgroundScheduler
 from contextlib import asynccontextmanager
+from typing import Optional
 
 from ingest import ingest_dataset
 from ingest import get_supabase
-from agent import chat_completion, get_agent_status
+from agent import chat_completion, get_agent_status, run_chat_agent
 from auth_guard import AuthUser, get_current_user, require_admin, require_ops_staff
 from users_admin import router as users_router, audit_router
 from rate_limiter import RateLimiter, check_rate_limit
@@ -19,6 +24,27 @@ from services.agent_context import AGENT_SYSTEM_PROMPT, GUEST_SYSTEM_PROMPT, bui
 from services.live_stream import get_live_stream_status, set_scheduler, start_live_stream, stop_live_stream
 from services.ticket_workflow import ticket_workflow_state
 
+START_TIME = time.time()
+
+
+class ChatMessageReq(BaseModel):
+    role: str
+    content: str = Field(..., max_length=2000)
+
+
+class ChatReq(BaseModel):
+    messages: list[ChatMessageReq]
+
+
+class StatusUpdateReq(BaseModel):
+    status: str
+
+
+class AssignTaskReq(BaseModel):
+    owner_id: Optional[str] = None
+    due_at: Optional[str] = None
+
+
 _s = get_settings()
 
 feedback_rate_limit = RateLimiter(max_requests=_s.rate_limit_feedback_guest, window_seconds=3600, scope="feedback_submit")
@@ -26,6 +52,16 @@ chat_rate_limit = RateLimiter(max_requests=_s.rate_limit_chat_guest, window_seco
 chat_rate_limit_staff = RateLimiter(max_requests=_s.rate_limit_chat_staff, window_seconds=3600, scope="agent_chat_staff")
 
 scheduler: BackgroundScheduler | None = None
+
+
+def _parse_timestamp(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -48,6 +84,28 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(_request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": {"code": "HTTP_ERROR", "message": str(exc.detail)}},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(_request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "Invalid input",
+                "details": exc.errors(),
+            }
+        },
+    )
 
 # CORS config to allow frontend to communicate with backend
 app.add_middleware(
@@ -81,6 +139,8 @@ def health_check():
     return {
         "status": "ok",
         "message": "Backend service is running",
+        "version": "1.0.0",
+        "uptime_seconds": int(time.time() - START_TIME),
         "data_file_exists": Path(DEFAULT_DATA_FILE).exists(),
         "llm_provider": agent_info.get("provider"),
         "llm_has_key": agent_info.get("has_key"),
@@ -137,15 +197,18 @@ def list_tasks(
     priority: str | None = Query(default=None),
     area: str | None = Query(default=None),
     overdue: bool = Query(default=False),
-    _: AuthUser = Depends(require_ops_staff),
+    user: AuthUser = Depends(require_ops_staff),
 ):
     try:
         db = get_supabase()
         q = db.table("tasks").select("*")
+        effective_team = team
+        if user.role == "manager" and user.department:
+            effective_team = user.department
         if status:
             q = q.eq("status", status)
-        if team:
-            q = q.eq("assigned_team", team)
+        if effective_team:
+            q = q.eq("assigned_team", effective_team)
         if priority:
             q = q.eq("priority", priority)
         if area:
@@ -172,8 +235,8 @@ def list_task_alerts(task_id: str, _: AuthUser = Depends(require_ops_staff)):
     return {"status": "success", "data": data}
 
 @app.patch("/api/tasks/{task_id}/status")
-def update_task_status(task_id: str, payload: dict, _: AuthUser = Depends(require_ops_staff)):
-    new_status = payload.get("status")
+def update_task_status(task_id: str, payload: StatusUpdateReq, _: AuthUser = Depends(require_ops_staff)):
+    new_status = payload.status
     if new_status not in {"open", "in_progress", "resolved"}:
         raise HTTPException(status_code=400, detail="Invalid task status")
     try:
@@ -190,12 +253,12 @@ def update_task_status(task_id: str, payload: dict, _: AuthUser = Depends(requir
     return {"status": "success", "data": data[0]}
 
 @app.patch("/api/tasks/{task_id}/assign")
-def assign_task(task_id: str, payload: dict, _: AuthUser = Depends(require_ops_staff)):
+def assign_task(task_id: str, payload: AssignTaskReq, _: AuthUser = Depends(require_ops_staff)):
     update_fields: dict = {}
-    if "owner_id" in payload:
-        update_fields["owner_id"] = payload["owner_id"]
-    if "due_at" in payload:
-        update_fields["due_at"] = payload["due_at"]
+    if payload.owner_id is not None:
+        update_fields["owner_id"] = payload.owner_id
+    if payload.due_at is not None:
+        update_fields["due_at"] = payload.due_at
     if not update_fields:
         raise HTTPException(status_code=400, detail="Must provide owner_id or due_at")
     update_fields["updated_at"] = "now()"
@@ -212,17 +275,68 @@ def assign_task(task_id: str, payload: dict, _: AuthUser = Depends(require_ops_s
         raise HTTPException(status_code=404, detail="Task not found")
     return {"status": "success", "data": data[0]}
 
-@app.get("/api/reports")
-def list_reports(team: str | None = None, limit: int = Query(default=50, ge=1, le=100), _: AuthUser = Depends(require_ops_staff)):
+@app.get("/api/leaderboard")
+def get_leaderboard(_: AuthUser = Depends(require_ops_staff)):
+    """Team leaderboard from resolved tasks."""
     try:
         db = get_supabase()
-        q = db.table("department_reports").select("*")
-        if team:
-            q = q.eq("team", team)
-        data = q.order("created_at", desc=True).limit(limit).execute().data or []
+        rows = db.table("tasks") \
+            .select("assigned_team,created_at,updated_at") \
+            .eq("status", "resolved") \
+            .execute() \
+            .data or []
+        team_stats: dict[str, dict] = {}
+        for row in rows:
+            team = row.get("assigned_team") or "Unknown"
+            stats = team_stats.setdefault(team, {"resolved_count": 0, "total_time_seconds": 0})
+            stats["resolved_count"] += 1
+            created = _parse_timestamp(row.get("created_at"))
+            updated = _parse_timestamp(row.get("updated_at"))
+            if created and updated and updated > created:
+                stats["total_time_seconds"] += (updated - created).total_seconds()
+        result = []
+        for team, stats in team_stats.items():
+            count = stats["resolved_count"]
+            avg_seconds = stats["total_time_seconds"] / count if count else 0
+            result.append({
+                "team": team,
+                "resolved_count": count,
+                "avg_resolution_hours": round(avg_seconds / 3600, 2),
+            })
+        result.sort(key=lambda item: (-item["resolved_count"], item["avg_resolution_hours"]))
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Cannot calculate leaderboard: {str(exc)[:300]}") from exc
+    return {"status": "success", "data": result}
+
+
+@app.get("/api/reports")
+def list_reports(
+    team: str | None = None,
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=100),
+    user: AuthUser = Depends(require_ops_staff),
+):
+    try:
+        db = get_supabase()
+        q = db.table("department_reports").select("*", count="exact")
+        effective_team = team
+        if user.role == "manager" and user.department:
+            effective_team = user.department
+        if effective_team:
+            q = q.eq("team", effective_team)
+        offset = (page - 1) * limit
+        response = q.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
+        data = response.data or []
+        total_items = response.count if response.count is not None else 0
+        pagination = {
+            "page": page,
+            "pageSize": limit,
+            "totalItems": total_items,
+            "totalPages": (total_items + limit - 1) // limit,
+        }
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot read reports: {str(exc)[:300]}") from exc
-    return {"status": "success", "data": data}
+    return {"status": "success", "data": data, "pagination": pagination}
 
 
 @app.patch("/api/reports/{report_id}/approve")
@@ -298,24 +412,21 @@ def agent_logs(limit: int = Query(default=50, ge=1, le=500), _: AuthUser = Depen
     return {"status": "success", "data": [line.rstrip("\n") for line in lines]}
 
 @app.post("/api/agent/chat")
-def agent_chat(payload: dict, user: AuthUser = Depends(get_current_user)):
+def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
     if user.role == "guest":
         check_rate_limit(chat_rate_limit, user.id)
         # Guests get a restricted customer-support-only chatbot
-        messages = payload.get("messages")
-        if not isinstance(messages, list) or not messages:
+        if not payload.messages:
             raise HTTPException(status_code=400, detail="messages must be a non-empty list")
         normalized = [
             {"role": "system", "content": GUEST_SYSTEM_PROMPT},
         ]
-        for message in messages[-30:]:
-            role = message.get("role")
-            content = message.get("content")
-            if role not in {"user", "assistant", "system"} or not isinstance(content, str) or not content.strip():
+        for message in payload.messages[-30:]:
+            if message.role not in {"user", "assistant", "system"} or not message.content.strip():
                 raise HTTPException(status_code=400, detail="Invalid chat message")
             # OWASP LLM: mask PII from user input before injecting into prompt
-            safe_content = mask_pii(content) if role == "user" else content
-            normalized.append({"role": role, "content": safe_content[:8000]})
+            safe_content = mask_pii(message.content) if message.role == "user" else message.content
+            normalized.append({"role": message.role, "content": safe_content[:8000]})
         try:
             result = chat_completion(normalized, temperature=0.4)
         except Exception as exc:
@@ -328,23 +439,20 @@ def agent_chat(payload: dict, user: AuthUser = Depends(get_current_user)):
     # Staff / manager / admin — apply a higher rate limit to prevent LLM API key abuse
     check_rate_limit(chat_rate_limit_staff, user.id)
 
-    messages = payload.get("messages")
-    if not isinstance(messages, list) or not messages:
+    if not payload.messages:
         raise HTTPException(status_code=400, detail="messages must be a non-empty list")
     normalized = [
         {"role": "system", "content": AGENT_SYSTEM_PROMPT},
         {"role": "system", "content": build_agent_data_context()},
     ]
-    for message in messages[-30:]:
-        role = message.get("role")
-        content = message.get("content")
-        if role not in {"user", "assistant", "system"} or not isinstance(content, str) or not content.strip():
+    for message in payload.messages[-30:]:
+        if message.role not in {"user", "assistant", "system"} or not message.content.strip():
             raise HTTPException(status_code=400, detail="Invalid chat message")
         # OWASP LLM: mask PII from user input before injecting into prompt
-        safe_content = mask_pii(content) if role == "user" else content
-        normalized.append({"role": role, "content": safe_content[:8000]})
+        safe_content = mask_pii(message.content) if message.role == "user" else message.content
+        normalized.append({"role": message.role, "content": safe_content[:8000]})
     try:
-        result = chat_completion(normalized, temperature=0.4)
+        result = run_chat_agent(normalized, temperature=0.4)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Agent model error: {str(exc)[:300]}") from exc
     # OWASP LLM: mask PII from LLM output before returning to client

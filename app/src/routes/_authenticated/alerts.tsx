@@ -103,6 +103,8 @@ function AlertsPage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("Tất cả");
+  const [severityFilter, setSeverityFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [stream, setStream] = useState<LiveStreamStatus | null>(null);
   const [workflow, setWorkflow] = useState<TicketWorkflowStatus | null>(null);
 
@@ -153,11 +155,24 @@ function AlertsPage() {
     setUpdating(null);
   }
 
-  // Filter theo tab
+  // Filter theo tab và các dropdown
   const filtered = alerts.filter((a) => {
-    if (activeTab === "Tất cả") return true;
-    const { assigned_team } = parseDescription(a.description ?? "");
-    return assigned_team.toLowerCase().includes(activeTab.toLowerCase());
+    // 1. Lọc theo Team
+    if (activeTab !== "Tất cả") {
+      const { assigned_team } = parseDescription(a.description ?? "");
+      if (!assigned_team.toLowerCase().includes(activeTab.toLowerCase())) return false;
+    }
+    // 2. Lọc theo Severity
+    if (severityFilter === "high") {
+      if (a.severity !== "P5" && a.severity !== "P4") return false;
+    } else if (severityFilter === "low") {
+      if (a.severity === "P5" || a.severity === "P4") return false;
+    }
+    // 3. Lọc theo Status
+    if (statusFilter !== "all" && a.status !== statusFilter) {
+      return false;
+    }
+    return true;
   });
 
   // Thống kê nhanh
@@ -237,26 +252,50 @@ function AlertsPage() {
         {workflow?.last_error && <span className="text-red-600">Lỗi workflow: {workflow.last_error}</span>}
       </div>
 
-      {/* Tab Filter theo Phòng Ban */}
-      <div className="flex flex-wrap gap-2">
-        {TABS.map((tab) => {
-          const cfg = tab !== "Tất cả" ? getTeamConfig(tab) : null;
-          const Icon = cfg?.icon;
-          return (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex items-center justify-center gap-1.5 px-4 min-h-[44px] rounded-full text-sm font-medium border transition-all ${
-                activeTab === tab
-                  ? "border-xanh-green bg-xanh-deep text-white shadow"
-                  : "border-border bg-white text-muted-foreground hover:border-xanh-green/40 hover:text-foreground"
-              }`}
-            >
-              {Icon && <Icon className="h-4 w-4" />}
-              {tab}
-            </button>
-          );
-        })}
+      {/* Filters: Tab Team & Dropdowns */}
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+        <div className="flex flex-wrap gap-2">
+          {TABS.map((tab) => {
+            const cfg = tab !== "Tất cả" ? getTeamConfig(tab) : null;
+            const Icon = cfg?.icon;
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex items-center justify-center gap-1.5 px-4 min-h-[44px] rounded-full text-sm font-medium border transition-all ${
+                  activeTab === tab
+                    ? "border-xanh-green bg-xanh-deep text-white shadow"
+                    : "border-border bg-white text-muted-foreground hover:border-xanh-green/40 hover:text-foreground"
+                }`}
+              >
+                {Icon && <Icon className="h-4 w-4" />}
+                {tab}
+              </button>
+            );
+          })}
+        </div>
+        
+        <div className="flex gap-2">
+          <select 
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 min-h-[44px] rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-xanh-green/50"
+          >
+            <option value="all">Mọi trạng thái</option>
+            <option value="open">🔴 Chờ xử lý</option>
+            <option value="in_progress">🟡 Đang xử lý</option>
+            <option value="resolved">🟢 Đã xong</option>
+          </select>
+          <select 
+            value={severityFilter}
+            onChange={(e) => setSeverityFilter(e.target.value)}
+            className="px-3 min-h-[44px] rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-xanh-green/50"
+          >
+            <option value="all">Mọi độ ưu tiên</option>
+            <option value="high">🔥 Cao (P5/P4)</option>
+            <option value="low">🧊 Thấp (P3-P1)</option>
+          </select>
+        </div>
       </div>
 
       {/* Alert Cards */}
