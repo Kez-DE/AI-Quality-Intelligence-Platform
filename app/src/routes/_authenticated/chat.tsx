@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, Send, Loader2, Bot, User as UserIcon } from "lucide-react";
+import { Sparkles, Send, Loader2, Bot, User as UserIcon, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch, useMe } from "@/lib/api";
 
@@ -31,6 +31,7 @@ function ChatPage() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const { data: me } = useMe();
   
@@ -108,16 +109,53 @@ function ChatPage() {
     }
   }
 
+  async function resetConversation() {
+    if (loading || resetting) return;
+    setResetting(true);
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) {
+        toast.error("Chưa đăng nhập");
+        return;
+      }
+      // Xoá toàn bộ lịch sử chat của user trong Supabase
+      const { error } = await supabase
+        .from("chat_messages")
+        .delete()
+        .eq("user_id", u.user.id);
+      if (error) throw error;
+
+      setMessages([]);
+      setInput("");
+      toast.success("Đã làm mới cuộc hội thoại");
+    } catch (err: any) {
+      toast.error(err.message ?? "Không thể làm mới cuộc hội thoại");
+    } finally {
+      setResetting(false);
+    }
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-7rem)]">
-      <div className="mb-4">
-        <h1 className="font-display text-3xl font-bold flex items-center gap-2">
-          <Sparkles className="h-6 w-6 text-xanh-green" />
-          {title}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {subtitle}
-        </p>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-3xl font-bold flex items-center gap-2">
+            <Sparkles className="h-6 w-6 text-xanh-green" />
+            {title}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {subtitle}
+          </p>
+        </div>
+        <button
+          onClick={resetConversation}
+          disabled={loading || resetting || messages.length === 0}
+          title="Làm mới cuộc hội thoại — xoá toàn bộ lịch sử chat"
+          className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-border bg-white text-sm font-medium text-muted-foreground hover:text-foreground hover:border-xanh-green/40 hover:bg-xanh-mint/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+        >
+          {resetting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+          Làm mới
+        </button>
       </div>
 
       <div className="flex-1 rounded-2xl border border-border bg-white shadow-[var(--shadow-card)] overflow-hidden flex flex-col">
