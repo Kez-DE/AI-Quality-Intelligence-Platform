@@ -29,7 +29,9 @@ pipeline/logs/
 
 # AI logs — tracked structure, ignored content
 .ai-log/*.jsonl
+.ai-log/.last-submit
 .ai-log/archive/
+.ai-logs/
 
 # Model backups (local only, không commit)
 pipeline/ml/_backup_*/
