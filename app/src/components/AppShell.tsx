@@ -112,6 +112,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               unreadCount={unreadCount}
               onMarkRead={markAsRead}
               onMarkAllRead={markAllRead}
+              align="left"
             />
           </div>
         )}

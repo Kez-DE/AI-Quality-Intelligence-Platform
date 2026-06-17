@@ -15,6 +15,7 @@ interface NotificationPanelProps {
   unreadCount: number;
   onMarkRead: (id: string) => void;
   onMarkAllRead: () => void;
+  align?: "left" | "right";
 }
 
 function relativeTime(isoDate: string): string {
@@ -38,6 +39,7 @@ export default function NotificationPanel({
   unreadCount,
   onMarkRead,
   onMarkAllRead,
+  align = "right",
 }: NotificationPanelProps) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -73,7 +75,11 @@ export default function NotificationPanel({
 
       {/* Dropdown panel */}
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 rounded-2xl border border-border bg-popover text-popover-foreground shadow-[var(--shadow-card)] z-50 overflow-hidden">
+        <div
+          className={`absolute top-full mt-2 w-80 max-w-[calc(100vw-1.5rem)] rounded-2xl border border-border bg-popover text-popover-foreground shadow-[var(--shadow-card)] z-50 overflow-hidden ${
+            align === "left" ? "left-0" : "right-0"
+          }`}
+        >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <h3 className="font-display font-semibold text-sm text-xanh-deep">
