@@ -9,9 +9,8 @@ from typing import Literal, TypedDict
 from groq import Groq
 from openai import OpenAI
 
-from env_config import load_project_env, get_settings
+from env_config import get_settings
 
-load_project_env()
 settings = get_settings()
 
 MessageRole = Literal["system", "user", "assistant", "tool", "function"]

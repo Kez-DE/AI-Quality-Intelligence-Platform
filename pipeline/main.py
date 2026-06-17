@@ -20,9 +20,12 @@ class AssignTaskReq(BaseModel):
     due_at: Optional[str] = None
 
 import os
+import time
 from collections import Counter
 from datetime import datetime, timezone
 from threading import Lock
+
+START_TIME = time.time()
 from apscheduler.schedulers.background import BackgroundScheduler
 from contextlib import asynccontextmanager
 
@@ -389,7 +392,12 @@ def read_root():
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "message": "Backend service is running"}
+    return {
+        "status": "ok", 
+        "message": "Backend service is running",
+        "version": "1.0.0",
+        "uptime_seconds": int(time.time() - START_TIME)
+    }
 
 @app.get("/api/feedback/recent")
 def recent_feedback(
