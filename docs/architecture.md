@@ -16,10 +16,14 @@ Supabase là trục nối: pipeline Python **ghi** kết quả, frontend **đọ
 
 ## Module ownership để dễ fix bug
 
-Không tách thêm Railway service ở giai đoạn demo/free-trial. Hạ tầng vẫn giữ 2 service:
+Mặc định hạ tầng giữ 2 service để tiết kiệm quota:
 
 - `frontend` → build từ `app/Dockerfile`
 - `backend` → build từ `pipeline/Dockerfile`
+
+Khi cần demo thật ổn định hơn, có thể bật service thứ 3:
+
+- `backend-worker` → build từ `pipeline/Dockerfile.worker`, chạy `pipeline/worker.py`
 
 Code bên trong đã được tách theo module để khi lỗi thì sửa đúng phần:
 
@@ -41,7 +45,7 @@ app/src/
 └── lib/                  Shared frontend helpers/API client
 ```
 
-Với Railway free/trial, ưu tiên modular hóa code thay vì tách thêm service để tránh tăng runtime/quota. Khi demo thật cần uptime ổn định hơn, nâng Railway Hobby `$5` trước; chỉ tách thêm service nếu có worker/cron/ML job thật sự cần scale riêng.
+Với Railway free/trial, giữ `backend-worker` tắt nếu cần tiết kiệm runtime/quota. Khi demo thật cần uptime ổn định hơn, nâng Railway Hobby `$5` rồi bật `backend-worker` để scheduler/live stream/ticket workflow chạy riêng khỏi API.
 
 ## Luồng xử lý
 

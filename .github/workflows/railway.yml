@@ -22,6 +22,7 @@ on:
           - all
           - frontend
           - backend
+          - backend-worker
 
 concurrency:
   group: railway-${{ github.ref }}
@@ -34,6 +35,7 @@ jobs:
     outputs:
       frontend: ${{ steps.detect.outputs.frontend }}
       backend: ${{ steps.detect.outputs.backend }}
+      backend_worker: ${{ steps.detect.outputs.backend_worker }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -48,18 +50,23 @@ jobs:
 
           frontend=false
           backend=false
+          backend_worker=false
 
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             case "${{ inputs.target }}" in
               all)
                 frontend=true
                 backend=true
+                backend_worker=true
                 ;;
               frontend)
                 frontend=true
                 ;;
               backend)
                 backend=true
+                ;;
+              backend-worker)
+                backend_worker=true
                 ;;
             esac
           else
@@ -78,10 +85,15 @@ jobs:
             if echo "$changed_files" | grep -Eq '^(pipeline/|data/|railway\.json$|\.env\.example$|\.github/workflows/railway\.yml$)'; then
               backend=true
             fi
+
+            if [[ "${{ vars.RAILWAY_DEPLOY_BACKEND_WORKER || 'false' }}" == "true" ]] && echo "$changed_files" | grep -Eq '^(pipeline/|data/|railway\.json$|\.env\.example$|\.github/workflows/railway\.yml$)'; then
+              backend_worker=true
+            fi
           fi
 
           echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
           echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "backend_worker=$backend_worker" >> "$GITHUB_OUTPUT"
 
   deploy-frontend:
     name: Deploy frontend
@@ -140,3 +152,32 @@ jobs:
       - name: Deploy backend to Railway
         shell: bash
         run: '"$RAILWAY_CLI" up --ci --service backend --environment "$RAILWAY_ENVIRONMENT" --project "$RAILWAY_PROJECT_ID"'
+
+  deploy-backend-worker:
+    name: Deploy backend worker
+    needs: changes
+    if: needs.changes.outputs.backend_worker == 'true'
+    runs-on: self-hosted
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+      RAILWAY_ENVIRONMENT: ${{ vars.RAILWAY_ENVIRONMENT || 'production' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Railway CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          railway_cli_dir="$RUNNER_TEMP/railway-cli"
+          mkdir -p "$railway_cli_dir"
+          npm install --prefix "$railway_cli_dir" @railway/cli
+          railway_bin="$railway_cli_dir/node_modules/.bin/railway"
+          echo "$(dirname "$railway_bin")" >> "$GITHUB_PATH"
+          echo "RAILWAY_CLI=$railway_bin" >> "$GITHUB_ENV"
+          "$railway_bin" --version
+
+      - name: Deploy backend worker to Railway
+        shell: bash
+        run: '"$RAILWAY_CLI" up --ci --service backend-worker --environment "$RAILWAY_ENVIRONMENT" --project "$RAILWAY_PROJECT_ID"'
