@@ -65,8 +65,9 @@ const TEAM_CONFIG: Record<
 };
 
 function getTeamConfig(team: string) {
+  const normalizedTeam = String(team || "");
   for (const key of Object.keys(TEAM_CONFIG)) {
-    if (team.toLowerCase().includes(key.toLowerCase())) return TEAM_CONFIG[key];
+    if (normalizedTeam.toLowerCase().includes(key.toLowerCase())) return TEAM_CONFIG[key];
   }
   return TEAM_CONFIG["Vận Hành"];
 }
@@ -160,7 +161,7 @@ function AlertsPage() {
     // 1. Lọc theo Team
     if (activeTab !== "Tất cả") {
       const { assigned_team } = parseDescription(a.description ?? "");
-      if (!assigned_team.toLowerCase().includes(activeTab.toLowerCase())) return false;
+      if (!String(assigned_team || "").toLowerCase().includes(String(activeTab || "").toLowerCase())) return false;
     }
     // 2. Lọc theo Severity
     if (severityFilter === "high") {

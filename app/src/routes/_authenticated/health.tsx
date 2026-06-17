@@ -223,16 +223,16 @@ function HealthDashboard() {
             <div className="space-y-3 font-mono text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Provider:</span>
-                <span>{agentStatus.provider}</span>
+                <span>{agentStatus.provider || "unknown"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Model:</span>
-                <span>{agentStatus.model}</span>
+                <span>{agentStatus.model || "unknown"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Agent Available:</span>
                 <span className={`font-bold ${agentStatus.status === "available" ? "text-green-600" : "text-red-600"}`}>
-                  {agentStatus.status.toUpperCase()}
+                  {String(agentStatus.status || "unknown").toUpperCase()}
                 </span>
               </div>
             </div>
