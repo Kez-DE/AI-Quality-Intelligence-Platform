@@ -101,6 +101,70 @@ Hoặc trigger thủ công: vào service → **Deployments** → **Trigger Deplo
 
 ---
 
+## CI/CD bằng GitHub Actions
+
+Repo đã có workflow: `.github/workflows/railway.yml`.
+
+Workflow này chạy khi push lên branch `main`:
+
+- Sửa `app/**` → deploy Railway service `frontend`
+- Sửa `pipeline/**` hoặc `data/**` → deploy Railway service `backend`
+- Sửa `.env.example`, `railway.json`, hoặc workflow deploy → deploy cả service liên quan
+- Có thể chạy thủ công trong tab **Actions** → **Deploy to Railway** → chọn `all`, `frontend`, hoặc `backend`
+
+### Bước 1: Tạo Railway token
+
+Trong Railway:
+
+1. Vào project `c2-app-116`
+2. Mở **Settings** → **Tokens**
+3. Tạo project token
+4. Copy token để đưa vào GitHub Secret
+
+### Bước 2: Lấy Railway Project ID
+
+Trong Railway project, Project ID thường nằm trong Settings hoặc URL project. Nếu đã cài Railway CLI local:
+
+```bash
+railway status
+```
+
+Copy `Project ID`.
+
+### Bước 3: Thêm GitHub Secrets/Variables
+
+Vào GitHub repo → **Settings** → **Secrets and variables** → **Actions**.
+
+Thêm **Repository secrets**:
+
+```env
+RAILWAY_TOKEN=your_railway_project_token
+RAILWAY_PROJECT_ID=your_railway_project_id
+```
+
+Tuỳ chọn thêm **Repository variable** nếu environment Railway không phải `production`:
+
+```env
+RAILWAY_ENVIRONMENT=production
+```
+
+### Bước 4: Kiểm tra tên service
+
+Workflow đang deploy tới 2 Railway service:
+
+```txt
+frontend
+backend
+```
+
+Nếu tên service trên Railway khác, sửa lại `--service frontend` hoặc `--service backend` trong `.github/workflows/railway.yml`.
+
+### Lưu ý env vars
+
+GitHub Actions chỉ trigger deploy code. Các biến runtime như `OPENROUTER_API_KEY`, `LLM_PROVIDER`, `VITE_SUPABASE_URL`, `VITE_BACKEND_API_URL` vẫn phải cấu hình trong **Railway Variables** của từng service.
+
+---
+
 ## Test local với Docker Compose
 
 Trước khi push lên Railway, test local:
