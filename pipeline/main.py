@@ -75,7 +75,15 @@ def read_root():
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "message": "Backend service is running"}
+    from pathlib import Path
+    from core.paths import DEFAULT_DATA_FILE
+    data_exists = Path(DEFAULT_DATA_FILE).exists()
+    return {
+        "status": "ok",
+        "message": "Backend service is running",
+        "data_file": DEFAULT_DATA_FILE,
+        "data_file_exists": data_exists,
+    }
 
 @app.get("/api/feedback/recent")
 def recent_feedback(
