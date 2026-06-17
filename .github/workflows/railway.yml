@@ -22,6 +22,10 @@ on:
           - all
           - frontend
           - backend
+          - backend-worker
+          - ingest-worker
+          - ml-worker
+          - agent-worker
 
 concurrency:
   group: railway-${{ github.ref }}
@@ -34,9 +38,13 @@ jobs:
     outputs:
       frontend: ${{ steps.detect.outputs.frontend }}
       backend: ${{ steps.detect.outputs.backend }}
+      backend_worker: ${{ steps.detect.outputs.backend_worker }}
+      ingest_worker: ${{ steps.detect.outputs.ingest_worker }}
+      ml_worker: ${{ steps.detect.outputs.ml_worker }}
+      agent_worker: ${{ steps.detect.outputs.agent_worker }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -48,18 +56,38 @@ jobs:
 
           frontend=false
           backend=false
+          backend_worker=false
+          ingest_worker=false
+          ml_worker=false
+          agent_worker=false
 
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             case "${{ inputs.target }}" in
               all)
                 frontend=true
                 backend=true
+                backend_worker=true
+                ingest_worker=true
+                ml_worker=true
+                agent_worker=true
                 ;;
               frontend)
                 frontend=true
                 ;;
               backend)
                 backend=true
+                ;;
+              backend-worker)
+                backend_worker=true
+                ;;
+              ingest-worker)
+                ingest_worker=true
+                ;;
+              ml-worker)
+                ml_worker=true
+                ;;
+              agent-worker)
+                agent_worker=true
                 ;;
             esac
           else
@@ -75,13 +103,22 @@ jobs:
               frontend=true
             fi
 
+            # Backend + all workers share the same source (pipeline/ + data/).
             if echo "$changed_files" | grep -Eq '^(pipeline/|data/|railway\.json$|\.env\.example$|\.github/workflows/railway\.yml$)'; then
               backend=true
+              backend_worker=true
+              ingest_worker=true
+              ml_worker=true
+              agent_worker=true
             fi
           fi
 
           echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
           echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "backend_worker=$backend_worker" >> "$GITHUB_OUTPUT"
+          echo "ingest_worker=$ingest_worker" >> "$GITHUB_OUTPUT"
+          echo "ml_worker=$ml_worker" >> "$GITHUB_OUTPUT"
+          echo "agent_worker=$agent_worker" >> "$GITHUB_OUTPUT"
 
   deploy-frontend:
     name: Deploy frontend
@@ -94,13 +131,23 @@ jobs:
       RAILWAY_ENVIRONMENT: ${{ vars.RAILWAY_ENVIRONMENT || 'production' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Railway CLI
-        run: npm install -g @railway/cli
+        shell: bash
+        run: |
+          set -euo pipefail
+          railway_cli_dir="$RUNNER_TEMP/railway-cli"
+          mkdir -p "$railway_cli_dir"
+          npm install --prefix "$railway_cli_dir" @railway/cli
+          railway_bin="$railway_cli_dir/node_modules/.bin/railway"
+          echo "$(dirname "$railway_bin")" >> "$GITHUB_PATH"
+          echo "RAILWAY_CLI=$railway_bin" >> "$GITHUB_ENV"
+          "$railway_bin" --version
 
       - name: Deploy frontend to Railway
-        run: railway up --ci --service frontend --environment "$RAILWAY_ENVIRONMENT" --project "$RAILWAY_PROJECT_ID"
+        shell: bash
+        run: '"$RAILWAY_CLI" up --ci --service frontend --environment "$RAILWAY_ENVIRONMENT" --project "$RAILWAY_PROJECT_ID"'
 
   deploy-backend:
     name: Deploy backend
@@ -113,10 +160,136 @@ jobs:
       RAILWAY_ENVIRONMENT: ${{ vars.RAILWAY_ENVIRONMENT || 'production' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Railway CLI
-        run: npm install -g @railway/cli
+        shell: bash
+        run: |
+          set -euo pipefail
+          railway_cli_dir="$RUNNER_TEMP/railway-cli"
+          mkdir -p "$railway_cli_dir"
+          npm install --prefix "$railway_cli_dir" @railway/cli
+          railway_bin="$railway_cli_dir/node_modules/.bin/railway"
+          echo "$(dirname "$railway_bin")" >> "$GITHUB_PATH"
+          echo "RAILWAY_CLI=$railway_bin" >> "$GITHUB_ENV"
+          "$railway_bin" --version
 
       - name: Deploy backend to Railway
-        run: railway up --ci --service backend --environment "$RAILWAY_ENVIRONMENT" --project "$RAILWAY_PROJECT_ID"
+        shell: bash
+        run: '"$RAILWAY_CLI" up --ci --service backend --environment "$RAILWAY_ENVIRONMENT" --project "$RAILWAY_PROJECT_ID"'
+
+  deploy-backend-worker:
+    name: Deploy backend worker
+    needs: changes
+    if: needs.changes.outputs.backend_worker == 'true'
+    runs-on: self-hosted
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+      RAILWAY_ENVIRONMENT: ${{ vars.RAILWAY_ENVIRONMENT || 'production' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Railway CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          railway_cli_dir="$RUNNER_TEMP/railway-cli"
+          mkdir -p "$railway_cli_dir"
+          npm install --prefix "$railway_cli_dir" @railway/cli
+          railway_bin="$railway_cli_dir/node_modules/.bin/railway"
+          echo "$(dirname "$railway_bin")" >> "$GITHUB_PATH"
+          echo "RAILWAY_CLI=$railway_bin" >> "$GITHUB_ENV"
+          "$railway_bin" --version
+
+      - name: Deploy backend worker to Railway
+        shell: bash
+        run: '"$RAILWAY_CLI" up --ci --service backend-worker --environment "$RAILWAY_ENVIRONMENT" --project "$RAILWAY_PROJECT_ID"'
+
+  deploy-ingest-worker:
+    name: Deploy ingest worker
+    needs: changes
+    if: needs.changes.outputs.ingest_worker == 'true'
+    runs-on: self-hosted
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+      RAILWAY_ENVIRONMENT: ${{ vars.RAILWAY_ENVIRONMENT || 'production' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Railway CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          railway_cli_dir="$RUNNER_TEMP/railway-cli"
+          mkdir -p "$railway_cli_dir"
+          npm install --prefix "$railway_cli_dir" @railway/cli
+          railway_bin="$railway_cli_dir/node_modules/.bin/railway"
+          echo "$(dirname "$railway_bin")" >> "$GITHUB_PATH"
+          echo "RAILWAY_CLI=$railway_bin" >> "$GITHUB_ENV"
+          "$railway_bin" --version
+
+      - name: Deploy ingest worker to Railway
+        shell: bash
+        run: '"$RAILWAY_CLI" up --ci --service ingest-worker --environment "$RAILWAY_ENVIRONMENT" --project "$RAILWAY_PROJECT_ID"'
+
+  deploy-ml-worker:
+    name: Deploy ML worker
+    needs: changes
+    if: needs.changes.outputs.ml_worker == 'true'
+    runs-on: self-hosted
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+      RAILWAY_ENVIRONMENT: ${{ vars.RAILWAY_ENVIRONMENT || 'production' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Railway CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          railway_cli_dir="$RUNNER_TEMP/railway-cli"
+          mkdir -p "$railway_cli_dir"
+          npm install --prefix "$railway_cli_dir" @railway/cli
+          railway_bin="$railway_cli_dir/node_modules/.bin/railway"
+          echo "$(dirname "$railway_bin")" >> "$GITHUB_PATH"
+          echo "RAILWAY_CLI=$railway_bin" >> "$GITHUB_ENV"
+          "$railway_bin" --version
+
+      - name: Deploy ML worker to Railway
+        shell: bash
+        run: '"$RAILWAY_CLI" up --ci --service ml-worker --environment "$RAILWAY_ENVIRONMENT" --project "$RAILWAY_PROJECT_ID"'
+
+  deploy-agent-worker:
+    name: Deploy agent worker
+    needs: changes
+    if: needs.changes.outputs.agent_worker == 'true'
+    runs-on: self-hosted
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+      RAILWAY_ENVIRONMENT: ${{ vars.RAILWAY_ENVIRONMENT || 'production' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Railway CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          railway_cli_dir="$RUNNER_TEMP/railway-cli"
+          mkdir -p "$railway_cli_dir"
+          npm install --prefix "$railway_cli_dir" @railway/cli
+          railway_bin="$railway_cli_dir/node_modules/.bin/railway"
+          echo "$(dirname "$railway_bin")" >> "$GITHUB_PATH"
+          echo "RAILWAY_CLI=$railway_bin" >> "$GITHUB_ENV"
+          "$railway_bin" --version
+
+      - name: Deploy agent worker to Railway
+        shell: bash
+        run: '"$RAILWAY_CLI" up --ci --service agent-worker --environment "$RAILWAY_ENVIRONMENT" --project "$RAILWAY_PROJECT_ID"'

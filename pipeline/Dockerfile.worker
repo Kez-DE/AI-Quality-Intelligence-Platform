@@ -1,0 +1,17 @@
+# Backend worker — APScheduler jobs for live stream + ticket workflow
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY pipeline/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY pipeline/ .
+COPY data/ /app/data/
+COPY .env.example /app/.env.example
+
+CMD ["python", "worker.py"]

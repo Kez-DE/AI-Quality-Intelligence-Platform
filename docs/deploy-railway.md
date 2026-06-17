@@ -4,13 +4,16 @@
 
 ```
 Railway Project (C2-App-116)
-├── backend   (Empty Service → pipeline/Dockerfile)
-├── frontend  (Empty Service → app/Dockerfile)
+├── backend          (Empty Service → pipeline/Dockerfile)
+├── backend-worker   (Empty Service → pipeline/Dockerfile.worker, optional cho demo ổn định)
+├── frontend         (Empty Service → app/Dockerfile)
 └── Supabase  (external, giữ nguyên cloud)
 ```
 
-Tách 2 service riêng biệt để:
+Tối thiểu giữ 2 service `frontend` + `backend`. Khi cần demo thật ổn định, thêm `backend-worker` để tách background jobs khỏi API:
+
 - Scale độc lập (backend nặng ML, frontend nhẹ)
+- Worker chạy live stream / ticket workflow riêng, tránh API bị nghẽn bởi scheduler
 - Deploy riêng khi chỉ sửa 1 phần
 - Dễ debug logs từng service
 
@@ -45,11 +48,54 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...
 LLM_PROVIDER=auto
 OPENROUTER_API_KEY=sk-or-...
 PORT=8000
+
+# Khi đã dùng backend-worker, tắt background loop trong API để tránh chạy trùng.
+LIVE_STREAM_ENABLED=false
+AUTO_TICKET_WORKFLOW_ENABLED=false
 ```
 
 ---
 
-## Bước 3: Tạo Frontend service
+## Bước 3: Tạo Backend Worker service (khuyến nghị cho demo thật)
+
+1. Click **+ New** → **Empty Service**
+2. Đặt tên service: `backend-worker`
+3. Tab **Settings**:
+   - **Source**: cùng GitHub repo
+   - **Build**: chọn **Dockerfile**
+   - **Dockerfile Path**: `pipeline/Dockerfile.worker`
+   - **Watch Paths**: `pipeline/**`, `data/**`
+4. Worker không cần public domain.
+5. Tab **Variables** → thêm env vars giống backend, cộng thêm:
+
+```env
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+LLM_PROVIDER=auto
+OPENROUTER_API_KEY=sk-or-...
+
+# Worker ownership
+AUTO_TICKET_WORKFLOW_ENABLED=true
+WORKER_TICKET_WORKFLOW_INTERVAL_SECONDS=5
+
+# Chỉ bật khi muốn worker tự bơm data demo.
+LIVE_STREAM_ENABLED=false
+LIVE_STREAM_BATCH_SIZE=150
+LIVE_STREAM_INTERVAL_SECONDS=10
+LIVE_STREAM_LOOP=false
+LIVE_STREAM_RESET_ON_START=false
+AUTO_TICKET_ENABLED=true
+AUTO_TICKET_EVERY_BATCHES=10
+AUTO_TICKET_MAX_FEEDBACK=1000
+AUTO_TICKET_MAX_SPIKES=1
+```
+
+Nếu còn ở free/trial và cần tiết kiệm quota, có thể chưa tạo `backend-worker`; code vẫn chạy với 2 service như trước.
+
+---
+
+## Bước 4: Tạo Frontend service
 
 1. Click **+ New** → **Empty Service**
 2. Đặt tên service: `frontend`
@@ -82,18 +128,19 @@ Lưu ý: `VITE_BACKEND_API_URL` phải là URL public của backend (browser g�
 
 ---
 
-## Bước 4: Kết nối 2 service
+## Bước 5: Kết nối service
 
 Railway cung cấp internal networking miễn phí giữa các service cùng project:
 
 - Frontend gọi backend qua: `http://backend.railway.internal:8000`
 - Browser gọi backend qua: `https://backend-xxx.up.railway.app`
+- Worker gọi Supabase/OpenRouter trực tiếp qua env vars, không cần domain.
 
 Vào backend **Settings** → **Networking** → đảm bảo **Private Networking** đang bật.
 
 ---
 
-## Bước 5: Deploy
+## Bước 6: Deploy
 
 Push code lên GitHub. Railway auto-deploy khi detect thay đổi trong watch paths.
 
@@ -109,8 +156,9 @@ Workflow này chạy khi push lên branch `main`:
 
 - Sửa `app/**` → deploy Railway service `frontend`
 - Sửa `pipeline/**` hoặc `data/**` → deploy Railway service `backend`
+- Nếu bật `RAILWAY_DEPLOY_BACKEND_WORKER=true`, sửa `pipeline/**` hoặc `data/**` cũng deploy `backend-worker`
 - Sửa `.env.example`, `railway.json`, hoặc workflow deploy → deploy cả service liên quan
-- Có thể chạy thủ công trong tab **Actions** → **Deploy to Railway** → chọn `all`, `frontend`, hoặc `backend`
+- Có thể chạy thủ công trong tab **Actions** → **Deploy to Railway** → chọn `all`, `frontend`, `backend`, hoặc `backend-worker`
 
 ### Bước 1: Tạo Railway token
 
@@ -148,16 +196,23 @@ Tuỳ chọn thêm **Repository variable** nếu environment Railway không ph�
 RAILWAY_ENVIRONMENT=production
 ```
 
+Nếu đã tạo service `backend-worker` và muốn deploy tự động theo push:
+
+```env
+RAILWAY_DEPLOY_BACKEND_WORKER=true
+```
+
 ### Bước 4: Kiểm tra tên service
 
-Workflow đang deploy tới 2 Railway service:
+Workflow đang deploy tới các Railway service:
 
 ```txt
 frontend
 backend
+backend-worker
 ```
 
-Nếu tên service trên Railway khác, sửa lại `--service frontend` hoặc `--service backend` trong `.github/workflows/railway.yml`.
+Nếu tên service trên Railway khác, sửa lại `--service ...` tương ứng trong `.github/workflows/railway.yml`.
 
 ### Lưu ý env vars
 

@@ -1,0 +1,27 @@
+# Backend workers — one image, role selected by WORKER_MODULE build arg.
+# Each Railway worker service sets WORKER_MODULE to its entrypoint:
+#   backend-worker → worker_ticket   (ticket workflow advancement)
+#   ingest-worker  → worker_ingest   (live stream ingest)
+#   ml-worker      → worker_ml        (risk scoring)
+#   agent-worker   → worker_agent     (multi-agent orchestrator)
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY pipeline/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY pipeline/ .
+COPY data/ /app/data/
+COPY .env.example /app/.env.example
+
+# Role selector — overridden per service by Railway (build arg + runtime env).
+ARG WORKER_MODULE=worker_ticket
+ENV WORKER_MODULE=${WORKER_MODULE}
+
+# shell form so ${WORKER_MODULE} expands at runtime
+CMD python ${WORKER_MODULE}.py

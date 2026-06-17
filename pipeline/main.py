@@ -41,14 +41,9 @@ feedback_rate_limit = RateLimiter(max_requests=10, window_seconds=3600, scope="f
 chat_rate_limit = RateLimiter(max_requests=20, window_seconds=3600, scope="agent_chat")
 chat_rate_limit_staff = RateLimiter(max_requests=100, window_seconds=3600, scope="agent_chat_staff")
 
-PIPELINE_DIR = os.path.dirname(__file__)
-PROJECT_ROOT = os.path.abspath(os.path.join(PIPELINE_DIR, ".."))
-DEFAULT_DATA_FILE = os.path.join(
-    PROJECT_ROOT,
-    "data",
-    "processed",
-    "seed_real_clean.json",
-)
+feedback_rate_limit = RateLimiter(max_requests=_s.rate_limit_feedback_guest, window_seconds=3600, scope="feedback_submit")
+chat_rate_limit = RateLimiter(max_requests=_s.rate_limit_chat_guest, window_seconds=3600, scope="agent_chat")
+chat_rate_limit_staff = RateLimiter(max_requests=_s.rate_limit_chat_staff, window_seconds=3600, scope="agent_chat_staff")
 
 scheduler: BackgroundScheduler | None = None
 live_stream_lock = Lock()
@@ -264,7 +259,12 @@ def get_live_stream_status():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global scheduler
+    # Web API keeps a scheduler ONLY for on-demand manual jobs (e.g.
+    # /api/live-stream/start). Recurring jobs (ticket workflow, auto live
+    # stream) run in their dedicated worker services — NOT here — to avoid
+    # double-scheduling when web + workers run against the same database.
     scheduler = BackgroundScheduler()
+    set_scheduler(scheduler)
     scheduler.start()
     scheduler.add_job(
         advance_ticket_workflow,
@@ -289,6 +289,7 @@ async def lifespan(app: FastAPI):
         )
     yield
     scheduler.shutdown()
+    set_scheduler(None)
 
 app = FastAPI(
     title="AI Quality Intelligence Platform API",
@@ -681,11 +682,6 @@ def agent_logs(limit: int = Query(default=50, ge=1, le=500), _: AuthUser = Depen
         lines = f.readlines()[-limit:]
     return {"status": "success", "data": [line.rstrip("\n") for line in lines]}
 
-GUEST_SYSTEM_PROMPT = """You are a customer support chatbot for the AI Quality Intelligence app.
-You can ONLY answer questions about how to use the app and how to submit feedback.
-Do NOT provide any internal data, analytics, metrics, or system information.
-If the user asks about anything else, politely redirect them to use the app's features or contact support."""
-
 @app.post("/api/agent/chat")
 def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
     # Rate limit all users, higher limit for staff/admin
@@ -707,6 +703,9 @@ def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
             result = chat_completion(normalized, temperature=0.4)
         except Exception as exc:
             raise HTTPException(status_code=502, detail=f"Agent model error: {str(exc)[:300]}") from exc
+        # OWASP LLM: mask PII from LLM output before returning to client
+        if isinstance(result.get("content"), str):
+            result["content"] = mask_pii(result["content"])
         return {"status": "success", "data": result}
 
     if not payload.messages:
@@ -723,6 +722,9 @@ def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
         result = run_chat_agent(normalized, temperature=0.4)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Agent model error: {str(exc)[:300]}") from exc
+    # OWASP LLM: mask PII from LLM output before returning to client
+    if isinstance(result.get("content"), str):
+        result["content"] = mask_pii(result["content"])
     return {"status": "success", "data": result}
 
 @app.post("/api/ingest-real-dataset")
@@ -1061,6 +1063,57 @@ def trigger_daily_report(
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Report generation error: {str(exc)[:300]}") from exc
     return {"status": "success", "data": result}
+
+@app.get("/api/health/services")
+def health_services(_: AuthUser = Depends(require_ops_staff)):
+    """System health check — trạng thái tất cả services + LLM providers (ops staff+)."""
+    from datetime import datetime, timezone
+
+    # DB connectivity
+    db_status = "ok"
+    db_error = None
+    try:
+        db = get_supabase()
+        db.table("feedback").select("id").limit(1).execute()
+    except Exception as exc:
+        db_status = "error"
+        db_error = str(exc)[:200]
+
+    # LLM provider status
+    agent_info = get_agent_status()
+    llm_configured = agent_info.get("configured", {})
+    active_provider = agent_info.get("provider", "unknown")
+    active_model = agent_info.get("model", "unknown")
+
+    # Worker status via ticket_workflow_state (only backend-worker reports state here)
+    workflow = dict(ticket_workflow_state)
+
+    # Live stream state
+    stream = get_live_stream_status()
+
+    # Rate limit settings (no counts — just config for visibility)
+    rate_limits = {
+        "chat_guest_per_hour": _s.rate_limit_chat_guest,
+        "chat_staff_per_hour": _s.rate_limit_chat_staff,
+        "feedback_guest_per_hour": _s.rate_limit_feedback_guest,
+    }
+
+    return {
+        "status": "success",
+        "data": {
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "database": {"status": db_status, "error": db_error},
+            "llm": {
+                "active_provider": active_provider,
+                "active_model": active_model,
+                "configured_providers": llm_configured,
+            },
+            "ticket_workflow": workflow,
+            "live_stream": stream,
+            "rate_limits": rate_limits,
+        },
+    }
+
 
 if __name__ == "__main__":
     import uvicorn

@@ -21,6 +21,7 @@ import {
   Headphones,
   Activity,
   User as UserIcon,
+  HeartPulse,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -51,7 +52,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { notifications, unreadCount, markAsRead, markAllRead } = useRealtimeNotifications();
   const { theme, toggleTheme } = useTheme();
 
-  const navItems = NAV.map(n => {
+  const navItems = NAV.filter(n => n.roles.includes(role as NavRole)).map(n => {
     if (n.to === "/chat" && role === "guest") {
       return { ...n, label: "Hỗ trợ CSKH" };
     }
