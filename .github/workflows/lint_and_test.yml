@@ -34,6 +34,6 @@ jobs:
 
     - name: Run Unit Tests
       run: |
-        python -m unittest discover pipeline/tests
+        python -m pytest pipeline/tests -q
       env:
         PYTHONUTF8: 1

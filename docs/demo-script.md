@@ -17,9 +17,11 @@ Mục tiêu: cho hội đồng thấy luồng khép kín từ review thô → ph
 **Phút 1–2 — Thu thập + tự gán nhãn.** Mở trang Phản hồi. Gõ một review (chỉ nhập nội dung + kênh + chọn khu vực từ dropdown — KHÔNG chọn cảm xúc/severity). Nhấn gửi → AI tự gán topic/sentiment/severity + confidence. Nhấn mạnh: người gửi không khai nhãn, máy phân tích.
 
 **Phút 2–3 — Streaming.** Bật live-stream 50 review/giây:
+
 ```bash
 curl -X POST "http://localhost:8000/api/live-stream/start?batch_size=50&interval_seconds=1&loop=false&auto_ticket=true" -H "Authorization: Bearer <admin_token>"
 ```
+
 Dashboard và danh sách phản hồi đổ dữ liệu liên tục theo thời gian thực (realtime, không reload).
 
 **Phút 3–4 — Spike → Alert → Ticket.** Khi vùng nào dồn P4/P5 vượt ngưỡng → spike detector bắt → LLM thật phân tích → sinh alert. Mở tab Alerts, click một alert đỏ: đọc root cause + action + phòng ban được giao (Safety/Vận hành/IT). Ticket tự chuyển trạng thái open→in_progress→resolved.
@@ -29,9 +31,11 @@ Dashboard và danh sách phản hồi đổ dữ liệu liên tục theo thời 
 **Phút 5–6 — Human-in-the-Loop.** Trong Review Queue, lấy một ca AI gán sai/không chắc. Bấm **Sửa nhãn** → chọn nhãn đúng → Lưu. Giải thích: nhãn sửa ghi vào `correction_logs` (audit + dữ liệu retrain), ca rời khỏi Queue. Hoặc bấm **Duyệt** nếu nhãn AI đã đúng.
 
 **Phút 6–7 — Multi-agent (tuỳ chọn).** Mở insight theo phòng ban:
+
 ```bash
 curl "http://localhost:8000/api/insights/departments/Safety?with_analysis=true" -H "Authorization: Bearer <admin_token>"
 ```
+
 Mỗi phòng ban có một "trợ lý AI" tổng hợp vấn đề cốt lõi + đề xuất hành động.
 
 ## Câu hỏi hay gặp
