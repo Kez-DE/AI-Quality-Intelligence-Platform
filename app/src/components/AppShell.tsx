@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useMe, ROLE_LABELS } from "@/lib/api";
 import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
+import { useTheme } from "@/hooks/useTheme";
 import NotificationPanel from "@/components/NotificationPanel";
 import {
   Bell,
@@ -13,8 +14,12 @@ import {
   Kanban,
   LogOut,
   MessageSquare,
+  Moon,
   Shield,
   Sparkles,
+  Sun,
+  Headphones,
+  Activity,
   User as UserIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -24,13 +29,17 @@ const NAV = [
   { to: "/alerts", label: "Ticket Triage 🔴", icon: Bell },
   { to: "/tasks", label: "Task Manager", icon: Kanban },
   { to: "/feedback", label: "Phản hồi", icon: MessageSquare },
+  { to: "/support", label: "CSKH Support", icon: Headphones },
   { to: "/reports", label: "Báo cáo AI", icon: FileText },
   { to: "/insights", label: "Phân tích phòng ban", icon: Building2 },
   { to: "/chat", label: "AI Chat", icon: Sparkles },
 ];
 
 // Link chỉ hiện với admin.
-const ADMIN_NAV = { to: "/admin", label: "Quản lý người dùng", icon: Shield } as const;
+const ADMIN_NAV = [
+  { to: "/admin", label: "Quản lý người dùng", icon: Shield },
+  { to: "/health", label: "System Health", icon: Activity },
+];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -40,6 +49,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const role = me?.role || "guest";
   const { notifications, unreadCount, markAsRead, markAllRead } = useRealtimeNotifications();
+  const { theme, toggleTheme } = useTheme();
 
   const navItems = NAV.map(n => {
     if (n.to === "/chat" && role === "guest") {
@@ -47,13 +57,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
     return n;
   }).filter(n => {
-    if (role === "guest" && ["/alerts", "/insights", "/tasks", "/reports"].includes(n.to)) return false;
+    if (role === "guest" && ["/alerts", "/insights", "/tasks", "/reports", "/support"].includes(n.to)) return false;
     if (role === "staff" && ["/reports"].includes(n.to)) return false;
     return true;
   });
 
   if (role === "admin") {
-    navItems.push(ADMIN_NAV);
+    navItems.push(...ADMIN_NAV);
   }
 
   useEffect(() => {
@@ -129,6 +139,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <div className="text-[10px] font-semibold text-xanh-deep">{ROLE_LABELS[me.role]}</div>
               )}
             </div>
+            <button
+              onClick={toggleTheme}
+              className="ml-auto h-7 w-7 rounded-full flex items-center justify-center bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              title="Toggle Dark Mode"
+            >
+              {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+            </button>
           </div>
           <button
             onClick={signOut}
@@ -161,7 +178,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 onMarkAllRead={markAllRead}
               />
             )}
-            <button onClick={signOut} className="text-xs font-mono text-muted-foreground">
+            <button
+              onClick={toggleTheme}
+              className="text-xs font-mono text-muted-foreground ml-1"
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+            <button onClick={signOut} className="text-xs font-mono text-muted-foreground ml-1">
               <LogOut className="h-4 w-4" />
             </button>
           </div>

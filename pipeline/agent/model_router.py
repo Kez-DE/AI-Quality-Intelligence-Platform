@@ -13,12 +13,15 @@ from env_config import load_project_env
 
 load_project_env()
 
-MessageRole = Literal["system", "user", "assistant"]
+MessageRole = Literal["system", "user", "assistant", "tool", "function"]
 
 
-class ChatMessage(TypedDict):
+class ChatMessage(TypedDict, total=False):
     role: MessageRole
     content: str
+    tool_calls: list[dict]
+    tool_call_id: str
+    name: str
 
 
 PIPELINE_DIR = Path(__file__).resolve().parent.parent
@@ -131,25 +134,28 @@ def parse_json_response(content: str | None) -> dict:
         return json.loads(content[start : end + 1])
 
 
-def mock_chat(messages: list[ChatMessage]) -> str:
-    last_user = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
-    return (
-        "Mình đang chạy ở chế độ mock vì chưa có provider key hợp lệ. "
-        f"Câu hỏi gần nhất: {last_user[:180]}"
-    )
+def mock_chat(messages: list[ChatMessage]) -> dict:
+    last_user = next((m.get("content", "") for m in reversed(messages) if m.get("role") == "user"), "")
+    return {
+        "role": "assistant",
+        "content": (
+            "Mình đang chạy ở chế độ mock vì chưa có provider key hợp lệ. "
+            f"Câu hỏi gần nhất: {last_user[:180]}"
+        )
+    }
 
 
 def gemini_messages_to_prompt(messages: list[ChatMessage]) -> str:
     lines = []
     for message in messages:
-        role = message["role"]
-        content = message["content"]
+        role = message.get("role", "")
+        content = message.get("content", "")
         lines.append(f"{role.upper()}:\n{content}")
     return "\n\n".join(lines)
 
 
-def _extract_chat_content(response: object) -> str:
-    """Extract content from OpenAI-compatible responses with clear errors."""
+def _extract_chat_response(response: object) -> tuple[dict, dict]:
+    """Extract message dict and usage from OpenAI-compatible responses."""
     choices = getattr(response, "choices", None)
     if not choices:
         raise ValueError("LLM response has no choices")
@@ -159,9 +165,26 @@ def _extract_chat_content(response: object) -> str:
         raise ValueError("LLM response choice has no message")
 
     content = getattr(message, "content", None)
-    if content is None:
-        raise ValueError("LLM response message has no content")
+    tool_calls = getattr(message, "tool_calls", None)
+    
+    msg_dict = {"role": "assistant"}
+    if content is not None:
+        msg_dict["content"] = content
         
+    if tool_calls is not None:
+        tc_list = []
+        for tc in tool_calls:
+            tc_dict = {
+                "id": getattr(tc, "id", ""),
+                "type": getattr(tc, "type", "function"),
+                "function": {
+                    "name": getattr(tc.function, "name", ""),
+                    "arguments": getattr(tc.function, "arguments", ""),
+                }
+            }
+            tc_list.append(tc_dict)
+        msg_dict["tool_calls"] = tc_list
+
     usage = getattr(response, "usage", None)
     token_usage = {}
     if usage:
@@ -171,7 +194,7 @@ def _extract_chat_content(response: object) -> str:
             "total_tokens": getattr(usage, "total_tokens", 0),
         }
         
-    return str(content), token_usage
+    return msg_dict, token_usage
 
 
 def _call_provider(
@@ -179,8 +202,10 @@ def _call_provider(
     messages: list[ChatMessage],
     response_json: bool,
     temperature: float,
-) -> tuple[str, dict]:
-    """Gọi đúng 1 provider, trả về content và usage. Raise nếu provider lỗi (để caller failover)."""
+    tools: list[dict] | None = None,
+    tool_choice: str | dict | None = None,
+) -> tuple[dict, dict]:
+    """Gọi đúng 1 provider, trả về message dict và usage. Raise nếu provider lỗi (để caller failover)."""
     model_name = provider_model(provider)
 
     if provider == "mock":
@@ -204,16 +229,26 @@ def _call_provider(
                 kwargs = {"messages": messages, "model": model_name, "temperature": temperature}
                 if response_json:
                     kwargs["response_format"] = {"type": "json_object"}
+                if tools:
+                    kwargs["tools"] = tools
+                if tool_choice:
+                    kwargs["tool_choice"] = tool_choice
                 response = client.chat.completions.create(**kwargs)
-                return _extract_chat_content(response)
+                return _extract_chat_response(response)
             if provider == "openai":
                 client = OpenAI(api_key=OPENAI_API_KEY)
                 kwargs = {"messages": messages, "model": model_name, "temperature": temperature}
                 if response_json:
                     kwargs["response_format"] = {"type": "json_object"}
+                if tools:
+                    kwargs["tools"] = tools
+                if tool_choice:
+                    kwargs["tool_choice"] = tool_choice
                 response = client.chat.completions.create(**kwargs)
-                return _extract_chat_content(response)
+                return _extract_chat_response(response)
             if provider == "gemini":
+                if tools:
+                    raise ValueError("Tools not supported for raw Gemini API fallback in this router")
                 with warnings.catch_warnings():
                     warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
                     import google.generativeai as genai
@@ -227,14 +262,18 @@ def _call_provider(
                 content = getattr(response, "text", None)
                 if content is None:
                     raise ValueError("Gemini response has no text")
-                return str(content), {}
+                return {"role": "assistant", "content": str(content)}, {}
             # groq
             client = Groq(api_key=GROQ_API_KEY)
             kwargs = {"messages": messages, "model": model_name, "temperature": temperature}
             if response_json:
                 kwargs["response_format"] = {"type": "json_object"}
+            if tools:
+                kwargs["tools"] = tools
+            if tool_choice:
+                kwargs["tool_choice"] = tool_choice
             response = client.chat.completions.create(**kwargs)
-            return _extract_chat_content(response)
+            return _extract_chat_response(response)
             
         except Exception as e:
             error_str = str(e).lower()
@@ -250,6 +289,8 @@ def chat_completion(
     *,
     response_json: bool = False,
     temperature: float = 0.3,
+    tools: list[dict] | None = None,
+    tool_choice: str | dict | None = None,
 ) -> dict:
     """Gọi LLM với failover: thử lần lượt các provider có key trong .env.
 
@@ -258,14 +299,14 @@ def chat_completion(
     nên thực tế gần như không bao giờ raise — cùng lắm trả lời mock).
     """
     chain = resolve_provider_chain()
-    first_user = next((m["content"] for m in messages if m["role"] == "user"), "")
+    first_user = next((m.get("content", "") for m in messages if m.get("role") == "user"), "")
     last_exc: Exception | None = None
 
     for provider in chain:
         model_name = provider_model(provider)
         started = perf_counter()
         try:
-            content, usage = _call_provider(provider, messages, response_json, temperature)
+            msg_dict, usage = _call_provider(provider, messages, response_json, temperature, tools, tool_choice)
             latency_ms = round((perf_counter() - started) * 1000)
             write_agent_log({
                 "event": "chat_completion",
@@ -277,7 +318,8 @@ def chat_completion(
                 "usage": usage,
             })
             return {
-                "content": content,
+                "message": msg_dict,
+                "content": msg_dict.get("content", ""),
                 "provider": provider,
                 "model": model_name,
                 "latency_ms": latency_ms,

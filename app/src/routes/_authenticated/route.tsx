@@ -25,7 +25,7 @@ export const Route = createFileRoute("/_authenticated")({
     }
 
     // Route Guard for Guests
-    const restrictedForGuests = ["/alerts", "/insights", "/admin", "/tasks", "/reports"];
+    const restrictedForGuests = ["/alerts", "/insights", "/admin", "/tasks", "/reports", "/support", "/health"];
     if (role === "guest" && restrictedForGuests.some(p => location.pathname.startsWith(p))) {
       throw redirect({ to: "/dashboard" });
     }

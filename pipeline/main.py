@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 
 from ingest import ingest_dataset
 from ingest import get_supabase
-from agent import chat_completion, get_agent_status
+from agent import chat_completion, get_agent_status, run_chat_agent
 from auth_guard import AuthUser, get_current_user, require_admin, require_ops_staff
 from users_admin import router as users_router, audit_router
 from rate_limiter import RateLimiter, check_rate_limit
@@ -296,7 +296,8 @@ def whoami(user: AuthUser = Depends(get_current_user)):
 
 AGENT_SYSTEM_PROMPT = """Bạn là AI Assistant cho Quality Operation Cockpit của xanhSM.
 Nhiệm vụ: phân tích feedback, alerts, spike, vận hành khu vực, chất lượng tài xế/xe/app/thanh toán/an toàn.
-Trả lời tiếng Việt, ngắn gọn, có cấu trúc, ưu tiên hành động cụ thể và mức độ ưu tiên P0/P1/P2."""
+Trả lời tiếng Việt, ngắn gọn, có cấu trúc, ưu tiên hành động cụ thể và mức độ ưu tiên P0/P1/P2.
+Bạn có thể dùng tools để lấy dữ liệu mới nhất (danh sách khu vực nóng, SLA ticket tồn đọng, task ưu tiên) và luôn trích dẫn nguồn ID (alert_id, task_id) khi trả lời."""
 
 def build_agent_data_context() -> str:
     try:
@@ -400,15 +401,21 @@ def list_tasks(
     priority: str | None = Query(default=None),
     area: str | None = Query(default=None),
     overdue: bool = Query(default=False),
-    _: AuthUser = Depends(require_ops_staff),
+    user: AuthUser = Depends(require_ops_staff),
 ):
     try:
         db = get_supabase()
         q = db.table("tasks").select("*")
+        
+        # Team Isolation: Manager chỉ xem của team mình
+        effective_team = team
+        if user.role == "manager" and user.department:
+            effective_team = user.department
+            
         if status:
             q = q.eq("status", status)
-        if team:
-            q = q.eq("assigned_team", team)
+        if effective_team:
+            q = q.eq("assigned_team", effective_team)
         if priority:
             q = q.eq("priority", priority)
         if area:
@@ -475,13 +482,62 @@ def assign_task(task_id: str, payload: dict, _: AuthUser = Depends(require_ops_s
         raise HTTPException(status_code=404, detail="Task not found")
     return {"status": "success", "data": data[0]}
 
+@app.get("/api/leaderboard")
+def get_leaderboard(_: AuthUser = Depends(require_ops_staff)):
+    """Lấy dữ liệu Bảng Xếp hạng (Leaderboard) các Team.
+    Chỉ xét các Task đã hoàn thành (resolved).
+    """
+    try:
+        db = get_supabase()
+        data = db.table("tasks") \
+            .select("assigned_team, created_at, updated_at") \
+            .eq("status", "resolved") \
+            .execute() \
+            .data or []
+        
+        team_stats: dict[str, dict] = {}
+        for row in data:
+            team = row.get("assigned_team") or "Unknown"
+            if team not in team_stats:
+                team_stats[team] = {"resolved_count": 0, "total_time_seconds": 0}
+            
+            created = parse_timestamp(row.get("created_at"))
+            updated = parse_timestamp(row.get("updated_at"))
+            
+            team_stats[team]["resolved_count"] += 1
+            if created and updated and updated > created:
+                team_stats[team]["total_time_seconds"] += (updated - created).total_seconds()
+        
+        result = []
+        for team, stats in team_stats.items():
+            count = stats["resolved_count"]
+            avg_seconds = stats["total_time_seconds"] / count if count > 0 else 0
+            result.append({
+                "team": team,
+                "resolved_count": count,
+                "avg_resolution_hours": round(avg_seconds / 3600, 2)
+            })
+            
+        # Sắp xếp theo số task hoàn thành (giảm dần), rồi đến tốc độ xử lý (nhanh nhất)
+        result.sort(key=lambda x: (-x["resolved_count"], x["avg_resolution_hours"]))
+        
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Cannot calculate leaderboard: {str(exc)[:300]}") from exc
+    return {"status": "success", "data": result}
+
 @app.get("/api/reports")
-def list_reports(team: str | None = None, limit: int = Query(default=50, ge=1, le=100), _: AuthUser = Depends(require_ops_staff)):
+def list_reports(team: str | None = None, limit: int = Query(default=50, ge=1, le=100), user: AuthUser = Depends(require_ops_staff)):
     try:
         db = get_supabase()
         q = db.table("department_reports").select("*")
-        if team:
-            q = q.eq("team", team)
+        
+        # Team Isolation: Manager chỉ xem của team mình
+        effective_team = team
+        if user.role == "manager" and user.department:
+            effective_team = user.department
+            
+        if effective_team:
+            q = q.eq("team", effective_team)
         data = q.order("created_at", desc=True).limit(limit).execute().data or []
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot read reports: {str(exc)[:300]}") from exc
@@ -602,7 +658,7 @@ def agent_chat(payload: dict, user: AuthUser = Depends(get_current_user)):
             raise HTTPException(status_code=400, detail="Invalid chat message")
         normalized.append({"role": role, "content": content[:8000]})
     try:
-        result = chat_completion(normalized, temperature=0.4)
+        result = run_chat_agent(normalized, temperature=0.4)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Agent model error: {str(exc)[:300]}") from exc
     return {"status": "success", "data": result}
@@ -726,6 +782,8 @@ def submit_feedback(payload: dict, user: AuthUser = Depends(get_current_user)):
     text = (payload.get("text") or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="Thiếu nội dung phản hồi (text)")
+    if len(text) > 2000:
+        raise HTTPException(status_code=400, detail="Nội dung phản hồi quá dài (tối đa 2000 ký tự)")
 
     channel = (payload.get("channel") or "app").strip() or "app"
     from regions import region_code

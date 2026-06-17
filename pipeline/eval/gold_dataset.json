@@ -1,0 +1,66 @@
+[
+    {
+        "text": "Tài xế đi ẩu vượt đèn đỏ suýt đâm người ở Cầu Giấy, thái độ lại còn lồi lõm khi bị nhắc",
+        "expected": {
+            "topic": "Safety",
+            "sentiment": "negative",
+            "severity": "P5"
+        }
+    },
+    {
+        "text": "App lag quá, cứ ấn xác nhận cuốc là bị văng ra ngoài, mãi không đặt được xe",
+        "expected": {
+            "topic": "App Issue",
+            "sentiment": "negative",
+            "severity": "P3"
+        }
+    },
+    {
+        "text": "Chuyến đi tuyệt vời, bác tài DRV-123 thân thiện, xe rất sạch sẽ thơm tho",
+        "expected": {
+            "topic": "Driver Behavior",
+            "sentiment": "positive",
+            "severity": "P1"
+        }
+    },
+    {
+        "text": "Tại sao hôm nay giá xe lại cao thế? Bình thường đi từ đây lên sân bay mất có 250k mà nay báo 400k",
+        "expected": {
+            "topic": "Pricing",
+            "sentiment": "negative",
+            "severity": "P3"
+        }
+    },
+    {
+        "text": "Mình để quên túi đồ trên xe, gọi tổng đài nhờ hỗ trợ mà chờ mãi không ai nhấc máy",
+        "expected": {
+            "topic": "Delay",
+            "sentiment": "negative",
+            "severity": "P3"
+        }
+    },
+    {
+        "text": "Xe điện đi rất êm, tài xế lái cẩn thận. Rất ưng ý với dịch vụ của Xanh",
+        "expected": {
+            "topic": "Driver Behavior",
+            "sentiment": "positive",
+            "severity": "P1"
+        }
+    },
+    {
+        "text": "Hôm nay mình đặt xe thanh toán thẻ tín dụng nhưng app báo lỗi rồi lại trừ tiền 2 lần",
+        "expected": {
+            "topic": "Payment",
+            "sentiment": "negative",
+            "severity": "P4"
+        }
+    },
+    {
+        "text": "Điều hoà trên xe hôm nay bị hỏng hay sao mà nóng phát ngất",
+        "expected": {
+            "topic": "Other",
+            "sentiment": "negative",
+            "severity": "P3"
+        }
+    }
+]
