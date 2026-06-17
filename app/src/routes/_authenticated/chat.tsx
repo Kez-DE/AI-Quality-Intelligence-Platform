@@ -1,17 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useServerFn } from "@tanstack/react-start";
-import { chatWithAI } from "@/lib/ai.functions";
-import { Sparkles, Send, Loader2, Bot, User as UserIcon } from "lucide-react";
+import { Sparkles, Send, Loader2, Bot, User as UserIcon, Trash2, Edit2 } from "lucide-react";
 import { toast } from "sonner";
-import { useMe } from "@/lib/api";
+import { apiFetch, useMe } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/chat")({
   component: ChatPage,
 });
 
 type Msg = { id?: string; role: "user" | "assistant"; content: string };
+
+type AgentChatResponse = {
+  data?: {
+    content?: string;
+    provider?: string;
+    model?: string;
+    latency_ms?: number;
+  };
+};
 
 const SUGGESTED = [
   "Tổng hợp 5 vấn đề chất lượng dịch vụ nổi cộm tuần qua",
@@ -25,7 +32,6 @@ function ChatPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const chatFn = useServerFn(chatWithAI);
   const { data: me } = useMe();
   
   const isGuest = me?.role === "guest";
@@ -54,6 +60,43 @@ function ChatPage() {
       });
   }, []);
 
+  async function clearChat() {
+    try {
+      setMessages([]);
+      const { data: u } = await supabase.auth.getUser();
+      if (u?.user) {
+        const { error } = await supabase.from("chat_messages").delete().eq("user_id", u.user.id);
+        if (error) throw error;
+      }
+      toast.success("Đã xóa cuộc trò chuyện, bạn có thể bắt đầu lại!");
+    } catch (err: any) {
+      toast.error("Lỗi khi xóa: " + (err.message || "Không xác định"));
+    }
+  }
+
+  async function editMessage(index: number) {
+    if (loading) return;
+    const targetMsg = messages[index];
+    if (targetMsg.role !== "user") return;
+    
+    const newMessages = messages.slice(0, index);
+    const textToEdit = targetMsg.content;
+    
+    setInput(textToEdit);
+    setMessages(newMessages);
+    
+    const { data: u } = await supabase.auth.getUser();
+    if (u?.user) {
+      const idsToDelete = messages.slice(index).map(m => m.id).filter(Boolean);
+      if (idsToDelete.length > 0) {
+        // @ts-ignore
+        supabase.from("chat_messages").delete().in("id", idsToDelete).then(({error}) => {
+          if (error) console.error("Edit delete error:", error);
+        });
+      }
+    }
+  }
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
@@ -81,14 +124,20 @@ function ChatPage() {
       .insert({ user_id: u.user.id, role: "user", content });
 
     try {
-      const reply = await chatFn({
-        data: { messages: next.map(({ role, content }) => ({ role, content })) },
+      const reply = await apiFetch<AgentChatResponse>("/api/agent/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          messages: next.map(({ role, content }) => ({ role, content })),
+        }),
       });
-      const aMsg: Msg = { role: "assistant", content: reply.content };
+      const replyContent = reply.data?.content?.trim();
+      if (!replyContent) throw new Error("AI không trả về nội dung.");
+
+      const aMsg: Msg = { role: "assistant", content: replyContent };
       setMessages((m) => [...m, aMsg]);
       await supabase
         .from("chat_messages")
-        .insert({ user_id: u.user.id, role: "assistant", content: reply.content });
+        .insert({ user_id: u.user.id, role: "assistant", content: replyContent });
     } catch (err: any) {
       toast.error(err.message ?? "AI lỗi");
     } finally {
@@ -98,14 +147,23 @@ function ChatPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-7rem)]">
-      <div className="mb-4">
-        <h1 className="font-display text-3xl font-bold flex items-center gap-2">
-          <Sparkles className="h-6 w-6 text-xanh-green" />
-          {title}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {subtitle}
-        </p>
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h1 className="font-display text-3xl font-bold flex items-center gap-2">
+            <Sparkles className="h-6 w-6 text-xanh-green" />
+            {title}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {subtitle}
+          </p>
+        </div>
+        <button
+          onClick={clearChat}
+          type="button"
+          className="relative z-50 cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-white border border-border rounded-lg text-sm font-semibold text-xanh-deep hover:bg-muted transition-colors shadow-sm active:scale-95"
+        >
+          <Trash2 className="h-4 w-4" /> Cuộc trò chuyện mới
+        </button>
       </div>
 
       <div className="flex-1 rounded-2xl border border-border bg-white shadow-[var(--shadow-card)] overflow-hidden flex flex-col">
@@ -139,7 +197,13 @@ function ChatPage() {
           )}
 
           {messages.map((m, i) => (
-            <Bubble key={m.id ?? i} role={m.role} content={m.content} />
+            <Bubble 
+              key={m.id ?? i} 
+              role={m.role} 
+              content={m.content} 
+              isLast={i === messages.length - 1 || (m.role === "user" && i === messages.length - 2)}
+              onEdit={m.role === "user" ? () => editMessage(i) : undefined}
+            />
           ))}
 
           {loading && (
@@ -180,10 +244,14 @@ function Bubble({
   role,
   content,
   loading,
+  isLast,
+  onEdit,
 }: {
   role: "user" | "assistant";
   content: string;
   loading?: boolean;
+  isLast?: boolean;
+  onEdit?: () => void;
 }) {
   const isUser = role === "user";
   return (
@@ -197,7 +265,7 @@ function Bubble({
         {isUser ? <UserIcon className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
       </div>
       <div
-        className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap leading-relaxed ${
+        className={`relative group max-w-[80%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap leading-relaxed ${
           isUser
             ? "bg-xanh-deep text-white rounded-tr-sm"
             : "bg-xanh-mint/40 text-foreground border border-xanh-green/20 rounded-tl-sm"
@@ -209,6 +277,16 @@ function Bubble({
           </span>
         ) : (
           content
+        )}
+        
+        {isUser && onEdit && isLast && (
+          <button
+            onClick={onEdit}
+            title="Sửa câu hỏi"
+            className="absolute -left-10 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-muted text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-xanh-deep"
+          >
+            <Edit2 className="h-4 w-4" />
+          </button>
         )}
       </div>
     </div>

@@ -1,0 +1,122 @@
+name: Deploy to Railway
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "app/**"
+      - "pipeline/**"
+      - "data/**"
+      - ".env.example"
+      - "railway.json"
+      - ".github/workflows/railway.yml"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Railway service to deploy"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - frontend
+          - backend
+
+concurrency:
+  group: railway-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect changed services
+    runs-on: self-hosted
+    outputs:
+      frontend: ${{ steps.detect.outputs.frontend }}
+      backend: ${{ steps.detect.outputs.backend }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect service changes
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          frontend=false
+          backend=false
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            case "${{ inputs.target }}" in
+              all)
+                frontend=true
+                backend=true
+                ;;
+              frontend)
+                frontend=true
+                ;;
+              backend)
+                backend=true
+                ;;
+            esac
+          else
+            base="${{ github.event.before }}"
+            if [[ -z "$base" || "$base" == "0000000000000000000000000000000000000000" ]]; then
+              base="$(git rev-list --max-parents=0 HEAD)"
+            fi
+
+            changed_files="$(git diff --name-only "$base" "${{ github.sha }}")"
+            echo "$changed_files"
+
+            if echo "$changed_files" | grep -Eq '^(app/|railway\.json$|\.env\.example$|\.github/workflows/railway\.yml$)'; then
+              frontend=true
+            fi
+
+            if echo "$changed_files" | grep -Eq '^(pipeline/|data/|railway\.json$|\.env\.example$|\.github/workflows/railway\.yml$)'; then
+              backend=true
+            fi
+          fi
+
+          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+
+  deploy-frontend:
+    name: Deploy frontend
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: self-hosted
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+      RAILWAY_ENVIRONMENT: ${{ vars.RAILWAY_ENVIRONMENT || 'production' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy frontend to Railway
+        run: railway up --ci --service frontend --environment "$RAILWAY_ENVIRONMENT" --project "$RAILWAY_PROJECT_ID"
+
+  deploy-backend:
+    name: Deploy backend
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: self-hosted
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+      RAILWAY_ENVIRONMENT: ${{ vars.RAILWAY_ENVIRONMENT || 'production' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy backend to Railway
+        run: railway up --ci --service backend --environment "$RAILWAY_ENVIRONMENT" --project "$RAILWAY_PROJECT_ID"

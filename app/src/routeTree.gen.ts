@@ -13,11 +13,11 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/tasks'
+import { Route as AuthenticatedSupportRouteImport } from './routes/_authenticated/support'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
-import { Route as AuthenticatedFeedbackUploadRouteImport } from './routes/_authenticated/feedback-upload'
+import { Route as AuthenticatedHealthRouteImport } from './routes/_authenticated/health'
 import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticated/feedback'
-import { Route as AuthenticatedDepartmentInsightsRouteImport } from './routes/_authenticated/department-insights'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedAlertsRouteImport } from './routes/_authenticated/alerts'
@@ -43,6 +43,11 @@ const AuthenticatedTasksRoute = AuthenticatedTasksRouteImport.update({
   path: '/tasks',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSupportRoute = AuthenticatedSupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -53,23 +58,16 @@ const AuthenticatedInsightsRoute = AuthenticatedInsightsRouteImport.update({
   path: '/insights',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedFeedbackUploadRoute =
-  AuthenticatedFeedbackUploadRouteImport.update({
-    id: '/feedback-upload',
-    path: '/feedback-upload',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
+const AuthenticatedHealthRoute = AuthenticatedHealthRouteImport.update({
+  id: '/health',
+  path: '/health',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedFeedbackRoute = AuthenticatedFeedbackRouteImport.update({
   id: '/feedback',
   path: '/feedback',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedDepartmentInsightsRoute =
-  AuthenticatedDepartmentInsightsRouteImport.update({
-    id: '/department-insights',
-    path: '/department-insights',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -104,11 +102,11 @@ export interface FileRoutesByFullPath {
   '/alerts': typeof AuthenticatedAlertsRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/department-insights': typeof AuthenticatedDepartmentInsightsRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
-  '/feedback-upload': typeof AuthenticatedFeedbackUploadRoute
+  '/health': typeof AuthenticatedHealthRoute
   '/insights': typeof AuthenticatedInsightsRoute
   '/reports': typeof AuthenticatedReportsRoute
+  '/support': typeof AuthenticatedSupportRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/feedback/upload': typeof AuthenticatedFeedbackUploadRoute
 }
@@ -119,11 +117,11 @@ export interface FileRoutesByTo {
   '/alerts': typeof AuthenticatedAlertsRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/department-insights': typeof AuthenticatedDepartmentInsightsRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
-  '/feedback-upload': typeof AuthenticatedFeedbackUploadRoute
+  '/health': typeof AuthenticatedHealthRoute
   '/insights': typeof AuthenticatedInsightsRoute
   '/reports': typeof AuthenticatedReportsRoute
+  '/support': typeof AuthenticatedSupportRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/feedback/upload': typeof AuthenticatedFeedbackUploadRoute
 }
@@ -136,11 +134,11 @@ export interface FileRoutesById {
   '/_authenticated/alerts': typeof AuthenticatedAlertsRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
-  '/_authenticated/department-insights': typeof AuthenticatedDepartmentInsightsRoute
   '/_authenticated/feedback': typeof AuthenticatedFeedbackRoute
-  '/_authenticated/feedback-upload': typeof AuthenticatedFeedbackUploadRoute
+  '/_authenticated/health': typeof AuthenticatedHealthRoute
   '/_authenticated/insights': typeof AuthenticatedInsightsRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
+  '/_authenticated/support': typeof AuthenticatedSupportRoute
   '/_authenticated/tasks': typeof AuthenticatedTasksRoute
   '/_authenticated/feedback_/upload': typeof AuthenticatedFeedbackUploadRoute
 }
@@ -153,11 +151,11 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/chat'
     | '/dashboard'
-    | '/department-insights'
     | '/feedback'
-    | '/feedback-upload'
+    | '/health'
     | '/insights'
     | '/reports'
+    | '/support'
     | '/tasks'
     | '/feedback/upload'
   fileRoutesByTo: FileRoutesByTo
@@ -168,11 +166,11 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/chat'
     | '/dashboard'
-    | '/department-insights'
     | '/feedback'
-    | '/feedback-upload'
+    | '/health'
     | '/insights'
     | '/reports'
+    | '/support'
     | '/tasks'
     | '/feedback/upload'
   id:
@@ -184,11 +182,11 @@ export interface FileRouteTypes {
     | '/_authenticated/alerts'
     | '/_authenticated/chat'
     | '/_authenticated/dashboard'
-    | '/_authenticated/department-insights'
     | '/_authenticated/feedback'
-    | '/_authenticated/feedback-upload'
+    | '/_authenticated/health'
     | '/_authenticated/insights'
     | '/_authenticated/reports'
+    | '/_authenticated/support'
     | '/_authenticated/tasks'
     | '/_authenticated/feedback_/upload'
   fileRoutesById: FileRoutesById
@@ -229,6 +227,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTasksRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/support': {
+      id: '/_authenticated/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof AuthenticatedSupportRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/reports': {
       id: '/_authenticated/reports'
       path: '/reports'
@@ -243,11 +248,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInsightsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/feedback-upload': {
-      id: '/_authenticated/feedback-upload'
-      path: '/feedback-upload'
-      fullPath: '/feedback-upload'
-      preLoaderRoute: typeof AuthenticatedFeedbackUploadRouteImport
+    '/_authenticated/health': {
+      id: '/_authenticated/health'
+      path: '/health'
+      fullPath: '/health'
+      preLoaderRoute: typeof AuthenticatedHealthRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/feedback': {
@@ -255,13 +260,6 @@ declare module '@tanstack/react-router' {
       path: '/feedback'
       fullPath: '/feedback'
       preLoaderRoute: typeof AuthenticatedFeedbackRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/department-insights': {
-      id: '/_authenticated/department-insights'
-      path: '/department-insights'
-      fullPath: '/department-insights'
-      preLoaderRoute: typeof AuthenticatedDepartmentInsightsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dashboard': {
@@ -307,11 +305,11 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAlertsRoute: typeof AuthenticatedAlertsRoute
   AuthenticatedChatRoute: typeof AuthenticatedChatRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
-  AuthenticatedDepartmentInsightsRoute: typeof AuthenticatedDepartmentInsightsRoute
   AuthenticatedFeedbackRoute: typeof AuthenticatedFeedbackRoute
-  AuthenticatedFeedbackUploadRoute: typeof AuthenticatedFeedbackUploadRoute
+  AuthenticatedHealthRoute: typeof AuthenticatedHealthRoute
   AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
+  AuthenticatedSupportRoute: typeof AuthenticatedSupportRoute
   AuthenticatedTasksRoute: typeof AuthenticatedTasksRoute
   AuthenticatedFeedbackUploadRoute: typeof AuthenticatedFeedbackUploadRoute
 }
@@ -321,11 +319,11 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAlertsRoute: AuthenticatedAlertsRoute,
   AuthenticatedChatRoute: AuthenticatedChatRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
-  AuthenticatedDepartmentInsightsRoute: AuthenticatedDepartmentInsightsRoute,
   AuthenticatedFeedbackRoute: AuthenticatedFeedbackRoute,
-  AuthenticatedFeedbackUploadRoute: AuthenticatedFeedbackUploadRoute,
+  AuthenticatedHealthRoute: AuthenticatedHealthRoute,
   AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
+  AuthenticatedSupportRoute: AuthenticatedSupportRoute,
   AuthenticatedTasksRoute: AuthenticatedTasksRoute,
   AuthenticatedFeedbackUploadRoute: AuthenticatedFeedbackUploadRoute,
 }

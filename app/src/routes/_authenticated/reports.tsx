@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Loader2, FileText, Calendar, Building2 } from "lucide-react";
+import { Loader2, FileText, Calendar, Building2, CheckCircle2, ClipboardCopy, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { useMe } from "@/lib/api";
+import { useMe, apiFetch } from "@/lib/api";
 import ReactMarkdown from 'react-markdown';
 
 export const Route = createFileRoute("/_authenticated/reports")({
@@ -15,9 +15,11 @@ type Report = {
   report_date: string;
   content: string;
   created_at: string;
+  approved: boolean;
+  approved_by: string | null;
+  approved_at: string | null;
 };
 
-const API_BASE = import.meta.env.VITE_BACKEND_API_URL ?? "http://127.0.0.1:8000";
 
 function ReportsPage() {
   const [reports, setReports] = useState<Report[]>([]);
@@ -33,10 +35,8 @@ function ReportsPage() {
     }
     setLoading(true);
     try {
-      const url = team && team !== "All" ? `${API_BASE}/api/reports?team=${team}` : `${API_BASE}/api/reports`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Failed to fetch reports");
-      const json = await res.json();
+      const path = team && team !== "All" ? `/api/reports?team=${team}` : "/api/reports";
+      const json = await apiFetch<{ data: Report[] }>(path);
       setReports(json.data || []);
     } catch (err) {
       toast.error("Không thể tải danh sách báo cáo.");
@@ -55,6 +55,31 @@ function ReportsPage() {
         Chỉ Trưởng phòng hoặc Admin mới xem được trang Báo Cáo.
       </div>
     );
+  }
+
+  async function handleApprove(reportId: string) {
+    try {
+      await apiFetch(`/api/reports/${reportId}/approve`, { method: "PATCH" });
+      setReports((prev) =>
+        prev.map((r) =>
+          r.id === reportId
+            ? { ...r, approved: true, approved_by: me?.email ?? null, approved_at: new Date().toISOString() }
+            : r
+        )
+      );
+      toast.success("Đã duyệt báo cáo thành công.");
+    } catch {
+      toast.error("Không thể duyệt báo cáo.");
+    }
+  }
+
+  async function handleCopyMarkdown(content: string) {
+    try {
+      await navigator.clipboard.writeText(content);
+      toast.success("Đã copy Markdown");
+    } catch {
+      toast.error("Không thể copy nội dung.");
+    }
   }
 
   const teams = ["All", "Safety", "CSKH", "IT", "Vận hành", "Pricing", "Marketing"];
@@ -115,6 +140,15 @@ function ReportsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {report.approved ? (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3" /> Đã duyệt
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-100 text-yellow-700">
+                      Chờ duyệt
+                    </span>
+                  )}
                   {hasCritical && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700">🚨 CRITICAL</span>}
                   {hasWarning && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">⚠️ WARNING</span>}
                   <span className="text-[10px] text-muted-foreground font-mono bg-muted px-2 py-1 rounded">

@@ -5,20 +5,27 @@ import AppShell from "@/components/AppShell";
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async ({ location }) => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) throw redirect({ to: "/auth" });
+
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) throw redirect({ to: "/auth" });
     
-    // Fetch user role
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', data.user.id)
-      .single();
+    let role = "guest";
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
+        .maybeSingle();
       
-    const role = profile?.role || "guest";
+      role = profile?.role || "guest";
+    } catch {
+      role = "guest";
+    }
 
     // Route Guard for Guests
-    const restrictedForGuests = ["/alerts", "/insights", "/admin"];
+    const restrictedForGuests = ["/alerts", "/insights", "/admin", "/tasks", "/reports", "/support", "/health"];
     if (role === "guest" && restrictedForGuests.some(p => location.pathname.startsWith(p))) {
       throw redirect({ to: "/dashboard" });
     }

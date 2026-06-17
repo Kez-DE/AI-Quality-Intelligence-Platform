@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from supabase import create_client, Client
 from llm_agent import analyze_spike
 from env_config import get_supabase_config, has_supabase_admin_key
+from webhook_notifier import send_webhook_alert
 
 SUPABASE_URL, SUPABASE_KEY = get_supabase_config()
 
@@ -98,6 +99,14 @@ def detect_spikes(hours: int = 1, max_feedback: int = 1000, max_spikes: int = 3,
                 db.table("alerts").insert(alert_payload).execute()
                 alerts_created += 1
                 print(f"✅ Đã tạo Alert khẩn cấp cho {area} thành công!")
+                
+                if alert_payload["severity"] == "P5":
+                    send_webhook_alert(
+                        title=alert_payload["title"],
+                        severity=alert_payload["severity"],
+                        area=alert_payload["area"],
+                        description=alert_payload["description"]
+                    )
             except Exception as e:
                 print(f"❌ Lỗi khi lưu Alert vào DB: {e}")
         else:

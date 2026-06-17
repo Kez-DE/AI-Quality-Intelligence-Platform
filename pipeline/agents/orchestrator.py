@@ -19,7 +19,7 @@ from agents.insight_agent import generate_department_insights
 from agents.analyst_agent import analyze_root_cause
 from agents.alert_agent import classify_alert_severity, process_area_alerts
 from agents.router_agent import route_ticket
-from agents.ticket_agent import create_or_update_ticket, TicketInput, get_overdue_tickets
+from agents.ticket_agent import create_or_update_ticket, get_overdue_tickets
 from agents.task_agent import cluster_alerts_into_tasks
 from llm_agent import analyze_spike
 

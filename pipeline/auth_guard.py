@@ -27,6 +27,7 @@ class AuthUser:
     id: str
     email: str | None
     role: str
+    department: str | None
 
 
 def _extract_token(authorization: str | None) -> str:
@@ -52,12 +53,13 @@ def get_current_user(authorization: str | None = Header(default=None)) -> AuthUs
     if not user or not getattr(user, "id", None):
         raise HTTPException(status_code=401, detail="Không xác thực được người dùng")
 
-    profile = db.table("profiles").select("role,email").eq("id", user.id).limit(1).execute().data or []
+    profile = db.table("profiles").select("role,email,department").eq("id", user.id).limit(1).execute().data or []
     role = (profile[0].get("role") if profile else None) or "guest"
+    department = profile[0].get("department") if profile else None
     if role not in VALID_ROLES:
         role = "guest"
 
-    return AuthUser(id=user.id, email=getattr(user, "email", None), role=role)
+    return AuthUser(id=user.id, email=getattr(user, "email", None), role=role, department=department)
 
 
 def require_ops_staff(user: AuthUser = Depends(get_current_user)) -> AuthUser:

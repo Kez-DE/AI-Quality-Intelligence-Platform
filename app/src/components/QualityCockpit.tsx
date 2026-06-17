@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database as DatabaseSchema } from "@/integrations/supabase/types";
-import { useMe } from "@/lib/api";
+import { apiFetch, useMe } from "@/lib/api";
 import {
   Activity,
   AlertTriangle,
@@ -242,11 +242,73 @@ function CockpitView() {
         <aside className="lg:col-span-4 space-y-6">
           {!isGuest && <AlertsPanel />}
           <Heatmap />
+          {!isGuest && <TeamLeaderboard />}
           {!isGuest && <DriverWatchlist />}
         </aside>
       </div>
       {!isGuest && <TicketBoard />}
     </div>
+  );
+}
+
+function TeamLeaderboard() {
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    async function loadData() {
+      try {
+        const json = await apiFetch<{data: any[]}>("/api/leaderboard");
+        if (active && json.data) {
+          setLeaderboard(json.data.slice(0, 5)); // Top 5
+        }
+      } catch (e) {
+        // silently fail
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    loadData();
+    return () => { active = false; };
+  }, []);
+
+  return (
+    <Card>
+      <SectionHeader
+        icon={Target}
+        title="Team Leaderboard"
+        subtitle="Top resolution speed & tasks done"
+      />
+      <div className="px-3 pb-3 space-y-2">
+        {loading ? (
+          <div className="p-4 text-center text-xs text-muted-foreground">Loading...</div>
+        ) : leaderboard.length === 0 ? (
+          <div className="p-4 text-center text-xs text-muted-foreground">Chưa có dữ liệu.</div>
+        ) : (
+          leaderboard.map((t, idx) => (
+            <div
+              key={t.team}
+              className="flex items-center justify-between rounded-xl border border-border bg-white p-3"
+            >
+              <div className="flex items-center gap-3">
+                <span className={`font-bold text-sm ${idx === 0 ? "text-yellow-600" : idx === 1 ? "text-gray-400" : idx === 2 ? "text-orange-600" : "text-muted-foreground"}`}>
+                  #{idx + 1}
+                </span>
+                <div>
+                  <div className="font-mono text-sm font-semibold text-xanh-deep">{t.team}</div>
+                  <div className="text-[11px] text-muted-foreground">{t.resolved_count} ticket</div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm font-semibold text-xanh-green">{t.avg_resolution_hours}h</div>
+                <div className="text-[11px] text-muted-foreground font-mono">avg time</div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </Card>
   );
 }
 
@@ -438,7 +500,6 @@ function LiveFeed() {
   const [newFeedIds, setNewFeedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [streamStatus, setStreamStatus] = useState<"connecting" | "live" | "error">("connecting");
-  const apiBase = import.meta.env.VITE_BACKEND_API_URL ?? "http://127.0.0.1:8000";
   const seenIdsRef = useRef<Set<string>>(new Set());
   const initializedRef = useRef(false);
 
@@ -448,11 +509,9 @@ function LiveFeed() {
 
     async function loadFeed() {
       try {
-        const res = await fetch(`${apiBase}/api/feedback/recent?limit=8`);
-        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-        const json = (await res.json()) as {
+        const json = await apiFetch<{
           data?: DatabaseSchema["public"]["Tables"]["feedback"]["Row"][];
-        };
+        }>("/api/feedback/recent?limit=8");
         if (!active) return;
         const rows = json.data ?? [];
         const incomingIds = rows.map((row) => row.id);
@@ -482,7 +541,7 @@ function LiveFeed() {
       window.clearInterval(polling);
       if (clearNewIdsTimer) window.clearTimeout(clearNewIdsTimer);
     };
-  }, [apiBase]);
+  }, []);
 
   return (
     <Card>
@@ -507,12 +566,16 @@ function LiveFeed() {
       />
       <div className="divide-y divide-border">
         {loading ? (
-          <div className="px-5 py-8 text-center text-sm text-muted-foreground">
-            Đang tải phản hồi...
+          <div className="px-5 py-12 flex flex-col items-center justify-center text-center text-muted-foreground">
+            <Radio className="h-8 w-8 animate-pulse text-xanh-green mb-3" />
+            <p className="font-semibold text-foreground">Đang tải phản hồi...</p>
+            <p className="text-sm mt-1">Kết nối với hệ thống Supabase...</p>
           </div>
         ) : feed.length === 0 ? (
-          <div className="px-5 py-8 text-center text-sm text-muted-foreground">
-            Chưa có phản hồi. Thêm dữ liệu tại trang Phản hồi để xem luồng trực tiếp.
+          <div className="px-5 py-12 flex flex-col items-center justify-center text-center text-muted-foreground">
+            <Radio className="h-8 w-8 text-muted-foreground/50 mb-3" />
+            <p className="font-semibold text-foreground">Chưa có luồng dữ liệu</p>
+            <p className="text-sm mt-1 max-w-sm">Chưa có phản hồi. Thêm dữ liệu tại trang Phản hồi để xem luồng trực tiếp.</p>
           </div>
         ) : (
           feed.map((f) => (

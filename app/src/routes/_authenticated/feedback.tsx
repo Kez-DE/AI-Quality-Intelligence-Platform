@@ -1,11 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Loader2, MessageSquarePlus, MapPin, Tag, AlertCircle, Pencil, ShieldAlert, CheckCircle2, Inbox } from "lucide-react";
 import { toast } from "sonner";
 import { AREAS, regionLabel } from "@/lib/regions";
 import { sentimentLabel, topicLabel, channelLabel, severityLabel } from "@/lib/labels";
-import { useMe } from "@/lib/api";
+import { apiFetch, useMe } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/feedback")({
   component: FeedbackPage,
@@ -34,7 +33,6 @@ const REFRESH_INTERVAL_MS = 5000;
 const TOPIC_OPTIONS = ["Safety", "Driver Behavior", "App Issue", "Payment", "Pricing", "Delay", "Other"];
 const SENTIMENT_OPTIONS = ["negative", "neutral", "positive"];
 const SEVERITY_OPTIONS = ["P1", "P2", "P3", "P4", "P5"];
-const API_BASE = import.meta.env.VITE_BACKEND_API_URL ?? "http://127.0.0.1:8000";
 
 function severityNum(sev: string | null): number {
   if (!sev) return 0;
@@ -79,29 +77,13 @@ function FeedbackPage() {
     });
   }
 
-  async function authToken(): Promise<string | null> {
-    const { data: s } = await supabase.auth.getSession();
-    return s.session?.access_token ?? null;
-  }
-
   async function saveCorrection(id: string) {
     setSavingId(id);
-    const token = await authToken();
-    if (!token) {
-      toast.error("Chưa đăng nhập");
-      setSavingId(null);
-      return;
-    }
     try {
-      const res = await fetch(`${API_BASE}/api/feedback/${id}/label`, {
+      await apiFetch(`/api/feedback/${id}/label`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(editDraft),
       });
-      if (!res.ok) {
-        const detail = await res.text();
-        throw new Error(`${res.status}: ${detail.slice(0, 200)}`);
-      }
       toast.success("Đã cập nhật nhãn — ghi vào correction log");
       setEditingId(null);
       load();
@@ -114,22 +96,11 @@ function FeedbackPage() {
 
   async function reviewAction(id: string) {
     setActingId(id);
-    const token = await authToken();
-    if (!token) {
-      toast.error("Chưa đăng nhập");
-      setActingId(null);
-      return;
-    }
     try {
-      const res = await fetch(`${API_BASE}/api/feedback/${id}/review`, {
+      await apiFetch(`/api/feedback/${id}/review`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ action: "approve" }),
       });
-      if (!res.ok) {
-        const detail = await res.text();
-        throw new Error(`${res.status}: ${detail.slice(0, 200)}`);
-      }
       toast.success("Đã duyệt — chuyển khỏi hàng đợi");
       load();
     } catch (err) {
@@ -140,20 +111,13 @@ function FeedbackPage() {
   }
 
   async function load() {
-    if (isGuest) {
+    if (!me?.role) {
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      // 2 nguồn riêng: Review Queue lấy đúng từ server (không sót ca cũ),
-      // Stream lấy danh sách chung gần nhất.
-      const [streamRes, queueRes] = await Promise.all([
-        fetch(`${API_BASE}/api/feedback/recent?limit=200`),
-        fetch(`${API_BASE}/api/feedback/recent?limit=200&needs_review=true&reviewed=false`),
-      ]);
-      if (!streamRes.ok) throw new Error(`${streamRes.status} ${streamRes.statusText}`);
-      const streamJson = (await streamRes.json()) as { data?: Feedback[] };
+      const streamJson = await apiFetch<{ data?: Feedback[] }>("/api/feedback/recent?limit=200");
       const rows = streamJson.data ?? [];
       const incomingIds = rows.map((row) => row.id);
       const freshIds = incomingIds.filter((id) => !seenIdsRef.current.has(id));
@@ -164,8 +128,12 @@ function FeedbackPage() {
       }
       initializedRef.current = true;
       setList(rows);
-      if (queueRes.ok) {
-        const queueJson = (await queueRes.json()) as { data?: Feedback[] };
+      if (isGuest) {
+        setQueue([]);
+      } else {
+        const queueJson = await apiFetch<{ data?: Feedback[] }>(
+          "/api/feedback/recent?limit=200&needs_review=true&reviewed=false",
+        );
         setQueue(queueJson.data ?? []);
       }
     } catch (error) {
@@ -175,7 +143,7 @@ function FeedbackPage() {
   }
 
   useEffect(() => {
-    if (me?.role && !isGuest) {
+    if (me?.role) {
       load();
       const id = window.setInterval(load, REFRESH_INTERVAL_MS);
       return () => window.clearInterval(id);
@@ -186,29 +154,15 @@ function FeedbackPage() {
     e.preventDefault();
     if (!form.text.trim()) return;
     setSubmitting(true);
-    const token = await authToken();
-    if (!token) {
-      toast.error("Chưa đăng nhập");
-      setSubmitting(false);
-      return;
-    }
     try {
-      const res = await fetch(`${API_BASE}/api/feedback/submit`, {
+      await apiFetch("/api/feedback/submit", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           text: form.text.trim(),
           channel: form.channel,
           area: form.area || null,
         }),
       });
-      if (!res.ok) {
-        const detail = await res.text();
-        throw new Error(`${res.status}: ${detail.slice(0, 200)}`);
-      }
       toast.success("Đã gửi phản hồi — AI đang phân tích & gán nhãn");
       setForm({ ...form, text: "", area: AREAS[0].code });
       load();

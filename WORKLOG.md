@@ -168,3 +168,22 @@ Chưa phân công. TODO: ai làm module nào, deadline nội bộ.
   2. **Phân tích Báo cáo Chuyên sâu (Analyst/Task Agent)**: Báo cáo định kỳ cho các Trưởng phòng được sinh ra tự động, định dạng Markdown với 4 mục khắt khe: (1) Nguyên nhân gốc rễ, (2) Mức rủi ro (LOW/WARNING/CRITICAL), (3) Dự báo, (4) Đề xuất hành động ưu tiên. Frontend UI tự động "đỏ/cam" (Highlight) dựa trên từ khóa rủi ro.
   3. **Deep Risk Matrix (Scoring Agent)**: Hoàn thiện chấm điểm rủi ro 5 chiều (An toàn, Gian lận, Thái độ, Phương tiện, Tuân thủ) kết hợp thuật toán Thác rơi (Max-pooling Waterfall) và phễu lọc 3 tầng (Lọc ML -> Batching LLM -> Caching) để tối ưu chi phí.
 - **Kết quả**: Vòng lặp Agent đã hoàn thiện, vừa tiết kiệm API LLM vừa mang lại báo cáo vận hành cực kỳ sắc bén cho người quản lý.
+
+## 2026-06-17
+
+### Hoàn thiện Phase 3 — Quản trị Tổ chức, Giám sát & CSKH Online
+- **Team Isolation**: Triển khai cơ chế phân quyền nâng cao trên API `/api/tasks` và `/api/reports`. Role Manager giờ đây chỉ nhìn thấy Ticket và Báo cáo thuộc `department` của mình (xác định qua bảng `profiles`).
+- **Support Dashboard (`/support`)**: 
+  - Tạo giao diện riêng theo kiến trúc **Queue + Approval** dành cho luồng CSKH.
+  - Phân loại Ticket nổi bật theo mức độ khẩn cấp và SLA (Thời gian xử lý).
+  - Tích hợp tính năng **Canned Responses** (Mẫu trả lời soạn sẵn) giúp đóng Ticket chỉ bằng một chạm.
+- **Observability (Webhook & Healthcheck)**: 
+  - Tích hợp `webhook_notifier.py` vào `spike_detector.py`. Tự động đẩy cảnh báo đến kênh chat nội bộ khi sinh ra Alert P5/Critical.
+  - Thêm trang **System Health (`/health`)** trên React để Admin trực tiếp theo dõi uptime, latency của API, DB và mô hình LLM.
+
+### Hoàn thiện Phase 4 — Gamification & UI Tối ưu
+- **Team Leaderboard**: Thêm API `/api/leaderboard` tính toán tốc độ xử lý (Avg Resolution Time) và số lượng Ticket đã giải quyết. Hiển thị Widget xếp hạng lên màn hình `QualityCockpit` tạo động lực thúc đẩy năng suất giữa các Team.
+- **Chế độ Tối (Dark Mode)**: 
+  - Thiết kế Theme chuyển đổi sáng/tối đồng bộ qua Tailwind `darkMode: class`.
+  - Tạo `useTheme` hook ghi nhớ tùy chọn vào `localStorage` và tự động kế thừa `prefers-color-scheme` của hệ điều hành.
+- **Tổng kết**: Toàn bộ dự án AI Quality Intelligence Platform đã được phát triển hoàn thiện 100% roadmap từ Ingestion, AI Processing, đến Operation Dashboard và Gamification.

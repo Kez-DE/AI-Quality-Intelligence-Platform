@@ -6,6 +6,8 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
+const isDocker = process.env.NITRO_PRESET === "node-server" || process.env.RAILWAY_ENVIRONMENT;
+
 export default defineConfig({
   vite: {
     envDir: "..",
@@ -15,4 +17,9 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Force nitro node-server preset for Docker/Railway builds.
+  // Outside Lovable context the plugin is skipped unless explicitly enabled.
+  ...(isDocker && {
+    nitro: { preset: "node-server" },
+  }),
 });
