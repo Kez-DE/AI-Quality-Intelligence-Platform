@@ -1,18 +1,15 @@
-import os
-import requests
+import httpx
+from env_config import get_settings
 
-def send_webhook_alert(title: str, severity: str, area: str, description: str):
-    """
-    Gửi thông báo tới kênh chat nội bộ (Slack/Zalo/Discord) qua Webhook.
-    Chỉ gửi cho các Ticket có severity P5/Critical.
-    """
-    webhook_url = os.getenv("WEBHOOK_URL")
+def send_alert_webhook(title: str, message: str, severity: str = "medium", area: str = "general") -> bool:
+    """Gửi cảnh báo đến Webhook (Discord/Slack/Teams) khi có bất thường."""
+    webhook_url = get_settings().webhook_url
     
     payload = {
-        "text": f"🚨 *CẢNH BÁO KHẨN CẤP (P5)* 🚨\n"
+        "text": f"🚨 *CẢNH BÁO KHẨN CẤP ({severity.upper()})* 🚨\n"
                 f"**Khu vực:** {area}\n"
                 f"**Tiêu đề:** {title}\n"
-                f"**Chi tiết:** {description}\n"
+                f"**Chi tiết:** {message}\n"
                 f"Yêu cầu các quản lý khu vực kiểm tra và xử lý ngay lập tức!"
     }
 
@@ -22,9 +19,9 @@ def send_webhook_alert(title: str, severity: str, area: str, description: str):
         return True
 
     try:
-        response = requests.post(webhook_url, json=payload, timeout=5)
+        response = httpx.post(webhook_url, json=payload, timeout=5)
         response.raise_for_status()
-        print(f"[Webhook Notifier] Đã gửi cảnh báo P5 cho {area} thành công.")
+        print(f"[Webhook Notifier] Đã gửi cảnh báo {severity.upper()} cho {area} thành công.")
         return True
     except Exception as e:
         print(f"[Webhook Notifier] Lỗi khi gửi webhook: {e}")

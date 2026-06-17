@@ -1,10 +1,25 @@
 import json
+import os
+import sys
+
+# Ensure pipeline dir is in sys.path for clean.py
+PIPELINE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PIPELINE_DIR not in sys.path:
+    sys.path.append(PIPELINE_DIR)
+
+from clean import mask_pii
 from .model_router import chat_completion, ChatMessage
 from .chat_tools import TOOLS_DEFINITIONS, execute_tool
 
 def run_chat_agent(messages: list[ChatMessage], temperature: float = 0.3, max_loops: int = 5) -> dict:
     """Chạy vòng lặp ReAct agent để LLM tự gọi công cụ (nếu cần) trước khi trả lời."""
-    current_messages = list(messages)
+    # Lọc PII từ input messages
+    current_messages = []
+    for m in messages:
+        m_copy = dict(m)
+        if m_copy.get("role") in ("user", "assistant") and m_copy.get("content"):
+            m_copy["content"] = mask_pii(m_copy["content"])
+        current_messages.append(m_copy)
     
     for loop_idx in range(max_loops):
         try:
@@ -31,6 +46,11 @@ def run_chat_agent(messages: list[ChatMessage], temperature: float = 0.3, max_lo
         tool_calls = msg_dict.get("tool_calls")
         if not tool_calls:
             # LLM không gọi tool nào, trả về kết quả ngay (trả lời text)
+            # Lọc PII từ kết quả trả về trước khi đưa ra ngoài
+            if result.get("content"):
+                result["content"] = mask_pii(result["content"])
+            if "message" in result and result["message"].get("content"):
+                result["message"]["content"] = mask_pii(result["message"]["content"])
             return result
             
         # Có tool calls -> thực thi các tools
@@ -48,10 +68,13 @@ def run_chat_agent(messages: list[ChatMessage], temperature: float = 0.3, max_lo
             # Thực thi hàm truy vấn dữ liệu thực tế
             tool_result = execute_tool(name, args)
             
+            # Lọc PII từ tool context (nếu có user feedback raw) để tránh leak lên prompt lần 2
+            safe_tool_result = mask_pii(str(tool_result))
+            
             # Gắn kết quả của hàm vào context để gửi lên LLM ở vòng lặp tiếp theo
             tool_msg = {
                 "role": "tool",
-                "content": str(tool_result),
+                "content": safe_tool_result,
                 "tool_call_id": tc_id,
                 "name": name
             }

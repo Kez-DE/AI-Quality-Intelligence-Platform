@@ -1,5 +1,23 @@
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from pydantic import BaseModel, Field
+from typing import Optional, List
+
+class ChatMessageReq(BaseModel):
+    role: str
+    content: str = Field(..., max_length=2000)
+
+class ChatReq(BaseModel):
+    messages: List[ChatMessageReq]
+
+class StatusUpdateReq(BaseModel):
+    status: str
+
+class AssignTaskReq(BaseModel):
+    owner_id: Optional[str] = None
+    due_at: Optional[str] = None
 
 import os
 from collections import Counter
@@ -14,9 +32,11 @@ from agent import chat_completion, get_agent_status, run_chat_agent
 from auth_guard import AuthUser, get_current_user, require_admin, require_ops_staff
 from users_admin import router as users_router, audit_router
 from rate_limiter import RateLimiter, check_rate_limit
+from env_config import get_settings
 
 feedback_rate_limit = RateLimiter(max_requests=10, window_seconds=3600, scope="feedback_submit")
 chat_rate_limit = RateLimiter(max_requests=20, window_seconds=3600, scope="agent_chat")
+chat_rate_limit_staff = RateLimiter(max_requests=100, window_seconds=3600, scope="agent_chat_staff")
 
 PIPELINE_DIR = os.path.dirname(__file__)
 PROJECT_ROOT = os.path.abspath(os.path.join(PIPELINE_DIR, ".."))
@@ -33,13 +53,13 @@ live_stream_tick_lock = Lock()
 live_stream_state = {
     "running": False,
     "offset": 0,
-    "batch_size": int(os.getenv("LIVE_STREAM_BATCH_SIZE", "150")),
-    "interval_seconds": int(os.getenv("LIVE_STREAM_INTERVAL_SECONDS", "10")),
-    "loop": os.getenv("LIVE_STREAM_LOOP", "false").lower() == "true",
-    "auto_ticket": os.getenv("AUTO_TICKET_ENABLED", "true").lower() == "true",
-    "ticket_every_batches": int(os.getenv("AUTO_TICKET_EVERY_BATCHES", "10")),
-    "ticket_max_feedback": int(os.getenv("AUTO_TICKET_MAX_FEEDBACK", "1000")),
-    "ticket_max_spikes": int(os.getenv("AUTO_TICKET_MAX_SPIKES", "1")),
+    "batch_size": get_settings().live_stream_batch_size,
+    "interval_seconds": get_settings().live_stream_interval_seconds,
+    "loop": get_settings().live_stream_loop,
+    "auto_ticket": get_settings().auto_ticket_enabled,
+    "ticket_every_batches": get_settings().auto_ticket_every_batches,
+    "ticket_max_feedback": get_settings().auto_ticket_max_feedback,
+    "ticket_max_spikes": get_settings().auto_ticket_max_spikes,
     "ticket_running": False,
     "batches_ingested": 0,
     "last_ticket_result": None,
@@ -50,9 +70,9 @@ live_stream_state = {
     "last_error": None,
 }
 ticket_workflow_state = {
-    "enabled": os.getenv("AUTO_TICKET_WORKFLOW_ENABLED", "true").lower() == "true",
-    "in_progress_after_seconds": int(os.getenv("AUTO_TICKET_IN_PROGRESS_AFTER_SECONDS", "10")),
-    "resolved_after_seconds": int(os.getenv("AUTO_TICKET_RESOLVED_AFTER_SECONDS", "30")),
+    "enabled": get_settings().auto_ticket_workflow_enabled,
+    "in_progress_after_seconds": get_settings().auto_ticket_in_progress_after_seconds,
+    "resolved_after_seconds": get_settings().auto_ticket_resolved_after_seconds,
     "last_run_at": None,
     "moved_to_in_progress": 0,
     "moved_to_resolved": 0,
@@ -133,7 +153,7 @@ def live_stream_tick():
         live_stream_tick_lock.release()
 
 def _live_stream_tick():
-    dataset_file = os.getenv("REAL_DATA_FILE", DEFAULT_DATA_FILE)
+    dataset_file = get_settings().real_data_file or DEFAULT_DATA_FILE
     with live_stream_lock:
         if not live_stream_state["running"]:
             return
@@ -254,15 +274,15 @@ async def lifespan(app: FastAPI):
         next_run_time=datetime.now(timezone.utc),
     )
     print("APScheduler started successfully.")
-    if os.getenv("LIVE_STREAM_ENABLED", "false").lower() == "true":
+    if get_settings().live_stream_enabled:
         start_live_stream(
-            batch_size=int(os.getenv("LIVE_STREAM_BATCH_SIZE", "150")),
-            interval_seconds=int(os.getenv("LIVE_STREAM_INTERVAL_SECONDS", "10")),
-            loop=os.getenv("LIVE_STREAM_LOOP", "false").lower() == "true",
-            reset=os.getenv("LIVE_STREAM_RESET_ON_START", "false").lower() == "true",
-            auto_ticket=os.getenv("AUTO_TICKET_ENABLED", "true").lower() == "true",
-            ticket_every_batches=int(os.getenv("AUTO_TICKET_EVERY_BATCHES", "10")),
-            ticket_max_spikes=int(os.getenv("AUTO_TICKET_MAX_SPIKES", "1")),
+            batch_size=get_settings().live_stream_batch_size,
+            interval_seconds=get_settings().live_stream_interval_seconds,
+            loop=get_settings().live_stream_loop,
+            reset=get_settings().live_stream_reset_on_start,
+            auto_ticket=get_settings().auto_ticket_enabled,
+            ticket_every_batches=get_settings().auto_ticket_every_batches,
+            ticket_max_spikes=get_settings().auto_ticket_max_spikes,
         )
     yield
     scheduler.shutdown()
@@ -273,6 +293,27 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"error": {"code": "INTERNAL_SERVER_ERROR", "message": str(exc)}}
+    )
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": {"code": "HTTP_ERROR", "message": str(exc.detail)}}
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={"error": {"code": "VALIDATION_ERROR", "message": "Invalid input", "details": exc.errors()}}
+    )
 
 # CORS config to allow frontend to communicate with backend
 app.add_middleware(
@@ -442,8 +483,8 @@ def list_task_alerts(task_id: str, _: AuthUser = Depends(require_ops_staff)):
     return {"status": "success", "data": data}
 
 @app.patch("/api/tasks/{task_id}/status")
-def update_task_status(task_id: str, payload: dict, _: AuthUser = Depends(require_ops_staff)):
-    new_status = payload.get("status")
+def update_task_status(task_id: str, payload: StatusUpdateReq, _: AuthUser = Depends(require_ops_staff)):
+    new_status = payload.status
     if new_status not in {"open", "in_progress", "resolved"}:
         raise HTTPException(status_code=400, detail="Invalid task status")
     try:
@@ -460,12 +501,12 @@ def update_task_status(task_id: str, payload: dict, _: AuthUser = Depends(requir
     return {"status": "success", "data": data[0]}
 
 @app.patch("/api/tasks/{task_id}/assign")
-def assign_task(task_id: str, payload: dict, _: AuthUser = Depends(require_ops_staff)):
+def assign_task(task_id: str, payload: AssignTaskReq, _: AuthUser = Depends(require_ops_staff)):
     update_fields: dict = {}
-    if "owner_id" in payload:
-        update_fields["owner_id"] = payload["owner_id"]
-    if "due_at" in payload:
-        update_fields["due_at"] = payload["due_at"]
+    if payload.owner_id is not None:
+        update_fields["owner_id"] = payload.owner_id
+    if payload.due_at is not None:
+        update_fields["due_at"] = payload.due_at
     if not update_fields:
         raise HTTPException(status_code=400, detail="Must provide owner_id or due_at")
     update_fields["updated_at"] = "now()"
@@ -526,10 +567,15 @@ def get_leaderboard(_: AuthUser = Depends(require_ops_staff)):
     return {"status": "success", "data": result}
 
 @app.get("/api/reports")
-def list_reports(team: str | None = None, limit: int = Query(default=50, ge=1, le=100), user: AuthUser = Depends(require_ops_staff)):
+def list_reports(
+    team: str | None = None, 
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=100), 
+    user: AuthUser = Depends(require_ops_staff)
+):
     try:
         db = get_supabase()
-        q = db.table("department_reports").select("*")
+        q = db.table("department_reports").select("*", count="exact")
         
         # Team Isolation: Manager chỉ xem của team mình
         effective_team = team
@@ -538,10 +584,21 @@ def list_reports(team: str | None = None, limit: int = Query(default=50, ge=1, l
             
         if effective_team:
             q = q.eq("team", effective_team)
-        data = q.order("created_at", desc=True).limit(limit).execute().data or []
+            
+        offset = (page - 1) * limit
+        res = q.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
+        data = res.data or []
+        total_items = res.count if res.count is not None else 0
+        
+        pagination = {
+            "page": page,
+            "pageSize": limit,
+            "totalItems": total_items,
+            "totalPages": (total_items + limit - 1) // limit
+        }
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot read reports: {str(exc)[:300]}") from exc
-    return {"status": "success", "data": data}
+    return {"status": "success", "data": data, "pagination": pagination}
 
 
 @app.patch("/api/reports/{report_id}/approve")
@@ -586,8 +643,8 @@ def alert_workflow_status(_: AuthUser = Depends(require_ops_staff)):
     return {"status": "success", "data": dict(ticket_workflow_state)}
 
 @app.patch("/api/alerts/{alert_id}/status")
-def update_alert_status(alert_id: str, payload: dict, _: AuthUser = Depends(require_ops_staff)):
-    new_status = payload.get("status")
+def update_alert_status(alert_id: str, payload: StatusUpdateReq, _: AuthUser = Depends(require_ops_staff)):
+    new_status = payload.status
     if new_status not in {"open", "in_progress", "resolved"}:
         raise HTTPException(status_code=400, detail="Invalid alert status")
     try:
@@ -622,41 +679,38 @@ Do NOT provide any internal data, analytics, metrics, or system information.
 If the user asks about anything else, politely redirect them to use the app's features or contact support."""
 
 @app.post("/api/agent/chat")
-def agent_chat(payload: dict, user: AuthUser = Depends(get_current_user)):
+def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
+    # Rate limit all users, higher limit for staff/admin
+    limit = chat_rate_limit_staff if user.role in ("staff", "manager", "admin") else chat_rate_limit
+    check_rate_limit(limit, user.id)
+
     if user.role == "guest":
-        check_rate_limit(chat_rate_limit, user.id)
         # Guests get a restricted customer-support-only chatbot
-        messages = payload.get("messages")
-        if not isinstance(messages, list) or not messages:
+        if not payload.messages:
             raise HTTPException(status_code=400, detail="messages must be a non-empty list")
         normalized = [
             {"role": "system", "content": GUEST_SYSTEM_PROMPT},
         ]
-        for message in messages[-30:]:
-            role = message.get("role")
-            content = message.get("content")
-            if role not in {"user", "assistant", "system"} or not isinstance(content, str) or not content.strip():
+        for message in payload.messages[-30:]:
+            if message.role not in {"user", "assistant", "system"} or not message.content.strip():
                 raise HTTPException(status_code=400, detail="Invalid chat message")
-            normalized.append({"role": role, "content": content[:8000]})
+            normalized.append({"role": message.role, "content": message.content.strip()})
         try:
             result = chat_completion(normalized, temperature=0.4)
         except Exception as exc:
             raise HTTPException(status_code=502, detail=f"Agent model error: {str(exc)[:300]}") from exc
         return {"status": "success", "data": result}
 
-    messages = payload.get("messages")
-    if not isinstance(messages, list) or not messages:
+    if not payload.messages:
         raise HTTPException(status_code=400, detail="messages must be a non-empty list")
     normalized = [
         {"role": "system", "content": AGENT_SYSTEM_PROMPT},
         {"role": "system", "content": build_agent_data_context()},
     ]
-    for message in messages[-30:]:
-        role = message.get("role")
-        content = message.get("content")
-        if role not in {"user", "assistant", "system"} or not isinstance(content, str) or not content.strip():
+    for message in payload.messages[-30:]:
+        if message.role not in {"user", "assistant", "system"} or not message.content.strip():
             raise HTTPException(status_code=400, detail="Invalid chat message")
-        normalized.append({"role": role, "content": content[:8000]})
+        normalized.append({"role": message.role, "content": message.content.strip()})
     try:
         result = run_chat_agent(normalized, temperature=0.4)
     except Exception as exc:
@@ -673,7 +727,7 @@ def ingest_real_dataset(
     """
     Ingest dataset thật từ thư mục /data. Không truyền limit thì chạy toàn bộ file.
     """
-    dataset_file = os.getenv("REAL_DATA_FILE", DEFAULT_DATA_FILE)
+    dataset_file = get_settings().real_data_file or DEFAULT_DATA_FILE
     try:
         result = ingest_dataset(dataset_file, limit=limit, batch_size=batch_size, offset=offset)
     except ValueError as exc:
@@ -732,7 +786,7 @@ def run_real_pipeline(
     """
     Chạy luồng thật: ingest dataset từ /data rồi detect spike/agent.
     """
-    dataset_file = os.getenv("REAL_DATA_FILE", DEFAULT_DATA_FILE)
+    dataset_file = get_settings().real_data_file or DEFAULT_DATA_FILE
     try:
         ingest_result = ingest_dataset(dataset_file, limit=limit, batch_size=batch_size)
         if not ingest_result["success"]:

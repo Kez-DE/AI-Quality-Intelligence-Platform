@@ -187,3 +187,8 @@ Chưa phân công. TODO: ai làm module nào, deadline nội bộ.
   - Thiết kế Theme chuyển đổi sáng/tối đồng bộ qua Tailwind `darkMode: class`.
   - Tạo `useTheme` hook ghi nhớ tùy chọn vào `localStorage` và tự động kế thừa `prefers-color-scheme` của hệ điều hành.
 - **Tổng kết**: Toàn bộ dự án AI Quality Intelligence Platform đã được phát triển hoàn thiện 100% roadmap từ Ingestion, AI Processing, đến Operation Dashboard và Gamification.
+
+### Hoàn thiện Giai đoạn 2 — Tăng cường Bảo mật (Đặc biệt cho AI)
+- **OWASP LLM (Tránh rò rỉ dữ liệu PII)**: Tích hợp hàm `mask_pii()` từ `clean.py` vào `pipeline/agent/chat_agent.py`. Lọc PII (Email, SĐT, Biển số xe) từ câu hỏi của người dùng và từ kết quả phân tích của Tool/LLM để tránh rò rỉ khi gán vào Prompt.
+- **Quản lý Cấu hình (Pydantic Settings)**: Thêm thư viện `pydantic-settings` vào `requirements.txt`. Refactor `env_config.py` để sử dụng class `Settings` quản lý toàn bộ cấu hình, loại bỏ `os.getenv` thô sơ trong `main.py`, `webhook_notifier.py` và `model_router.py` nhằm nâng cao tính an toàn (type hinting & validation).
+- **Rate Limiting**: Rà soát và xác nhận đã áp dụng giới hạn request (`chat_rate_limit` và `chat_rate_limit_staff`) cho endpoint `/api/agent/chat` nhằm phòng ngừa rủi ro bị lạm dụng API Key của LLM. Thống nhất sử dụng `httpx` thay cho `requests` trong Webhook.
