@@ -14,7 +14,7 @@ Agent nhận **input** (phản hồi khách hàng) → **xử lý** (làm sạch
 
 | # | Deliverable yêu cầu | Trạng thái | Vị trí trong repo |
 |---|---------------------|:----------:|-------------------|
-| 1 | **MVP Demo** — video 3 phút show user flow end-to-end | 🎬 | [👉 Link Google Drive](https://drive.google.com/REPLACE_WITH_YOUR_LINK) _(cập nhật sau khi upload)_ |
+| 1 | **MVP Demo** — video 3 phút show user flow end-to-end | 🎬 | [👉 Link Google Drive](https://drive.google.com/drive/folders/1VNNx_eeJSA_tm2Vm9LgMwaBKtqs4Qlk2) _(cập nhật sau khi upload)_ |
 | 2 | **Architecture diagram** — sơ đồ components, data flow | ✅ | [`docs/architecture-diagram.md`](docs/architecture-diagram.md) (Mermaid) · [`docs/architecture.md`](docs/architecture.md) (chi tiết) |
 | 3 | **Repo ≥ 10 PR merged** | ✅ | [Pull Requests (merged)](https://github.com/AI20K-Build-Cohort-2/C2-App-116/pulls?q=is%3Apr+is%3Amerged) |
 | 4 | **README** — setup, env vars, sample queries | ✅ | [`README.md`](README.md) · env: [`.env.example`](.env.example) · sample queries: [mục bên dưới](#-sample-queries) |
@@ -24,7 +24,7 @@ Agent nhận **input** (phản hồi khách hàng) → **xử lý** (làm sạch
 
 ## 1. 🎬 MVP Demo (video 3 phút)
 
-- **Link:** https://drive.google.com/REPLACE_WITH_YOUR_LINK
+- **Link:** https://drive.google.com/drive/folders/1VNNx_eeJSA_tm2Vm9LgMwaBKtqs4Qlk2
 - Nội dung: review thô → tự gán nhãn → streaming → spike → alert định tuyến phòng ban → Human-in-the-Loop.
 - Kịch bản tham chiếu: [`docs/demo-script.md`](docs/demo-script.md).
 
