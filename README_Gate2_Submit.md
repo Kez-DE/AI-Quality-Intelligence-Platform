@@ -28,7 +28,7 @@ Agent nhận **input** (phản hồi khách hàng) → **xử lý** (làm sạch
 - Nội dung: review thô → tự gán nhãn → streaming → spike → alert định tuyến phòng ban → Human-in-the-Loop.
 - Kịch bản tham chiếu: [`docs/demo-script.md`](docs/demo-script.md).
 
-> ⚠️ Nhớ đặt quyền chia sẻ Google Drive = **"Anyone with the link can view"** và dán link thật thay cho `REPLACE_WITH_YOUR_LINK`.
+> ⚠️ Đảm bảo quyền chia sẻ Google Drive = **"Anyone with the link can view"** để giám khảo mở được video.
 
 ## 2. 🗺️ Architecture diagram
 
@@ -95,4 +95,4 @@ curl -X POST http://127.0.0.1:8000/api/chat \
 
 ---
 
-*Mọi đường dẫn file đều tương đối từ gốc repo. Cập nhật link Google Drive ở mục 1 trước khi nộp.*
+*Mọi đường dẫn file đều tương đối từ gốc repo.*
