@@ -18,7 +18,7 @@ live_stream_state: dict[str, Any] = {
     "interval_seconds": int(os.getenv("LIVE_STREAM_INTERVAL_SECONDS", "10")),
     "loop": os.getenv("LIVE_STREAM_LOOP", "false").lower() == "true",
     "auto_ticket": os.getenv("AUTO_TICKET_ENABLED", "true").lower() == "true",
-    "ticket_every_batches": int(os.getenv("AUTO_TICKET_EVERY_BATCHES", "10")),
+    "ticket_every_batches": int(os.getenv("AUTO_TICKET_EVERY_BATCHES", "2")),
     "ticket_max_feedback": int(os.getenv("AUTO_TICKET_MAX_FEEDBACK", "1000")),
     "ticket_max_spikes": int(os.getenv("AUTO_TICKET_MAX_SPIKES", "6")),
     "ticket_running": False,
@@ -27,6 +27,7 @@ live_stream_state: dict[str, Any] = {
     "last_ticket_error": None,
     "last_ticket_at": None,
     "last_ticket_batch": None,
+    "final_detection_requested": False,
     "last_result": None,
     "last_error": None,
 }
@@ -60,13 +61,55 @@ def run_auto_ticket_detection():
             live_stream_state["ticket_running"] = False
 
 
+def schedule_auto_ticket_detection():
+    """Queue one detector run after state has been marked ticket_running."""
+    if scheduler:
+        scheduler.add_job(
+            run_auto_ticket_detection,
+            id="auto_ticket_detection",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        return
+    with live_stream_lock:
+        live_stream_state["ticket_running"] = False
+        live_stream_state["last_ticket_error"] = "Scheduler is not initialized"
+
+
+def claim_final_detection_request() -> bool:
+    """Atomically claim a pending final scan when no equivalent scan is running."""
+    with live_stream_lock:
+        if not live_stream_state["final_detection_requested"]:
+            return False
+        current_batch = int(live_stream_state["batches_ingested"])
+        if live_stream_state["ticket_running"]:
+            # The active detector already reads all feedback committed so far.
+            live_stream_state["final_detection_requested"] = False
+            return False
+        if (
+            not live_stream_state["auto_ticket"]
+            or current_batch <= 0
+            or live_stream_state.get("last_ticket_batch") == current_batch
+        ):
+            live_stream_state["final_detection_requested"] = False
+            return False
+        live_stream_state["final_detection_requested"] = False
+        live_stream_state["ticket_running"] = True
+        return True
+
+
 def live_stream_tick():
     if not live_stream_tick_lock.acquire(blocking=False):
         return
+    detect_after_tick = False
     try:
         _live_stream_tick()
     finally:
+        detect_after_tick = claim_final_detection_request()
         live_stream_tick_lock.release()
+    if detect_after_tick:
+        schedule_auto_ticket_detection()
 
 
 def _live_stream_tick():
@@ -89,10 +132,16 @@ def _live_stream_tick():
             live_stream_state["last_error"] = None
             if result.get("success"):
                 live_stream_state["batches_ingested"] += 1
+                periodic_detection = (
+                    live_stream_state["batches_ingested"]
+                    % int(live_stream_state["ticket_every_batches"])
+                    == 0
+                )
+                final_detection = bool(result.get("complete") and not live_stream_state["loop"])
                 should_detect = (
                     live_stream_state["auto_ticket"]
                     and not live_stream_state["ticket_running"]
-                    and live_stream_state["batches_ingested"] % int(live_stream_state["ticket_every_batches"]) == 0
+                    and (periodic_detection or final_detection)
                 )
                 if should_detect:
                     live_stream_state["ticket_running"] = True
@@ -108,14 +157,8 @@ def _live_stream_tick():
             else:
                 live_stream_state["running"] = False
                 should_detect = False
-        if should_detect and scheduler:
-            scheduler.add_job(
-                run_auto_ticket_detection,
-                id="auto_ticket_detection",
-                replace_existing=True,
-                max_instances=1,
-                coalesce=True,
-            )
+        if should_detect:
+            schedule_auto_ticket_detection()
     except Exception as exc:
         with live_stream_lock:
             live_stream_state["last_error"] = str(exc)
@@ -130,7 +173,7 @@ def start_live_stream(
     loop: bool,
     reset: bool = False,
     auto_ticket: bool = True,
-    ticket_every_batches: int = 10,
+    ticket_every_batches: int = 2,
     ticket_max_spikes: int = 6,
 ):
     if not scheduler:
@@ -146,6 +189,7 @@ def start_live_stream(
             live_stream_state["last_ticket_error"] = None
             live_stream_state["last_ticket_at"] = None
             live_stream_state["last_ticket_batch"] = None
+            live_stream_state["final_detection_requested"] = False
         live_stream_state["batch_size"] = batch_size
         live_stream_state["interval_seconds"] = interval_seconds
         live_stream_state["loop"] = loop
@@ -170,10 +214,18 @@ def start_live_stream(
 
 
 def stop_live_stream():
-    with live_stream_lock:
-        live_stream_state["running"] = False
     if scheduler and scheduler.get_job("live_feedback_stream"):
         scheduler.remove_job("live_feedback_stream")
+    with live_stream_lock:
+        live_stream_state["running"] = False
+        live_stream_state["final_detection_requested"] = True
+    # Nếu không có batch đang chạy, claim ngay; nếu có, live_stream_tick sẽ claim
+    # sau khi batch commit xong để nút Dừng không bị block.
+    should_detect = False
+    if not live_stream_tick_lock.locked():
+        should_detect = claim_final_detection_request()
+    if should_detect:
+        schedule_auto_ticket_detection()
     return get_live_stream_status()
 
 

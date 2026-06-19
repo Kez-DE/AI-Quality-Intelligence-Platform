@@ -29,7 +29,7 @@ export default function LiveStreamPanel() {
   const [loop, setLoop] = useState(false);
   const [reset, setReset] = useState(true);
   const [autoTicket, setAutoTicket] = useState(true);
-  const [ticketEvery, setTicketEvery] = useState(10);
+  const [ticketEvery, setTicketEvery] = useState(2);
   const [ticketMaxSpikes, setTicketMaxSpikes] = useState(6);
 
   const statusQuery = useQuery({

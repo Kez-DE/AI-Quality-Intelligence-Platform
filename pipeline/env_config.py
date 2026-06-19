@@ -116,7 +116,7 @@ class Settings(BaseSettings):
     live_stream_loop: bool = Field(default=False, alias="LIVE_STREAM_LOOP")
     live_stream_reset_on_start: bool = Field(default=False, alias="LIVE_STREAM_RESET_ON_START")
     auto_ticket_enabled: bool = Field(default=True, alias="AUTO_TICKET_ENABLED")
-    auto_ticket_every_batches: int = Field(default=10, alias="AUTO_TICKET_EVERY_BATCHES")
+    auto_ticket_every_batches: int = Field(default=2, alias="AUTO_TICKET_EVERY_BATCHES")
     auto_ticket_max_spikes: int = Field(default=6, alias="AUTO_TICKET_MAX_SPIKES")
     ticket_critical_threshold: int = Field(default=1, alias="TICKET_CRITICAL_THRESHOLD")
     ticket_high_risk_threshold: int = Field(default=3, alias="TICKET_HIGH_RISK_THRESHOLD")

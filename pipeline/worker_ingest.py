@@ -33,7 +33,7 @@ def main():
             loop=_env_bool("LIVE_STREAM_LOOP", False),
             reset=_env_bool("LIVE_STREAM_RESET_ON_START", False),
             auto_ticket=_env_bool("AUTO_TICKET_ENABLED", True),
-            ticket_every_batches=int(os.getenv("AUTO_TICKET_EVERY_BATCHES", "10")),
+            ticket_every_batches=int(os.getenv("AUTO_TICKET_EVERY_BATCHES", "2")),
             ticket_max_spikes=int(os.getenv("AUTO_TICKET_MAX_SPIKES", "1")),
         )
 

@@ -115,7 +115,7 @@ Bất kỳ review chứa keyword nguy hiểm (tai nạn, xe tông, bỏ chạy, 
 
 **1. Streaming (luồng chính) — gần real-time**
 - `POST /api/live-stream/start` bật APScheduler bơm batch theo `interval_seconds`. Demo dùng **50 review/giây** (`LIVE_STREAM_BATCH_SIZE=50`, `INTERVAL_SECONDS=1`, `LOOP=false`).
-- Sau mỗi `ticket_every_batches` lô → tự spike detect → LLM → ghi alert.
+- Sau mỗi `ticket_every_batches` lô (mặc định 2), khi stream kết thúc hoặc khi admin bấm dừng → tự spike detect → LLM → ghi alert.
 - Ticket workflow tự chuyển `open → in_progress → resolved`.
 - Frontend subscribe Supabase realtime → dashboard tự cập nhật.
 

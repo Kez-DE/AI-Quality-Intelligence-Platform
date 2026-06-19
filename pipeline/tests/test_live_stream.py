@@ -1,5 +1,6 @@
 import os
 import sys
+from unittest.mock import patch
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -52,6 +53,102 @@ def test_start_live_stream_resets_after_completed_dataset():
         assert status["last_error"] is None
         assert fake_scheduler.get_job("live_feedback_stream") is not None
     finally:
+        live_stream.live_stream_state.clear()
+        live_stream.live_stream_state.update(old_state)
+        live_stream.set_scheduler(old_scheduler)
+
+
+def test_completed_stream_schedules_final_ticket_detection():
+    old_scheduler = live_stream.scheduler
+    old_state = dict(live_stream.live_stream_state)
+    fake_scheduler = FakeScheduler()
+
+    try:
+        live_stream.set_scheduler(fake_scheduler)
+        live_stream.live_stream_state.update({
+            "running": True,
+            "offset": 0,
+            "batch_size": 500,
+            "loop": False,
+            "auto_ticket": True,
+            "ticket_every_batches": 10,
+            "ticket_running": False,
+            "batches_ingested": 0,
+            "last_ticket_batch": None,
+        })
+
+        with patch.object(live_stream, "ingest_dataset", return_value={
+            "success": True,
+            "complete": True,
+            "next_offset": 500,
+        }):
+            live_stream._live_stream_tick()
+
+        assert live_stream.live_stream_state["running"] is False
+        assert live_stream.live_stream_state["ticket_running"] is True
+        assert fake_scheduler.get_job("auto_ticket_detection") is not None
+    finally:
+        live_stream.live_stream_state.clear()
+        live_stream.live_stream_state.update(old_state)
+        live_stream.set_scheduler(old_scheduler)
+
+
+def test_manual_stop_schedules_detection_for_unprocessed_batches():
+    old_scheduler = live_stream.scheduler
+    old_state = dict(live_stream.live_stream_state)
+    fake_scheduler = FakeScheduler()
+    fake_scheduler.add_job(lambda: None, id="live_feedback_stream")
+
+    try:
+        live_stream.set_scheduler(fake_scheduler)
+        live_stream.live_stream_state.update({
+            "running": True,
+            "auto_ticket": True,
+            "ticket_running": False,
+            "batches_ingested": 2,
+            "last_ticket_batch": None,
+        })
+
+        status = live_stream.stop_live_stream()
+
+        assert status["running"] is False
+        assert status["ticket_running"] is True
+        assert fake_scheduler.get_job("live_feedback_stream") is None
+        assert fake_scheduler.get_job("auto_ticket_detection") is not None
+    finally:
+        live_stream.live_stream_state.clear()
+        live_stream.live_stream_state.update(old_state)
+        live_stream.set_scheduler(old_scheduler)
+
+
+def test_manual_stop_defers_detection_when_batch_is_active():
+    old_scheduler = live_stream.scheduler
+    old_state = dict(live_stream.live_stream_state)
+    fake_scheduler = FakeScheduler()
+
+    try:
+        live_stream.set_scheduler(fake_scheduler)
+        live_stream.live_stream_state.update({
+            "running": True,
+            "auto_ticket": True,
+            "ticket_running": False,
+            "batches_ingested": 2,
+            "last_ticket_batch": None,
+            "final_detection_requested": False,
+        })
+        live_stream.live_stream_tick_lock.acquire()
+        try:
+            status = live_stream.stop_live_stream()
+        finally:
+            live_stream.live_stream_tick_lock.release()
+
+        assert status["running"] is False
+        assert status["ticket_running"] is False
+        assert status["final_detection_requested"] is True
+        assert live_stream.claim_final_detection_request() is True
+    finally:
+        if live_stream.live_stream_tick_lock.locked():
+            live_stream.live_stream_tick_lock.release()
         live_stream.live_stream_state.clear()
         live_stream.live_stream_state.update(old_state)
         live_stream.set_scheduler(old_scheduler)

@@ -717,7 +717,7 @@ def start_live_feedback_stream(
     loop: bool = Query(default=False),
     reset: bool = Query(default=False),
     auto_ticket: bool = Query(default=True),
-    ticket_every_batches: int = Query(default=10, ge=1, le=100),
+    ticket_every_batches: int = Query(default=2, ge=1, le=100),
     ticket_max_spikes: int = Query(default=6, ge=1, le=10),
     _: AuthUser = Depends(require_admin),
 ):
