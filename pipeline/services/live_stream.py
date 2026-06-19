@@ -136,9 +136,12 @@ def start_live_stream(
     if not scheduler:
         raise ValueError("Scheduler is not initialized")
     with live_stream_lock:
-        if reset:
+        previous_complete = bool((live_stream_state.get("last_result") or {}).get("complete"))
+        if reset or (previous_complete and not loop):
             live_stream_state["offset"] = 0
             live_stream_state["batches_ingested"] = 0
+            live_stream_state["last_result"] = None
+            live_stream_state["last_error"] = None
             live_stream_state["last_ticket_result"] = None
             live_stream_state["last_ticket_error"] = None
             live_stream_state["last_ticket_at"] = None

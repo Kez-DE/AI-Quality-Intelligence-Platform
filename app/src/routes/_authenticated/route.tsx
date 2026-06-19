@@ -10,7 +10,7 @@ export const Route = createFileRoute("/_authenticated")({
 
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) throw redirect({ to: "/auth" });
-    
+
     let role = "guest";
     try {
       const { data: profile } = await supabase
@@ -18,15 +18,25 @@ export const Route = createFileRoute("/_authenticated")({
         .select("role")
         .eq("id", data.user.id)
         .maybeSingle();
-      
+
       role = profile?.role || "guest";
     } catch {
       role = "guest";
     }
 
     // Route Guard for Guests
-    const restrictedForGuests = ["/alerts", "/insights", "/admin", "/tasks", "/reports", "/support", "/health", "/agent-control"];
-    if (role === "guest" && restrictedForGuests.some(p => location.pathname.startsWith(p))) {
+    const restrictedForGuests = [
+      "/alerts",
+      "/insights",
+      "/admin",
+      "/tasks",
+      "/reports",
+      "/support",
+      "/health",
+      "/agent-control",
+      "/live-stream",
+    ];
+    if (role === "guest" && restrictedForGuests.some((p) => location.pathname.startsWith(p))) {
       throw redirect({ to: "/dashboard" });
     }
 

@@ -17,6 +17,7 @@ import {
   LogOut,
   MessageSquare,
   Moon,
+  Radio,
   Shield,
   Sparkles,
   Sun,
@@ -50,6 +51,7 @@ const NAV: NavItem[] = [
 
 // Link chỉ hiện với admin.
 const ADMIN_NAV: NavItem[] = [
+  { to: "/live-stream", label: "Live Stream", icon: Radio, roles: ["admin"] },
   { to: "/admin", label: "Quản lý người dùng", icon: Shield, roles: ["admin"] },
   { to: "/health", label: "System Health", icon: Activity, roles: ["admin"] },
 ];
@@ -64,7 +66,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { notifications, unreadCount, markAsRead, markAllRead } = useRealtimeNotifications();
   const { theme, toggleTheme } = useTheme();
 
-  const navItems = NAV.filter(n => n.roles.includes(role)).map(n => {
+  const navItems = NAV.filter((n) => n.roles.includes(role)).map((n) => {
     if (n.to === "/chat" && role === "guest") {
       return { ...n, label: "Hỗ trợ CSKH" };
     }
@@ -105,9 +107,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <div className="leading-tight">
               <div className="font-display font-bold text-sm">xanhSM Cockpit</div>
-              <div className="text-[10px] font-mono text-muted-foreground">
-                AI Quality Intel.
-              </div>
+              <div className="text-[10px] font-mono text-muted-foreground">AI Quality Intel.</div>
             </div>
           </Link>
         </div>
@@ -150,7 +150,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="min-w-0 leading-tight">
               <div className="truncate font-mono text-muted-foreground">{email}</div>
               {me?.role && (
-                <div className="text-[10px] font-semibold text-xanh-deep">{ROLE_LABELS[me.role]}</div>
+                <div className="text-[10px] font-semibold text-xanh-deep">
+                  {ROLE_LABELS[me.role]}
+                </div>
               )}
             </div>
             <button
@@ -158,7 +160,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               className="ml-auto h-7 w-7 rounded-full flex items-center justify-center bg-muted text-muted-foreground hover:text-foreground transition-colors"
               title="Toggle Dark Mode"
             >
-              {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+              {theme === "dark" ? (
+                <Sun className="h-3.5 w-3.5" />
+              ) : (
+                <Moon className="h-3.5 w-3.5" />
+              )}
             </button>
           </div>
           <button
@@ -193,10 +199,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 onMarkAllRead={markAllRead}
               />
             )}
-            <button
-              onClick={toggleTheme}
-              className="text-xs font-mono text-muted-foreground ml-1"
-            >
+            <button onClick={toggleTheme} className="text-xs font-mono text-muted-foreground ml-1">
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
             <button onClick={signOut} className="text-xs font-mono text-muted-foreground ml-1">
@@ -224,7 +227,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <main className="flex-1 md:py-6 md:px-8 pt-28 pb-10 px-4 max-w-7xl text-foreground">{children}</main>
+      <main className="flex-1 md:py-6 md:px-8 pt-28 pb-10 px-4 max-w-7xl text-foreground">
+        {children}
+      </main>
     </div>
   );
 }

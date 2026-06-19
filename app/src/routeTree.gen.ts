@@ -16,6 +16,7 @@ import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedSystemHealthRouteImport } from './routes/_authenticated/system-health'
 import { Route as AuthenticatedSupportRouteImport } from './routes/_authenticated/support'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
+import { Route as AuthenticatedLiveStreamRouteImport } from './routes/_authenticated/live-stream'
 import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
 import { Route as AuthenticatedHealthRouteImport } from './routes/_authenticated/health'
 import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticated/feedback'
@@ -59,6 +60,11 @@ const AuthenticatedSupportRoute = AuthenticatedSupportRouteImport.update({
 const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedLiveStreamRoute = AuthenticatedLiveStreamRouteImport.update({
+  id: '/live-stream',
+  path: '/live-stream',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedInsightsRoute = AuthenticatedInsightsRouteImport.update({
@@ -120,6 +126,7 @@ export interface FileRoutesByFullPath {
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/health': typeof AuthenticatedHealthRoute
   '/insights': typeof AuthenticatedInsightsRoute
+  '/live-stream': typeof AuthenticatedLiveStreamRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/support': typeof AuthenticatedSupportRoute
   '/system-health': typeof AuthenticatedSystemHealthRoute
@@ -137,6 +144,7 @@ export interface FileRoutesByTo {
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/health': typeof AuthenticatedHealthRoute
   '/insights': typeof AuthenticatedInsightsRoute
+  '/live-stream': typeof AuthenticatedLiveStreamRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/support': typeof AuthenticatedSupportRoute
   '/system-health': typeof AuthenticatedSystemHealthRoute
@@ -156,6 +164,7 @@ export interface FileRoutesById {
   '/_authenticated/feedback': typeof AuthenticatedFeedbackRoute
   '/_authenticated/health': typeof AuthenticatedHealthRoute
   '/_authenticated/insights': typeof AuthenticatedInsightsRoute
+  '/_authenticated/live-stream': typeof AuthenticatedLiveStreamRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/support': typeof AuthenticatedSupportRoute
   '/_authenticated/system-health': typeof AuthenticatedSystemHealthRoute
@@ -175,6 +184,7 @@ export interface FileRouteTypes {
     | '/feedback'
     | '/health'
     | '/insights'
+    | '/live-stream'
     | '/reports'
     | '/support'
     | '/system-health'
@@ -192,6 +202,7 @@ export interface FileRouteTypes {
     | '/feedback'
     | '/health'
     | '/insights'
+    | '/live-stream'
     | '/reports'
     | '/support'
     | '/system-health'
@@ -210,6 +221,7 @@ export interface FileRouteTypes {
     | '/_authenticated/feedback'
     | '/_authenticated/health'
     | '/_authenticated/insights'
+    | '/_authenticated/live-stream'
     | '/_authenticated/reports'
     | '/_authenticated/support'
     | '/_authenticated/system-health'
@@ -272,6 +284,13 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/reports'
       preLoaderRoute: typeof AuthenticatedReportsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/live-stream': {
+      id: '/_authenticated/live-stream'
+      path: '/live-stream'
+      fullPath: '/live-stream'
+      preLoaderRoute: typeof AuthenticatedLiveStreamRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/insights': {
@@ -349,6 +368,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFeedbackRoute: typeof AuthenticatedFeedbackRoute
   AuthenticatedHealthRoute: typeof AuthenticatedHealthRoute
   AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
+  AuthenticatedLiveStreamRoute: typeof AuthenticatedLiveStreamRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedSupportRoute: typeof AuthenticatedSupportRoute
   AuthenticatedSystemHealthRoute: typeof AuthenticatedSystemHealthRoute
@@ -365,6 +385,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFeedbackRoute: AuthenticatedFeedbackRoute,
   AuthenticatedHealthRoute: AuthenticatedHealthRoute,
   AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
+  AuthenticatedLiveStreamRoute: AuthenticatedLiveStreamRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedSupportRoute: AuthenticatedSupportRoute,
   AuthenticatedSystemHealthRoute: AuthenticatedSystemHealthRoute,
