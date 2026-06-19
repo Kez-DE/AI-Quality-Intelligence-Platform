@@ -1,289 +1,148 @@
-# Deploy lên Railway với Docker
+# Deploy lên Railway
 
-## Kiến trúc
+Hệ thống chạy trên Railway dưới dạng **6 service riêng**, build từ Docker, deploy tự động qua GitHub Actions khi push lên `main`. Supabase là dịch vụ ngoài (cloud), không nằm trong Railway.
+
+## Kiến trúc 6 service
+
+| Railway service | Build từ | Chạy gì | Public domain |
+|-----------------|----------|---------|:-------------:|
+| `frontend` | `app/Dockerfile` | TanStack Start node-server (port 3000) | ✅ |
+| `backend` | `pipeline/Dockerfile` | FastAPI uvicorn `main:app` (port 8000) | ✅ |
+| `backend-worker` | `pipeline/Dockerfile.workers` | `worker_ticket.py` — vòng đời ticket | ❌ |
+| `ingest-worker` | `pipeline/Dockerfile.workers` | `worker_ingest.py` — live stream nạp dataset | ❌ |
+| `ml-worker` | `pipeline/Dockerfile.workers` | `worker_ml.py` — chấm risk bằng LLM | ❌ |
+| `agent-worker` | `pipeline/Dockerfile.workers` | `worker_agent.py` — multi-agent pipeline | ❌ |
+
+`backend` và 4 worker dùng **chung source** (`pipeline/` + `data/`). Bốn worker build từ cùng một Dockerfile (`Dockerfile.workers`); mỗi service chọn entrypoint bằng biến `WORKER_MODULE` (ví dụ `worker_ticket`, `worker_agent`).
 
 ```
-Railway Project (C2-App-116)
-├── backend          (Empty Service → pipeline/Dockerfile)
-├── backend-worker   (Empty Service → pipeline/Dockerfile.worker, optional cho demo ổn định)
-├── frontend         (Empty Service → app/Dockerfile)
-└── Supabase  (external, giữ nguyên cloud)
+Railway Project
+├── frontend        app/Dockerfile           → port 3000, public
+├── backend         pipeline/Dockerfile      → port 8000, public
+├── backend-worker  Dockerfile.workers       → WORKER_MODULE=worker_ticket
+├── ingest-worker   Dockerfile.workers       → WORKER_MODULE=worker_ingest
+├── ml-worker       Dockerfile.workers       → WORKER_MODULE=worker_ml
+└── agent-worker    Dockerfile.workers       → WORKER_MODULE=worker_agent
+
+Supabase (external cloud) ← tất cả service kết nối qua env var
 ```
 
-Tối thiểu giữ 2 service `frontend` + `backend`. Khi cần demo thật ổn định, thêm `backend-worker` để tách background jobs khỏi API:
+## Vì sao tách worker khỏi web API
 
-- Scale độc lập (backend nặng ML, frontend nhẹ)
-- Worker chạy live stream / ticket workflow riêng, tránh API bị nghẽn bởi scheduler
-- Deploy riêng khi chỉ sửa 1 phần
-- Dễ debug logs từng service
+Các job định kỳ (ticket workflow, live stream, ML scoring, multi-agent) chạy trong worker riêng, không nhét vào `backend`. Lý do: nếu cả web API và worker cùng giữ scheduler thì job sẽ chạy trùng. Web API chỉ giữ scheduler cho job thủ công on-demand (ví dụ `POST /api/live-stream/start`). Tách ra còn cho phép scale và tắt từng phần độc lập, ví dụ tắt `agent-worker` để tiết kiệm LLM cost mà không ảnh hưởng API.
 
 ---
 
-## Bước 1: Tạo project trên Railway
+## Deploy tự động qua GitHub Actions
 
-1. Vào [railway.app](https://railway.app), đăng nhập
-2. **New Project** → chọn **Empty Project**
-3. Đặt tên: `c2-app-116`
+Đây là cơ chế deploy chính. Repo dùng `.github/workflows/railway.yml` chạy trên **self-hosted runner**, gọi `railway up --ci` cho từng service. Railway **không** tự watch GitHub repo; mọi deploy đi qua workflow này.
 
----
+Workflow trigger khi push `main` và có thay đổi trong các path: `app/**`, `pipeline/**`, `data/**`, `.env.example`, `railway.json`, hoặc chính file workflow.
 
-## Bước 2: Tạo Backend service
+Quy tắc detect service cần deploy (job `changes`):
 
-1. Trong project, click **+ New** → **Empty Service**
-2. Đặt tên service: `backend`
-3. Vào tab **Settings** của service:
-   - **Source**: Connect GitHub repo `AI20K-Build-Cohort-2/C2-App-116`
-   - **Build**: chọn **Dockerfile**
-   - **Dockerfile Path**: `pipeline/Dockerfile`
-   - **Watch Paths**: `pipeline/**`, `data/**` (chỉ redeploy khi thay đổi backend)
-4. Tab **Networking**:
-   - Click **Generate Domain** (lấy URL public, ví dụ `backend-xxx.up.railway.app`)
-   - Hoặc chỉ dùng Internal Networking nếu frontend cùng project
-5. Tab **Variables** → thêm env vars:
+- Đổi `app/**` → deploy `frontend`.
+- Đổi `pipeline/**` hoặc `data/**` → deploy `backend` **và cả 4 worker** (vì share chung source).
+- Đổi `railway.json`, `.env.example`, hoặc workflow → tính là đổi cả frontend lẫn backend.
 
-```
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
-SUPABASE_SERVICE_ROLE_KEY=eyJ...
-LLM_PROVIDER=auto
-OPENROUTER_API_KEY=sk-or-...
-PORT=8000
+Vì chỉ sửa file `.md` (không nằm trong watch path) sẽ **không** trigger deploy service nào.
 
-# Khi đã dùng backend-worker, tắt background loop trong API để tránh chạy trùng.
-LIVE_STREAM_ENABLED=false
-AUTO_TICKET_WORKFLOW_ENABLED=false
-```
+### Deploy thủ công
+
+Vào tab **Actions** trên GitHub → workflow **Deploy to Railway** → **Run workflow**, chọn `target`: `all`, `frontend`, `backend`, `backend-worker`, `ingest-worker`, `ml-worker`, hoặc `agent-worker`.
+
+### Secrets và variables cần có
+
+Vào GitHub repo → **Settings** → **Secrets and variables** → **Actions**:
+
+| Tên | Loại | Giá trị |
+|-----|------|---------|
+| `RAILWAY_TOKEN` | Secret | Project token lấy từ Railway → Settings → Tokens |
+| `RAILWAY_PROJECT_ID` | Secret | Project ID (xem qua `railway status` hoặc URL project) |
+| `RAILWAY_ENVIRONMENT` | Variable | Mặc định `production` nếu không set |
+
+`railway.json` ở gốc repo cấu hình builder Docker + restart policy (`ON_FAILURE`, tối đa 10 lần).
 
 ---
 
-## Bước 3: Tạo Backend Worker service (khuyến nghị cho demo thật)
+## Biến môi trường runtime
 
-1. Click **+ New** → **Empty Service**
-2. Đặt tên service: `backend-worker`
-3. Tab **Settings**:
-   - **Source**: cùng GitHub repo
-   - **Build**: chọn **Dockerfile**
-   - **Dockerfile Path**: `pipeline/Dockerfile.worker`
-   - **Watch Paths**: `pipeline/**`, `data/**`
-4. Worker không cần public domain.
-5. Tab **Variables** → thêm env vars giống backend, cộng thêm:
+GitHub Actions chỉ deploy code. Các biến runtime phải set trong **Railway Variables** của từng service.
+
+### backend + 4 worker (chung nhóm biến Supabase + LLM)
 
 ```env
 SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
-SUPABASE_SERVICE_ROLE_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=...
 LLM_PROVIDER=auto
 OPENROUTER_API_KEY=sk-or-...
+```
 
-# Worker ownership
-AUTO_TICKET_WORKFLOW_ENABLED=true
-WORKER_TICKET_WORKFLOW_INTERVAL_SECONDS=5
+Backend đọc Supabase theo chuỗi fallback: `SUPABASE_SERVICE_ROLE_KEY` > `SUPABASE_KEY` > `SUPABASE_PUBLISHABLE_KEY`. Dùng service role key để bypass RLS (RBAC kiểm ở tầng API, xem [rbac-departments.md](rbac-departments.md)).
 
-# Chỉ bật khi muốn worker tự bơm data demo.
-LIVE_STREAM_ENABLED=false
+Biến riêng theo worker:
+
+```env
+# backend-worker (worker_ticket)
+WORKER_TICKET_WORKFLOW_INTERVAL_SECONDS=15
+
+# ingest-worker (worker_ingest)
+LIVE_STREAM_ENABLED=true
 LIVE_STREAM_BATCH_SIZE=150
 LIVE_STREAM_INTERVAL_SECONDS=10
-LIVE_STREAM_LOOP=false
-LIVE_STREAM_RESET_ON_START=false
-AUTO_TICKET_ENABLED=true
-AUTO_TICKET_EVERY_BATCHES=10
-AUTO_TICKET_MAX_FEEDBACK=1000
-AUTO_TICKET_MAX_SPIKES=1
+
+# ml-worker (worker_ml)
+WORKER_ML_INTERVAL_SECONDS=60
+WORKER_ML_BATCH_SIZE=50
+
+# agent-worker (worker_agent) — tắt để tiết kiệm LLM cost
+WORKER_AGENT_ENABLED=true
+WORKER_AGENT_INTERVAL_SECONDS=300
+WORKER_AGENT_HOURS=24
 ```
 
-Nếu còn ở free/trial và cần tiết kiệm quota, có thể chưa tạo `backend-worker`; code vẫn chạy với 2 service như trước.
+### frontend
 
----
+Biến `VITE_*` được nhúng vào client bundle **lúc build**, nên phải set trước khi deploy:
 
-## Bước 4: Tạo Frontend service
-
-1. Click **+ New** → **Empty Service**
-2. Đặt tên service: `frontend`
-3. Tab **Settings**:
-   - **Source**: cùng GitHub repo
-   - **Build**: chọn **Dockerfile**
-   - **Dockerfile Path**: `app/Dockerfile`
-   - **Watch Paths**: `app/**` (chỉ redeploy khi thay đổi frontend)
-4. Tab **Networking**:
-   - Click **Generate Domain** (đây là URL user truy cập)
-   - Hoặc gắn custom domain
-5. Tab **Variables**:
-
-```
+```env
 PORT=3000
-NITRO_PORT=3000
-NITRO_HOST=0.0.0.0
 NITRO_PRESET=node-server
-
-# Trỏ tới backend service (dùng internal networking)
 BACKEND_API_URL=http://backend.railway.internal:8000
 VITE_BACKEND_API_URL=https://backend-xxx.up.railway.app
-
-# Supabase (cần cho SSR)
 VITE_SUPABASE_URL=https://xxx.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 ```
 
-Lưu ý: `VITE_BACKEND_API_URL` phải là URL public của backend (browser gọi trực tiếp). `BACKEND_API_URL` dùng internal networking (server-side calls).
-
----
-
-## Bước 5: Kết nối service
-
-Railway cung cấp internal networking miễn phí giữa các service cùng project:
-
-- Frontend gọi backend qua: `http://backend.railway.internal:8000`
-- Browser gọi backend qua: `https://backend-xxx.up.railway.app`
-- Worker gọi Supabase/OpenRouter trực tiếp qua env vars, không cần domain.
-
-Vào backend **Settings** → **Networking** → đảm bảo **Private Networking** đang bật.
-
----
-
-## Bước 6: Deploy
-
-Push code lên GitHub. Railway auto-deploy khi detect thay đổi trong watch paths.
-
-Hoặc trigger thủ công: vào service → **Deployments** → **Trigger Deploy**.
-
----
-
-## CI/CD bằng GitHub Actions
-
-Repo đã có workflow: `.github/workflows/railway.yml`.
-
-Workflow này chạy khi push lên branch `main`:
-
-- Sửa `app/**` → deploy Railway service `frontend`
-- Sửa `pipeline/**` hoặc `data/**` → deploy Railway service `backend`
-- Nếu bật `RAILWAY_DEPLOY_BACKEND_WORKER=true`, sửa `pipeline/**` hoặc `data/**` cũng deploy `backend-worker`
-- Sửa `.env.example`, `railway.json`, hoặc workflow deploy → deploy cả service liên quan
-- Có thể chạy thủ công trong tab **Actions** → **Deploy to Railway** → chọn `all`, `frontend`, `backend`, hoặc `backend-worker`
-
-### Bước 1: Tạo Railway token
-
-Trong Railway:
-
-1. Vào project `c2-app-116`
-2. Mở **Settings** → **Tokens**
-3. Tạo project token
-4. Copy token để đưa vào GitHub Secret
-
-### Bước 2: Lấy Railway Project ID
-
-Trong Railway project, Project ID thường nằm trong Settings hoặc URL project. Nếu đã cài Railway CLI local:
-
-```bash
-railway status
-```
-
-Copy `Project ID`.
-
-### Bước 3: Thêm GitHub Secrets/Variables
-
-Vào GitHub repo → **Settings** → **Secrets and variables** → **Actions**.
-
-Thêm **Repository secrets**:
-
-```env
-RAILWAY_TOKEN=your_railway_project_token
-RAILWAY_PROJECT_ID=your_railway_project_id
-```
-
-Tuỳ chọn thêm **Repository variable** nếu environment Railway không phải `production`:
-
-```env
-RAILWAY_ENVIRONMENT=production
-```
-
-Nếu đã tạo service `backend-worker` và muốn deploy tự động theo push:
-
-```env
-RAILWAY_DEPLOY_BACKEND_WORKER=true
-```
-
-### Bước 4: Kiểm tra tên service
-
-Workflow đang deploy tới các Railway service:
-
-```txt
-frontend
-backend
-backend-worker
-```
-
-Nếu tên service trên Railway khác, sửa lại `--service ...` tương ứng trong `.github/workflows/railway.yml`.
-
-### Lưu ý env vars
-
-GitHub Actions chỉ trigger deploy code. Các biến runtime như `OPENROUTER_API_KEY`, `LLM_PROVIDER`, `VITE_SUPABASE_URL`, `VITE_BACKEND_API_URL` vẫn phải cấu hình trong **Railway Variables** của từng service.
+`VITE_BACKEND_API_URL` là URL public (browser gọi trực tiếp). `BACKEND_API_URL` dùng internal networking cho server-side call.
 
 ---
 
 ## Test local với Docker Compose
 
-Trước khi push lên Railway, test local:
+`docker-compose.yml` chỉ để test local (Railway deploy từng service từ Dockerfile riêng, không từ compose). Compose chỉ dựng `backend` + `frontend`:
 
 ```bash
-cd C2-App-116
-
-# Build và chạy cả 2 service
 docker compose up --build
-
 # Frontend: http://localhost:3000
 # Backend:  http://localhost:8000/health
-```
-
-Dừng:
-```bash
 docker compose down
 ```
 
 ---
 
-## Cách dùng Docker Image trên Railway (thay vì GitHub source)
-
-Nếu muốn push Docker image lên registry rồi Railway pull:
-
-```bash
-# Build
-docker build -f pipeline/Dockerfile -t c2-backend .
-docker build -f app/Dockerfile -t c2-frontend .
-
-# Tag cho Docker Hub hoặc GHCR
-docker tag c2-backend ghcr.io/ai20k-build-cohort-2/c2-backend:latest
-docker tag c2-frontend ghcr.io/ai20k-build-cohort-2/c2-frontend:latest
-
-# Push
-docker push ghcr.io/ai20k-build-cohort-2/c2-backend:latest
-docker push ghcr.io/ai20k-build-cohort-2/c2-frontend:latest
-```
-
-Trên Railway: **+ New** → **Docker Image** → nhập image URL.
-
----
-
 ## Troubleshooting
 
-### Build frontend fail: "Cannot find module @lovable.dev/vite-tanstack-config"
-Package này nằm trong `node_modules`. Đảm bảo `npm ci` chạy trước `npm run build` trong Dockerfile.
+**Backend healthy nhưng RAG trả rỗng:** kiểm tra `data/` đã được `COPY` vào image (`pipeline/Dockerfile` dòng `COPY data/ /app/data/`). KB retriever resolve path `/app/data/knowledge_base` và `/app/data/public_kb` trong container.
 
-### Backend crash: "No module named 'sklearn'"
-Check requirements.txt có `scikit-learn>=1.6.1`. ML models cần đúng version.
+**Backend crash "No module named sklearn":** `requirements.txt` cần `scikit-learn`; model `.joblib` phải khớp version.
 
-### Frontend không gọi được backend
-- Kiểm tra `VITE_BACKEND_API_URL` là URL public (có https)
-- Kiểm tra backend service có domain public
-- CORS trong `main.py` đã allow origin của frontend
+**Frontend không gọi được backend:** `VITE_BACKEND_API_URL` phải là URL public có `https`, backend phải có domain public, và CORS trong `main.py` allow origin frontend.
 
-### Nitro vẫn build Cloudflare target
-Set env var `NITRO_PRESET=node-server` trong Railway variables. File `vite.config.ts` đã detect biến này.
+**Worker chạy sai entrypoint:** kiểm tra biến `WORKER_MODULE` của service đó trên Railway (ví dụ `agent-worker` phải set `WORKER_MODULE=worker_agent`).
 
 ---
 
 ## Chi phí
 
-Railway Hobby plan (5$/tháng):
-- 8GB RAM / 8 vCPU shared
-- 500 giờ execution / tháng (đủ cho 2 service chạy liên tục)
-- Nếu chỉ cần demo: dùng trial credit miễn phí
+Railway Hobby ($5/tháng) là gói thuê bao kèm $5 tín dụng tài nguyên, tính theo mức dùng thật (RAM, CPU, disk theo giây). Đây là hạn mức, không phải "dùng vô hạn": vượt $5 thì trả thêm phần vượt. RAM thường trực là khoản tốn nhất, nên các worker tốn LLM (`agent-worker`, `ml-worker`) đều có cờ tắt để tiết kiệm khi không demo.

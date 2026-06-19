@@ -12,7 +12,7 @@
 
 Mục tiêu: giúp đội ngũ vận hành nắm bắt nhanh vấn đề chất lượng dịch vụ, giảm thời gian xử lý, và đưa ra quyết định dựa trên dữ liệu.
 
-> **Phạm vi**: chạy local, không Docker, chưa deploy public URL. Sử dụng Supabase cloud + FastAPI + Vite.
+> **Phạm vi**: chạy được cả local lẫn deploy. Production chạy trên Railway (6 service Docker) + Supabase cloud. Stack: FastAPI + Vite + Supabase.
 
 ---
 
@@ -24,7 +24,7 @@ Mục tiêu: giúp đội ngũ vận hành nắm bắt nhanh vấn đề chất 
 | 2 | Che giấu PII | Tự động mask SĐT, email, biển số xe |
 | 3 | Ma trận Rủi ro Sâu | Chấm điểm 5 chiều (safety, fraud, attitude, vehicle, compliance) qua LLM Scoring Agent |
 | 4 | Phát hiện Spike | Nhận diện điểm nóng → tự động tạo alert ticket |
-| 5 | Multi-Agent | 6 agent nghiệp vụ + Orchestrator |
+| 5 | Multi-Agent | 8 agent nghiệp vụ + Orchestrator |
 | 6 | Phân tích phòng ban | Insights 6 phòng ban với phân tích sâu bằng LLM |
 | 7 | Human-in-the-Loop | Hàng đợi duyệt nhãn — nhân viên sửa nhãn AI, ghi correction log |
 | 8 | AI Chat | Hỏi đáp trực tiếp về dữ liệu phản hồi |
@@ -45,12 +45,14 @@ Mục tiêu: giúp đội ngũ vận hành nắm bắt nhanh vấn đề chất 
                        ▼
 ┌─────────────────────────────────────────────────┐
 │            BACKEND (pipeline/)                   │
-│  FastAPI + scikit-learn + LM Agents             │
+│  FastAPI + scikit-learn + LLM Agents            │
 │                                                 │
 │  clean.py → classifier.py → rules.py           │
 │  spike_detector.py → llm_agent.py              │
-│  agents/ (orchestrator, router, insight,        │
-│           analyst, alert, ingestion)            │
+│  agent/   chat ReAct + RAG + model router       │
+│  agents/  orchestrator + 8 agent nghiệp vụ      │
+│                                                 │
+│  4 worker: ticket · ingest · ml · agent         │
 └──────────────────────┬──────────────────────────┘
                        │ SQL / Realtime
                        ▼
@@ -60,7 +62,7 @@ Mục tiêu: giúp đội ngũ vận hành nắm bắt nhanh vấn đề chất 
 └─────────────────────────────────────────────────┘
 ```
 
-LLM Providers: OpenRouter, OpenAI, Gemini, Groq (cấu hình qua `LLM_PROVIDER` trong `.env`).
+LLM Providers: OpenRouter, OpenAI, Gemini, Groq (cấu hình qua `LLM_PROVIDER` trong `.env`). Deploy: 6 Railway service Docker, xem [`docs/deploy-railway.md`](docs/deploy-railway.md).
 
 ---
 
@@ -132,19 +134,26 @@ Mở: [http://localhost:5174](http://localhost:5174)
 C2-App-116/
 ├── app/                    Frontend (React 19 / TanStack Start / Vite 7)
 │   └── src/routes/         dashboard, feedback, alerts, insights, chat, admin
-├── pipeline/               Backend (FastAPI + ML + Agent pipeline)
-│   ├── main.py             API chính
+├── pipeline/               Backend (FastAPI + ML + Agent)
+│   ├── main.py             API chính + endpoint handlers
 │   ├── classifier.py       ML classifier (TF-IDF/LinearSVC)
 │   ├── clean.py            PII masking
 │   ├── rules.py            Rule engine tiếng Việt
 │   ├── spike_detector.py   Phát hiện spike P4/P5
-│   ├── llm_agent.py        LLM scoring & ticket generation
-│   ├── agents/             Multi-agent system
-│   └── ml/                 Model .joblib + experiment scripts
+│   ├── llm_agent.py        LLM phân tích spike
+│   ├── agent/              Chat ReAct + RAG (nội bộ/khách) + model router
+│   ├── agents/             8 agent nghiệp vụ + orchestrator (batch)
+│   ├── services/           Live stream, ticket workflow, agent context
+│   ├── worker_*.py         4 worker: ticket / ingest / ml / agent
+│   ├── core/               Path/config dùng chung
+│   └── ml/                 Model .joblib + script train
 ├── supabase/               Migration SQL + cấu hình
-├── data/                   Training data & datasets
-├── docs/                   Tài liệu chi tiết
-├── scripts/                Utility scripts
+├── data/
+│   ├── knowledge_base/     KB nội bộ cho RAG theo phòng (sop/sla/tech/tickets)
+│   ├── public_kb/          FAQ khách cho chatbot guest
+│   ├── taxonomy/           routing_table, severity_rules, safety_keywords
+│   └── raw/ processed/     Dataset review + nhãn
+├── docs/                   Tài liệu chi tiết (xem mục Tài liệu)
 ├── Todo.md                 Backlog cải tiến
 ├── JOURNAL.md              Nhật ký cohort
 └── WORKLOG.md              Quyết định kỹ thuật
@@ -164,10 +173,12 @@ C2-App-116/
 | Quản lý người dùng | ✅ | ❌ | ❌ | ❌ |
 | Trigger Operations | ✅ | ❌ | ❌ | ❌ |
 
-- **Admin**: toàn quyền, quản lý user, trigger ingest/streaming
-- **Manager**: giám sát — alerts, feedback, insights, chat
-- **Staff**: công việc hàng ngày — feedback, chat
+- **Admin**: toàn quyền, quản lý user, trigger ingest/streaming, xem mọi phòng
+- **Manager**: giám sát phòng mình — alerts, feedback, insights, reports, chat
+- **Staff**: công việc hàng ngày phòng mình — feedback, tasks, chat
 - **Guest**: dashboard, feedback, chat hỗ trợ CSKH
+
+Ngoài role, mỗi ops user gắn một **phòng ban** (IT/Safety/CSKH/Vận hành/Pricing/Marketing) quyết định họ thấy dữ liệu của ai. Manager/staff chỉ xem và thao tác trong phòng mình; admin xem tất cả. Chi tiết cơ chế scope: [`docs/rbac-departments.md`](docs/rbac-departments.md).
 
 ---
 
@@ -188,16 +199,33 @@ Kịch bản chi tiết: [`docs/demo-script.md`](docs/demo-script.md)
 
 ## Tài liệu
 
+**Bắt đầu**
+
 | File | Nội dung |
 |------|----------|
 | [`docs/setup-macos.md`](docs/setup-macos.md) | Cài đặt trên macOS |
 | [`docs/setup-windows.md`](docs/setup-windows.md) | Cài đặt trên Windows |
-| [`docs/setup-supabase.md`](docs/setup-supabase.md) | Cấu hình Supabase |
-| [`docs/architecture.md`](docs/architecture.md) | Kiến trúc hệ thống |
-| [`docs/agents-guide.md`](docs/agents-guide.md) | Hệ thống multi-agent |
+| [`docs/setup-supabase.md`](docs/setup-supabase.md) | Cấu hình Supabase (auth, schema, migration) |
+| [`pipeline/README.md`](pipeline/README.md) | Backend/ML pipeline chi tiết |
+
+**Kiến trúc & AI**
+
+| File | Nội dung |
+|------|----------|
+| [`docs/architecture.md`](docs/architecture.md) | Kiến trúc tổng thể, 3 tầng, cấu trúc data, 6 service |
+| [`docs/architecture-diagram.md`](docs/architecture-diagram.md) | Sơ đồ Mermaid các module |
+| [`docs/ai-systems.md`](docs/ai-systems.md) | 4 lớp AI, LLM router, luồng dữ liệu theo worker |
+| [`docs/agents-guide.md`](docs/agents-guide.md) | 8 agent + orchestrator: thứ tự thực thi, I/O, routing |
+| [`docs/rbac-departments.md`](docs/rbac-departments.md) | Phân quyền role + scope theo phòng ban |
+
+**Vận hành**
+
+| File | Nội dung |
+|------|----------|
+| [`docs/deploy-railway.md`](docs/deploy-railway.md) | Deploy 6 service lên Railway qua GitHub Actions |
 | [`docs/demo-script.md`](docs/demo-script.md) | Kịch bản demo 5-7 phút |
-| [`docs/guest-account.md`](docs/guest-account.md) | Cơ chế tài khoản khách |
-| [`pipeline/README.md`](pipeline/README.md) | Hướng dẫn backend/ML pipeline |
+| [`docs/guest-account.md`](docs/guest-account.md) | Cơ chế tài khoản khách + chatbot CSKH |
+| [`docs/eval-evidence.md`](docs/eval-evidence.md) | Bằng chứng đánh giá model (Gate G2) |
 
 ---
 
@@ -206,7 +234,7 @@ Kịch bản chi tiết: [`docs/demo-script.md`](docs/demo-script.md)
 | Layer | Công nghệ |
 |-------|-----------|
 | Frontend | React 19, TanStack Start/Router/Query, Vite 7, Tailwind CSS 4, shadcn/ui, Recharts |
-| Backend | FastAPI, Python 3.10+, scikit-learn (TF-IDF + LinearSVC) |
+| Backend | FastAPI, Python 3.10+, scikit-learn (TF-IDF + LinearSVC), multi-agent LLM |
 | LLM | OpenRouter / OpenAI / Gemini / Groq (multi-provider) |
 | Database | Supabase (PostgreSQL + Auth + Realtime) |
 

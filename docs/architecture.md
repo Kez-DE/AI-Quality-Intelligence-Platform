@@ -14,38 +14,54 @@ C2-App-116/
 
 Supabase là trục nối: pipeline Python **ghi** kết quả, frontend **đọc** để hiển thị (realtime). Backend FastAPI chịu trách nhiệm xử lý + xác thực; frontend cũng đọc trực tiếp Supabase qua RLS cho realtime subscription.
 
-## Module ownership để dễ fix bug
+## Cấu trúc thư mục `data/`
 
-Mặc định hạ tầng giữ 2 service để tiết kiệm quota:
+```
+data/
+├── knowledge_base/       KB nội bộ cho RAG theo phòng ban (mock tự soạn)
+│   ├── sop/              5 quy trình xử lý (tai nạn, quấy rối, gian lận, mất đồ, thái độ)
+│   ├── sla/              1 file cam kết bồi thường chuẩn
+│   ├── tech/             2 file lỗi kỹ thuật (thanh toán, không nhận cước)
+│   └── tickets/          1 file case study P5 làm few-shot cho AI
+├── public_kb/            FAQ khách hàng cho chatbot guest (audience: public)
+├── taxonomy/             routing_table.json, severity_rules.json, safety_keywords.json
+├── reference/            area_catalog.json (16 khu vực HN/HCM/ĐN), enrichment
+├── raw/                  Dataset review công khai (Google Play + App Store)
+└── processed/            seed_real_clean.json — nguồn ingest chính
+```
 
-- `frontend` → build từ `app/Dockerfile`
-- `backend` → build từ `pipeline/Dockerfile`
+Mỗi file trong `knowledge_base/` có YAML frontmatter `department` để RAG lọc theo phòng. KB nội bộ chỉ phủ 4 phòng (Safety, CSKH, Vận hành, IT); `public_kb/` gắn `topic_group` theo phòng nhưng mở cho mọi khách. Xem [agents-guide.md](agents-guide.md) và [rbac-departments.md](rbac-departments.md).
 
-Khi cần demo thật ổn định hơn, có thể bật service thứ 3:
+## Hạ tầng: 6 Railway service
 
-- `backend-worker` → build từ `pipeline/Dockerfile.worker`, chạy `pipeline/worker.py`
+Hệ thống deploy thành 6 service riêng (xem chi tiết ở [deploy-railway.md](deploy-railway.md)):
 
-Code bên trong đã được tách theo module để khi lỗi thì sửa đúng phần:
+- `frontend` → `app/Dockerfile`
+- `backend` (web API) → `pipeline/Dockerfile`
+- `backend-worker`, `ingest-worker`, `ml-worker`, `agent-worker` → cùng `pipeline/Dockerfile.workers`, chọn entrypoint qua biến `WORKER_MODULE`
+
+Web API và 4 worker dùng chung source `pipeline/` + `data/`. Job định kỳ (ticket workflow, live stream, ML scoring, multi-agent) chạy trong worker riêng để không trùng với scheduler on-demand của web API.
+
+Code bên trong tách theo module để khi lỗi thì sửa đúng phần:
 
 ```
 pipeline/
 ├── core/                 Path/config dùng chung cho backend
 ├── services/             Live stream, ticket workflow, agent context
-├── agents/               Multi-agent phân tích theo phòng ban
-├── agent/                LLM provider routing/failover
+├── agents/               8 agent nghiệp vụ + orchestrator (batch)
+├── agent/                Chat agent ReAct + RAG + LLM provider router
+├── ml/                   Model .joblib + script train
 ├── main.py               FastAPI app wiring + endpoint handlers
-└── ingest/classifier/... Pipeline xử lý dữ liệu
+├── worker_*.py           4 entrypoint worker (ticket/ingest/ml/agent)
+└── classifier.py, clean.py, rules.py, spike_detector.py, ...
 
 app/src/
 ├── features/             Logic theo feature/domain
-│   └── momo-chat/        Parser, mock contacts, types cho Momo chat demo
-├── components/           UI components
+├── components/           UI components (AppShell, DepartmentBadge, ...)
 ├── routes/               TanStack route screens
 ├── integrations/         Supabase clients/auth middleware
 └── lib/                  Shared frontend helpers/API client
 ```
-
-Với Railway free/trial, giữ `backend-worker` tắt nếu cần tiết kiệm runtime/quota. Khi demo thật cần uptime ổn định hơn, nâng Railway Hobby `$5` rồi bật `backend-worker` để scheduler/live stream/ticket workflow chạy riêng khỏi API.
 
 ## Luồng xử lý
 
@@ -122,14 +138,17 @@ Trang `/feedback` tách 2 luồng rõ ràng:
 
 ## Multi-agent layer
 
-`pipeline/agents/` — 6 agent phân tích theo phòng ban (IT/Safety/CSKH/Vận hành/Pricing/Marketing):
+`pipeline/agents/` — 8 agent nghiệp vụ + orchestrator, phân tích theo phòng ban (IT/Safety/CSKH/Vận hành/Pricing/Marketing). Điều phối bởi `orchestrator.run_agent_pipeline()` chạy trong `agent-worker`:
 
-- **router_agent** — định tuyến ticket theo topic→phòng ban + SLA; P5 override → Safety.
-- **insight_agent** — gom metric/topic theo phòng ban.
-- **analyst_agent** — gọi LLM phân tích root cause + action items.
 - **alert_agent** — phân cấp WATCH/WARNING/CRITICAL + chống alert trùng (cooldown).
-- **orchestrator** — điều phối quét toàn bộ phòng ban.
-- **common** — bridge LLM + DB.
+- **router_agent** — định tuyến ticket theo topic → phòng ban + SLA; P5 override → Safety.
+- **ticket_agent** — tạo/cập nhật ticket vào bảng `alerts`.
+- **task_agent** — gom alert thành task theo `(team, area)`.
+- **insight_agent** — gom metric/topic theo phòng ban.
+- **analyst_agent** — gọi LLM phân tích root cause + action items, có persona theo phòng.
+- **ingestion_agent** và **scoring_agent** — chạy độc lập ngoài orchestrator (ingest + ml-worker).
+
+Chi tiết thứ tự thực thi và I/O từng agent: [agents-guide.md](agents-guide.md).
 
 Endpoint: `GET /api/insights/departments`, `GET /api/insights/departments/{team}`, `POST /api/agent/run`.
 

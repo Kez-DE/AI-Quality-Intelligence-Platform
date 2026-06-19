@@ -8,7 +8,7 @@ Tài liệu mô tả kiến trúc AI của dự án: các lớp AI, luồng dữ
 
 ## Tổng quan
 
-Hệ thống có **4 lớp AI** chạy trên dataset feedback gọi xe (lưu ở Supabase), điều phối qua **5 background worker** (Railway services). Mọi lệnh gọi LLM đi qua **một cổng router duy nhất** có failover — đổi provider/model chỉ cần sửa env var, không sửa code.
+Hệ thống có **4 lớp AI** chạy trên dataset feedback gọi xe (lưu ở Supabase), vận hành bởi **1 web API + 4 background worker** (5 Railway service backend, cộng frontend là 6). Mọi lệnh gọi LLM đi qua **một cổng router duy nhất** có failover. Đổi provider/model chỉ cần sửa env var, không sửa code.
 
 | Lớp | Thành phần | Loại |
 |-----|-----------|------|
@@ -118,7 +118,7 @@ sklearn `Pipeline(TfidfVectorizer(ngram 1-2, max_features=30000, sublinear_tf) +
 
 ---
 
-## E. Workers (5 Railway services)
+## E. Workers (1 web API + 4 worker)
 
 Tất cả dùng APScheduler + signal handling.
 
