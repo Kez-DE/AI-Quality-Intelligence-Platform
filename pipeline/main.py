@@ -605,9 +605,21 @@ def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
         # Guests get a restricted customer-support-only chatbot
         if not payload.messages:
             raise HTTPException(status_code=400, detail="messages must be a non-empty list")
+        # RAG công khai: lấy câu hỏi cuối của khách -> tra public KB (chính sách/FAQ).
+        last_user_q = next(
+            (m.content for m in reversed(payload.messages) if m.role == "user" and m.content.strip()),
+            "",
+        )
         normalized = [
             {"role": "system", "content": GUEST_SYSTEM_PROMPT},
         ]
+        if last_user_q:
+            try:
+                from agent.public_kb import search_public_knowledge, format_public_for_prompt
+                kb = format_public_for_prompt(search_public_knowledge(mask_pii(last_user_q), top_k=3))
+                normalized.append({"role": "system", "content": kb})
+            except Exception as exc:
+                print(f"[agent_chat] public KB lookup failed: {exc}", flush=True)
         for message in payload.messages[-30:]:
             if message.role not in {"user", "assistant", "system"} or not message.content.strip():
                 raise HTTPException(status_code=400, detail="Invalid chat message")
