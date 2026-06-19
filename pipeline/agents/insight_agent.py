@@ -72,7 +72,8 @@ def generate_department_insights(team: str, hours: int = 24) -> Dict[str, Any]:
             status="success",
             latency_ms=latency_ms,
             output_summary="0 feedback found.",
-            input_hash=f"{team}_{hours}"
+            input_hash=f"{team}_{hours}",
+            team=team
         )
         return output.model_dump()
 
@@ -117,7 +118,8 @@ def generate_department_insights(team: str, hours: int = 24) -> Dict[str, Any]:
         status="success",
         latency_ms=latency_ms,
         output_summary=f"{total_feedback} feedbacks aggregated.",
-        input_hash=f"{team}_{hours}"
+        input_hash=f"{team}_{hours}",
+        team=team
     )
 
     return output.model_dump()

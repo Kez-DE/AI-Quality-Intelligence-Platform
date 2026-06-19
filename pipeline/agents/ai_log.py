@@ -37,9 +37,14 @@ def log_agent_event(
     error_message: str = "",
     provider: str = "",
     model: str = "",
+    team: str = "",
+    source: str = "pipeline",
     **extra,
 ) -> None:
     """Ghi 1 sự kiện vận hành agent ra file JSONL theo ngày.
+
+    team: phòng ban gắn với sự kiện (Safety/IT/.../admin/guest) để bóc log theo phòng.
+    source: 'pipeline' (6 agent nghiệp vụ) | 'chat' (chat agent theo account).
 
     Best-effort: mọi lỗi I/O đều nuốt để KHÔNG bao giờ làm vỡ pipeline agent.
     """
@@ -49,6 +54,8 @@ def log_agent_event(
         "ts": datetime.now(timezone.utc).isoformat(),
         "agent": agent_name,
         "status": status,
+        "team": team,
+        "source": source,
         "run_id": run_id,
         "latency_ms": latency_ms,
         "summary": output_summary,
@@ -67,8 +74,11 @@ def log_agent_event(
         print(f"[ai_log] write failed: {exc}", flush=True)
 
 
-def read_recent(limit: int = 100, agent_name: str = "") -> list[dict]:
-    """Đọc N dòng log gần nhất của hôm nay (lọc theo agent nếu truyền)."""
+def read_recent(limit: int = 100, agent_name: str = "", team: str = "") -> list[dict]:
+    """Đọc N dòng log gần nhất của hôm nay.
+
+    agent_name: lọc theo tên agent nếu truyền.
+    team: lọc theo phòng ban nếu truyền (ops chỉ xem phòng mình)."""
     path = _today_file()
     if not path.exists():
         return []
@@ -85,6 +95,8 @@ def read_recent(limit: int = 100, agent_name: str = "") -> list[dict]:
             except Exception:
                 continue
             if agent_name and rec.get("agent") != agent_name:
+                continue
+            if team and rec.get("team") != team:
                 continue
             out.append(rec)
             if len(out) >= limit:

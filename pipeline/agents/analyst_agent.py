@@ -167,7 +167,8 @@ Trả về JSON đúng cấu trúc:
                 latency_ms=latency_ms,
                 output_summary=f"Risk level: {analysis.risk_level}, {len(analysis.action_items)} actions.",
                 error_message="",
-                input_hash=input_hash
+                input_hash=input_hash,
+                team=team
             )
             return output.model_dump()
             
@@ -183,9 +184,10 @@ Trả về JSON đúng cấu trúc:
         latency_ms=latency_ms,
         output_summary="Fallback triggered.",
         error_message=error_msg,
-        input_hash=input_hash
+        input_hash=input_hash,
+        team=team
     )
-    
+
     return _fallback_analysis(team, insights)
 
 

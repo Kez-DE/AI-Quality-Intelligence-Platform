@@ -451,13 +451,20 @@ def agent_logs(limit: int = Query(default=50, ge=1, le=500), _: AuthUser = Depen
 def agent_ai_log(
     limit: int = Query(default=100, ge=1, le=500),
     agent: str = Query(default=""),
-    _: AuthUser = Depends(require_admin),
+    team: str = Query(default=""),
+    user: AuthUser = Depends(require_ops_staff),
 ):
-    """Log vận hành 6 agent nghiệp vụ (file JSONL), lọc theo agent nếu truyền.
+    """AI-log vận hành (6 agent nghiệp vụ + chat agent), bóc theo phòng ban.
 
-    Chỉ admin: số liệu vận hành là toàn cục, không bóc theo phòng ban."""
+    - admin: xem mọi phòng; lọc theo ?team nếu truyền (vd team=guest, team=Safety).
+    - ops đã gán phòng: CHỈ thấy log phòng mình (ép team, bỏ qua ?team).
+    - ops chưa gán phòng: 403."""
     from agents.ai_log import read_recent
-    return {"status": "success", "data": read_recent(limit=limit, agent_name=agent)}
+    if user.role == "admin":
+        scope = team or ""  # admin: tôn trọng filter tùy chọn (rỗng = tất cả)
+    else:
+        scope = scoped_team(user, None)  # ép phòng của ops; raise 403 nếu chưa gán
+    return {"status": "success", "data": read_recent(limit=limit, agent_name=agent, team=scope)}
 
 
 # Tên + cờ env của 6 agent nghiệp vụ — khớp orchestrator._agent_enabled.
@@ -571,6 +578,26 @@ def agent_stats(
     }}
 
 
+def _log_chat_event(team: str, status: str, latency_ms: int, *, provider: str = "", model: str = "", error: str = ""):
+    """Ghi ai-log cho 1 lượt chat agent, gắn phòng ban của account (guest/admin/tên phòng).
+
+    Best-effort — không bao giờ làm vỡ request chat."""
+    try:
+        from agents.ai_log import log_agent_event
+        log_agent_event(
+            agent_name="chat_agent",
+            status=status,
+            team=team,
+            source="chat",
+            latency_ms=latency_ms,
+            provider=provider,
+            model=model,
+            error_message=error,
+        )
+    except Exception:
+        pass
+
+
 @app.post("/api/agent/chat")
 def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
     if user.role == "guest":
@@ -587,13 +614,17 @@ def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
             # OWASP LLM: mask PII from user input before injecting into prompt
             safe_content = mask_pii(message.content) if message.role == "user" else message.content
             normalized.append({"role": message.role, "content": safe_content[:8000]})
+        _t0 = time.time()
         try:
             result = chat_completion(normalized, temperature=0.4)
         except Exception as exc:
+            _log_chat_event("guest", "error", int((time.time() - _t0) * 1000), error=str(exc)[:200])
             raise HTTPException(status_code=502, detail=f"Agent model error: {str(exc)[:300]}") from exc
         # OWASP LLM: mask PII from LLM output before returning to client
         if isinstance(result.get("content"), str):
             result["content"] = mask_pii(result["content"])
+        _log_chat_event("guest", "success", int((time.time() - _t0) * 1000),
+                        provider=result.get("provider", ""), model=result.get("model", ""))
         return {"status": "success", "data": result}
 
     # Staff / manager / admin — apply a higher rate limit to prevent LLM API key abuse
@@ -613,13 +644,19 @@ def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
         # OWASP LLM: mask PII from user input before injecting into prompt
         safe_content = mask_pii(message.content) if message.role == "user" else message.content
         normalized.append({"role": message.role, "content": safe_content[:8000]})
+    # Log theo phòng: ops -> phòng của mình; admin -> "admin" (toàn hệ thống).
+    log_team = scope_team or ("admin" if user.role == "admin" else "unassigned")
+    _t0 = time.time()
     try:
         result = run_chat_agent(normalized, temperature=0.4, scope_team=scope_team)
     except Exception as exc:
+        _log_chat_event(log_team, "error", int((time.time() - _t0) * 1000), error=str(exc)[:200])
         raise HTTPException(status_code=502, detail=f"Agent model error: {str(exc)[:300]}") from exc
     # OWASP LLM: mask PII from LLM output before returning to client
     if isinstance(result.get("content"), str):
         result["content"] = mask_pii(result["content"])
+    _log_chat_event(log_team, "success", int((time.time() - _t0) * 1000),
+                    provider=result.get("provider", ""), model=result.get("model", ""))
     return {"status": "success", "data": result}
 
 @app.post("/api/ingest-real-dataset")

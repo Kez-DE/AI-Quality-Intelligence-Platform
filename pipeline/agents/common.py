@@ -83,11 +83,15 @@ def log_agent_run(
     provider: str = "",
     model: str = "",
     token_usage: dict = None,
-    cost_estimate: float = 0.0
+    cost_estimate: float = 0.0,
+    team: str = "",
+    source: str = "pipeline",
 ):
     """Ghi log execution của agent vào file ai-log (cục bộ) + Supabase.
 
     File ai-log ghi trước để debug được ngay cả khi Supabase lỗi/mất mạng.
+
+    team: phòng ban gắn với log (để bóc ai-log theo phòng); source: 'pipeline'|'chat'.
     """
     # 1. File JSONL cục bộ — best-effort, không bao giờ làm vỡ agent
     log_agent_event(
@@ -101,6 +105,8 @@ def log_agent_run(
         model=model,
         input_hash=input_hash,
         cost_estimate=cost_estimate,
+        team=team,
+        source=source,
     )
 
     # 2. Supabase — nguồn log bền vững
