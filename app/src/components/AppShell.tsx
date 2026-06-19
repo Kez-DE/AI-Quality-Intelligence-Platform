@@ -5,8 +5,10 @@ import { useMe, ROLE_LABELS, type Role } from "@/lib/api";
 import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 import { useTheme } from "@/hooks/useTheme";
 import NotificationPanel from "@/components/NotificationPanel";
+import { DepartmentBadge } from "@/components/DepartmentBadge";
 import {
   Bell,
+  Bot,
   Building2,
   Car,
   FileText,
@@ -21,7 +23,6 @@ import {
   Headphones,
   Activity,
   User as UserIcon,
-  HeartPulse,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -43,13 +44,14 @@ const NAV: NavItem[] = [
   { to: "/support", label: "CSKH Support", icon: Headphones, roles: AUTHENTICATED_ROLES },
   { to: "/reports", label: "Báo cáo AI", icon: FileText, roles: ["admin", "manager"] },
   { to: "/insights", label: "Phân tích phòng ban", icon: Building2, roles: AUTHENTICATED_ROLES },
+  { to: "/agent-control", label: "Điều khiển Agent", icon: Bot, roles: ["admin"] },
   { to: "/chat", label: "AI Chat", icon: Sparkles, roles: ALL_ROLES },
 ];
 
 // Link chỉ hiện với admin.
-const ADMIN_NAV = [
-  { to: "/admin", label: "Quản lý người dùng", icon: Shield },
-  { to: "/health", label: "System Health", icon: Activity },
+const ADMIN_NAV: NavItem[] = [
+  { to: "/admin", label: "Quản lý người dùng", icon: Shield, roles: ["admin"] },
+  { to: "/health", label: "System Health", icon: Activity, roles: ["admin"] },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -87,6 +89,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex text-foreground">
+      {/* Badge phòng ban — góc trên bên phải (desktop). Guest/chưa gán phòng: ẩn. */}
+      <div className="hidden md:block fixed top-4 right-6 z-50">
+        <DepartmentBadge me={me} className="shadow-sm backdrop-blur bg-card/80" />
+      </div>
       {/* Sidebar */}
       <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border bg-card/90 text-card-foreground backdrop-blur sticky top-0 h-screen">
         <div className="p-5 border-b border-border">
@@ -178,6 +184,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <span className="font-display font-bold text-sm">xanhSM</span>
           </div>
           <div className="flex items-center gap-2">
+            <DepartmentBadge me={me} />
             {role !== "guest" && (
               <NotificationPanel
                 notifications={notifications}

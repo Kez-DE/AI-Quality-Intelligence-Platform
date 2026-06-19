@@ -34,6 +34,7 @@ def cluster_alerts_into_tasks() -> Dict[str, Any]:
     # Trong alerts schema hiện tại: area có sẵn. assigned_team nằm trong description (từ format **Assigned Team:**) hoặc cần trích xuất.
     # Vì schema alerts không có cột assigned_team, ta parse từ description
     clusters = {}
+    cluster_priority = {}  # (team, area) -> priority parse từ router (vd "P4"), nếu có
     for alert in unassigned_alerts:
         area = alert.get("area", "Unknown")
         desc = alert.get("description", "")
@@ -43,12 +44,18 @@ def cluster_alerts_into_tasks() -> Dict[str, Any]:
             parts = desc.split("**Assigned Team:**")
             if len(parts) > 1:
                 team = parts[1].strip().split("\n")[0]
-        
+
         # We can also extract topic from title if we strictly want to cluster by topic. For now, cluster by area & team.
         key = (team, area)
         if key not in clusters:
             clusters[key] = []
         clusters[key].append(alert)
+
+        # Parse priority do Router gán: "**Priority:** P4". Giữ priority đầu tiên hợp lệ cho cụm.
+        if key not in cluster_priority and "**Priority:**" in desc:
+            prio = desc.split("**Priority:**")[1].strip().split("\n")[0].strip()
+            if prio:
+                cluster_priority[key] = prio
 
     tasks_created = 0
     alerts_assigned = 0
@@ -99,7 +106,7 @@ Trả về định dạng JSON:
                     "assigned_team": team,
                     "area": area,
                     "topic": "General", # Can be extracted from LLM if needed
-                    "priority": "P2", # Default, can calculate max severity from alerts
+                    "priority": cluster_priority.get((team, area), "P2"),  # ưu tiên do Router gán, fallback P2
                     "status": "open"
                 }
                 insert_res = db.table("tasks").insert(new_task).execute()

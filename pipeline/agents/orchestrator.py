@@ -13,6 +13,7 @@ Orchestrator KHÔNG phải agent nghiệp vụ — chỉ điều phối, retry, 
 
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
+import os
 
 from agents.common import get_db, log_agent_run
 from agents.insight_agent import generate_department_insights
@@ -25,6 +26,20 @@ from llm_agent import analyze_spike
 
 # Phòng ban khớp với routing_table.json (team đích của router_agent).
 TEAMS = ["IT", "Safety", "CSKH", "Vận hành", "Pricing", "Marketing"]
+
+
+def _agent_enabled(name: str) -> bool:
+    """Cờ bật/tắt từng agent qua env, mặc định bật (giữ nguyên hành vi cũ).
+
+    Tắt một agent để cô lập debug hoặc tiết kiệm chi phí LLM mà không cần
+    redeploy cả cụm. Ví dụ: AGENT_ANALYST_ENABLED=false tắt root-cause LLM.
+    Các cờ: AGENT_ALERT_ENABLED, AGENT_TASK_ENABLED, AGENT_INSIGHT_ENABLED,
+    AGENT_ANALYST_ENABLED.
+    """
+    val = os.getenv(f"AGENT_{name.upper()}_ENABLED")
+    if val is None:
+        return True
+    return val.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
@@ -66,6 +81,10 @@ def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
                 area_feedbacks[area] = []
             area_feedbacks[area].append(f)
 
+        if not _agent_enabled("alert"):
+            pipeline_log.append("Alert agent disabled (AGENT_ALERT_ENABLED=false) — skipped spike→ticket")
+            area_feedbacks = {}
+
         for area, fbs in area_feedbacks.items():
             # Alert Agent đánh giá severity
             alert_decision = process_area_alerts(area, fbs)
@@ -86,6 +105,8 @@ def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
                         spike_analysis.get("description", "")
                         + f"\n\n**Action Plan:** {spike_analysis.get('action', '')}"
                         + f"\n**Assigned Team:** {route_res.get('team')}"
+                        + f"\n**Priority:** {route_res.get('priority') or ''}"
+                        + f"\n**Routing Note:** {route_res.get('description') or ''}"
                     ),
                     severity=alert_decision.get("severity", "CRITICAL"),
                     team=route_res.get("team"),
@@ -102,13 +123,16 @@ def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
         errors["alerts"] = error_msg
 
     # ── Step 5: Task Agent — gom cụm alerts thành tasks ──
-    try:
-        cluster_res = cluster_alerts_into_tasks()
-        results["tasks_clustered"] = cluster_res
-        pipeline_log.append(f"Tasks clustered: {cluster_res.get('tasks_created', 0)} task(s)")
-    except Exception as exc:
-        pipeline_log.append(f"Task clustering error: {str(exc)[:100]}")
-        errors["task_clustering"] = str(exc)[:200]
+    if not _agent_enabled("task"):
+        pipeline_log.append("Task agent disabled (AGENT_TASK_ENABLED=false) — skipped")
+    else:
+        try:
+            cluster_res = cluster_alerts_into_tasks()
+            results["tasks_clustered"] = cluster_res
+            pipeline_log.append(f"Tasks clustered: {cluster_res.get('tasks_created', 0)} task(s)")
+        except Exception as exc:
+            pipeline_log.append(f"Task clustering error: {str(exc)[:100]}")
+            errors["task_clustering"] = str(exc)[:200]
 
     # ── Step 5.5: Kiểm tra ticket quá SLA ──
     overdue_tickets = []
@@ -120,12 +144,16 @@ def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
         pipeline_log.append(f"Lỗi kiểm tra SLA: {str(exc)[:100]}")
 
     # ── Step 6-7: Insight + Analyst cho từng phòng ban ──
-    for team in TEAMS:
+    insight_on = _agent_enabled("insight")
+    analyst_on = _agent_enabled("analyst")
+    if not insight_on:
+        pipeline_log.append("Insight agent disabled (AGENT_INSIGHT_ENABLED=false) — skipped Insight+Analyst")
+    for team in (TEAMS if insight_on else []):
         try:
             # Agent 4: Insight Agent
             insights = generate_department_insights(team, hours=hours)
 
-            if insights.get("total_feedback", 0) > 0:
+            if insights.get("total_feedback", 0) > 0 and analyst_on:
                 # Agent 5: Analyst Agent — phân tích root cause
                 analysis_res = analyze_root_cause(team, insights)
                 insights["analysis"] = analysis_res
@@ -158,7 +186,11 @@ def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
                 )
             else:
                 insights["analysis"] = None
-                pipeline_log.append(f"{team}: 0 feedback, skipped analysis")
+                total = insights.get("total_feedback", 0)
+                if total > 0 and not analyst_on:
+                    pipeline_log.append(f"{team}: {total} feedback, analyst disabled — insight only")
+                else:
+                    pipeline_log.append(f"{team}: 0 feedback, skipped analysis")
 
             results[team] = insights
 

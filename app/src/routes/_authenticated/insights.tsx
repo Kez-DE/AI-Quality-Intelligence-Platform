@@ -2,15 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Loader2, Building2, AlertCircle, Sparkles, RefreshCw, BarChart3, MessageSquare, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, useMe, visibleTeams, isUnassignedOps } from "@/lib/api";
+import { NoDepartmentNotice } from "@/components/NoDepartmentNotice";
 import { topicLabel } from "@/lib/labels";
 import { regionLabel } from "@/lib/regions";
 
 export const Route = createFileRoute("/_authenticated/insights")({
   component: InsightsPage,
 });
-
-const TEAMS = ["IT", "Safety", "CSKH", "Vận hành", "Pricing", "Marketing"] as const;
 
 const TEAM_LABEL: Record<string, string> = {
   IT: "Kỹ thuật / IT",
@@ -70,17 +69,20 @@ type Department = {
 type ApiResponse<T> = { status: string; data: T };
 
 function InsightsPage() {
+  const { data: me, isLoading: meLoading } = useMe();
+  const teams = visibleTeams(me);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [analyzingTeam, setAnalyzingTeam] = useState<string | null>(null);
   const [lastLoadedAt, setLastLoadedAt] = useState<string | null>(null);
 
   async function loadMetrics() {
+    if (teams.length === 0) return;
     setLoadingMetrics(true);
     try {
       // Load nhanh: KHÔNG gọi LLM. Mỗi team dùng Insight Agent để gom số liệu.
       const results = await Promise.allSettled(
-        TEAMS.map((team) =>
+        teams.map((team) =>
           apiFetch<ApiResponse<Department>>(
             `/api/insights/departments/${encodeURIComponent(team)}?hours=720&with_analysis=false`,
           ).then((json) => json.data),
@@ -88,7 +90,7 @@ function InsightsPage() {
       );
 
       const rows = results.map((res, idx) => {
-        const team = TEAMS[idx];
+        const team = teams[idx];
         if (res.status === "fulfilled") return res.value;
         return {
           team,
@@ -102,7 +104,9 @@ function InsightsPage() {
 
       setDepartments(rows);
       setLastLoadedAt(new Date().toLocaleTimeString("vi-VN"));
-      toast.success("Đã tải số liệu 6 phòng ban");
+      toast.success(
+        teams.length === 1 ? `Đã tải số liệu phòng ${teams[0]}` : `Đã tải số liệu ${teams.length} phòng ban`,
+      );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Không tải được phân tích phòng ban");
     } finally {
@@ -127,12 +131,25 @@ function InsightsPage() {
   }
 
   useEffect(() => {
-    void loadMetrics();
-  }, []);
+    if (me && teams.length > 0) void loadMetrics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.id]);
 
   const totalFeedback = departments.reduce((sum, d) => sum + (d.total_feedback || 0), 0);
   const teamsWithData = departments.filter((d) => d.total_feedback > 0).length;
   const criticalCount = departments.reduce((sum, d) => sum + (d.severity_distribution?.CRITICAL ?? 0), 0);
+
+  if (!meLoading && isUnassignedOps(me)) {
+    return (
+      <div className="space-y-6">
+        <h1 className="font-display text-3xl font-bold flex items-center gap-2">
+          <Building2 className="h-6 w-6 text-xanh-green" />
+          Phân tích phòng ban
+        </h1>
+        <NoDepartmentNotice />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -160,7 +177,7 @@ function InsightsPage() {
 
       <div className="grid sm:grid-cols-3 gap-3">
         <SummaryCard label="Tổng phản hồi" value={totalFeedback} icon={MessageSquare} />
-        <SummaryCard label="Phòng ban có dữ liệu" value={`${teamsWithData}/6`} icon={Building2} />
+        <SummaryCard label="Phòng ban có dữ liệu" value={`${teamsWithData}/${teams.length}`} icon={Building2} />
         <SummaryCard label="Ca nghiêm trọng" value={criticalCount} icon={ShieldCheck} tone="coral" />
       </div>
 
@@ -178,7 +195,7 @@ function InsightsPage() {
       {loadingMetrics && departments.length === 0 ? (
         <div className="rounded-2xl border border-border bg-white p-10 text-center shadow-[var(--shadow-card)]">
           <Loader2 className="h-6 w-6 animate-spin inline text-xanh-green" />
-          <p className="text-sm text-muted-foreground mt-3">Đang gom metric từ 6 phòng ban...</p>
+          <p className="text-sm text-muted-foreground mt-3">Đang gom metric từ phòng ban...</p>
         </div>
       ) : (
         <div className="grid xl:grid-cols-2 gap-4 items-start">

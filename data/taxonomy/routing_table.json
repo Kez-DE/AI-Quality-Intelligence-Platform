@@ -1,15 +1,18 @@
 {
   "default_team": "CSKH",
   "routes": [
-    { "topic": "Safety",         "team": "Safety",   "sla_hours": 1 },
-    { "topic": "Driver Behavior","team": "Vận hành", "sla_hours": 8 },
-    { "topic": "App Issue",      "team": "IT",       "sla_hours": 12 },
-    { "topic": "Payment",        "team": "CSKH",     "sla_hours": 12 },
-    { "topic": "Pricing",        "team": "Pricing",  "sla_hours": 24 },
-    { "topic": "Delay",          "team": "Vận hành", "sla_hours": 8 },
-    { "topic": "Other",          "team": "CSKH",     "sla_hours": 24 }
+    { "topic": "Safety",          "team": "Safety",   "sla_hours": 1,  "priority_default": "P5", "description": "Sự cố an toàn, tai nạn, đe doạ — ưu tiên tính mạng, xử lý ngay." },
+    { "topic": "Driver Behavior", "team": "Vận hành", "sla_hours": 8,  "priority_default": "P3", "description": "Hành vi/thái độ tài xế, điều phối cung-cầu thuộc đội Vận hành." },
+    { "topic": "App Issue",       "team": "IT",       "sla_hours": 12, "priority_default": "P3", "description": "Lỗi ứng dụng, bản đồ, sự cố kỹ thuật do đội IT xử lý." },
+    { "topic": "Payment",         "team": "CSKH",     "sla_hours": 12, "priority_default": "P3", "description": "Vấn đề thanh toán, hoàn tiền — CSKH hỗ trợ khách trực tiếp." },
+    { "topic": "Pricing",         "team": "Pricing",  "sla_hours": 24, "priority_default": "P4", "description": "Phản ánh về giá cước, mã giảm giá thuộc đội Pricing." },
+    { "topic": "Delay",           "team": "Vận hành", "sla_hours": 8,  "priority_default": "P3", "description": "Chậm trễ, thiếu cuốc, khu vực nóng do đội Vận hành điều phối." },
+    { "topic": "Other",           "team": "CSKH",     "sla_hours": 24, "priority_default": "P4", "description": "Phản hồi chung chưa phân loại rõ — CSKH tiếp nhận." }
   ],
   "severity_overrides": [
-    { "severity": "P5", "team": "Safety", "sla_hours": 1 }
+    { "severity": "P5", "team": "Safety", "sla_hours": 1, "priority_default": "P5", "description": "Mọi ticket mức P5 ép về Safety bất kể chủ đề (Safety-first)." }
+  ],
+  "sentiment_overrides": [
+    { "sentiment": "positive", "team": "Marketing", "sla_hours": 48, "priority_default": "P4", "description": "Phản hồi tích cực phản ánh cảm nhận thương hiệu — chuyển Marketing theo dõi & khai thác truyền thông." }
   ]
 }

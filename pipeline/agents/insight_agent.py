@@ -35,7 +35,7 @@ def generate_department_insights(team: str, hours: int = 24) -> Dict[str, Any]:
     try:
         response = (
             db.table("feedback")
-            .select("id, text, topic, severity, created_at, area")
+            .select("id, text, topic, severity, sentiment, created_at, area")
             .gte("created_at", since)
             .order("created_at", desc=True)
             .limit(2000)
@@ -50,7 +50,7 @@ def generate_department_insights(team: str, hours: int = 24) -> Dict[str, Any]:
     team_feedback = [
         f
         for f in all_feedback
-        if route_ticket(f.get("topic", ""), f.get("severity", 3))["team"] == team
+        if route_ticket(f.get("topic", ""), f.get("severity", 3), f.get("sentiment"))["team"] == team
     ]
 
     start_time = time.time()
@@ -72,7 +72,8 @@ def generate_department_insights(team: str, hours: int = 24) -> Dict[str, Any]:
             status="success",
             latency_ms=latency_ms,
             output_summary="0 feedback found.",
-            input_hash=f"{team}_{hours}"
+            input_hash=f"{team}_{hours}",
+            team=team
         )
         return output.model_dump()
 
@@ -117,7 +118,8 @@ def generate_department_insights(team: str, hours: int = 24) -> Dict[str, Any]:
         status="success",
         latency_ms=latency_ms,
         output_summary=f"{total_feedback} feedbacks aggregated.",
-        input_hash=f"{team}_{hours}"
+        input_hash=f"{team}_{hours}",
+        team=team
     )
 
     return output.model_dump()

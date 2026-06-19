@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from agents.common import get_db
+from agents.ai_log import log_agent_event
 
 
 @dataclass
@@ -228,7 +229,16 @@ def save_to_db(output: IngestionOutput) -> Dict[str, Any]:
 
 
 def _log_run(log: AgentRunLog):
-    """Ghi agent_run_log vào DB (best-effort, không crash nếu lỗi)."""
+    """Ghi agent_run_log vào ai-log (file) + DB (best-effort, không crash nếu lỗi)."""
+    log_agent_event(
+        agent_name=log.agent_name,
+        status=log.status,
+        run_id=log.run_id,
+        latency_ms=log.latency_ms,
+        output_summary=log.output_summary,
+        error_message=log.error or "",
+        input_hash=log.input_hash,
+    )
     try:
         db = get_db()
         db.table("agent_run_logs").insert(asdict(log)).execute()

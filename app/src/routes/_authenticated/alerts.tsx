@@ -17,7 +17,8 @@ import {
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, useMe, isUnassignedOps } from "@/lib/api";
+import { NoDepartmentNotice } from "@/components/NoDepartmentNotice";
 
 export const Route = createFileRoute("/_authenticated/alerts")({
   component: AlertsPage,
@@ -40,14 +41,20 @@ function parseDescription(raw: string): {
   description: string;
   action: string;
   assigned_team: string;
+  priority: string;
+  routing_note: string;
 } {
   const actionMatch = raw.match(/\*\*Action Plan:\*\*\s*(.*)/);
   const teamMatch = raw.match(/\*\*Assigned Team:\*\*\s*(.*)/);
+  const priorityMatch = raw.match(/\*\*Priority:\*\*\s*(.*)/);
+  const noteMatch = raw.match(/\*\*Routing Note:\*\*\s*(.*)/);
   const descClean = raw.split("\n\n**Action Plan:**")[0].trim();
   return {
     description: descClean,
     action: actionMatch?.[1]?.trim() ?? "",
     assigned_team: teamMatch?.[1]?.trim() ?? "Vận Hành",
+    priority: priorityMatch?.[1]?.trim() ?? "",
+    routing_note: noteMatch?.[1]?.trim() ?? "",
   };
 }
 
@@ -100,6 +107,8 @@ type TicketWorkflowStatus = {
 };
 
 function AlertsPage() {
+  const { data: me, isLoading: meLoading } = useMe();
+  const isAdmin = me?.role === "admin";
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
@@ -181,6 +190,18 @@ function AlertsPage() {
   const inProgressCount = alerts.filter((a) => a.status === "in_progress").length;
   const resolvedCount = alerts.filter((a) => a.status === "resolved").length;
 
+  if (!meLoading && isUnassignedOps(me)) {
+    return (
+      <div className="space-y-6">
+        <h1 className="font-display text-3xl font-bold flex items-center gap-2">
+          <Siren className="h-7 w-7 text-xanh-coral" />
+          Ticket Triage
+        </h1>
+        <NoDepartmentNotice />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -256,24 +277,32 @@ function AlertsPage() {
       {/* Filters: Tab Team & Dropdowns */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
         <div className="flex flex-wrap gap-2">
-          {TABS.map((tab) => {
-            const cfg = tab !== "Tất cả" ? getTeamConfig(tab) : null;
-            const Icon = cfg?.icon;
-            return (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`flex items-center justify-center gap-1.5 px-4 min-h-[44px] rounded-full text-sm font-medium border transition-all ${
-                  activeTab === tab
-                    ? "border-xanh-green bg-xanh-deep text-white shadow"
-                    : "border-border bg-white text-muted-foreground hover:border-xanh-green/40 hover:text-foreground"
-                }`}
-              >
-                {Icon && <Icon className="h-4 w-4" />}
-                {tab}
-              </button>
-            );
-          })}
+          {isAdmin ? (
+            TABS.map((tab) => {
+              const cfg = tab !== "Tất cả" ? getTeamConfig(tab) : null;
+              const Icon = cfg?.icon;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`flex items-center justify-center gap-1.5 px-4 min-h-[44px] rounded-full text-sm font-medium border transition-all ${
+                    activeTab === tab
+                      ? "border-xanh-green bg-xanh-deep text-white shadow"
+                      : "border-border bg-white text-muted-foreground hover:border-xanh-green/40 hover:text-foreground"
+                  }`}
+                >
+                  {Icon && <Icon className="h-4 w-4" />}
+                  {tab}
+                </button>
+              );
+            })
+          ) : (
+            me?.department && (
+              <span className="flex items-center gap-1.5 px-4 min-h-[44px] rounded-full text-sm font-medium border border-xanh-green bg-xanh-deep text-white">
+                Phòng {me.department}
+              </span>
+            )
+          )}
         </div>
         
         <div className="flex gap-2">
@@ -314,7 +343,7 @@ function AlertsPage() {
       ) : (
         <div className="grid gap-4">
           {filtered.map((alert) => {
-            const { description, action, assigned_team } = parseDescription(alert.description ?? "");
+            const { description, action, assigned_team, priority, routing_note } = parseDescription(alert.description ?? "");
             const teamCfg = getTeamConfig(assigned_team);
             const TeamIcon = teamCfg.icon;
             const isUpdating = updating === alert.id;
@@ -368,6 +397,12 @@ function AlertsPage() {
                           <TeamIcon className="h-3 w-3" />
                           {assigned_team}
                         </span>
+                        {/* Priority do Router gán */}
+                        {priority && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-bold border bg-slate-50 border-slate-200 text-slate-700">
+                            {priority}
+                          </span>
+                        )}
                         {/* Area */}
                         {alert.area && (
                           <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
@@ -433,6 +468,14 @@ function AlertsPage() {
                         ⚡ Hành động đề xuất
                       </div>
                       <p className="text-sm text-foreground leading-relaxed">{action}</p>
+                    </div>
+                  )}
+                  {routing_note && (
+                    <div className="rounded-xl bg-white/70 border border-border/60 p-3">
+                      <div className="text-[10px] font-mono text-muted-foreground mb-1 uppercase">
+                        🧭 Lý do định tuyến
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{routing_note}</p>
                     </div>
                   )}
                 </div>

@@ -100,7 +100,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Worker intervals
     # ------------------------------------------------------------------
-    worker_ticket_workflow_interval_seconds: int = Field(default=5, alias="WORKER_TICKET_WORKFLOW_INTERVAL_SECONDS")
+    worker_ticket_workflow_interval_seconds: int = Field(default=15, alias="WORKER_TICKET_WORKFLOW_INTERVAL_SECONDS")
     worker_ml_batch_size: int = Field(default=50, alias="WORKER_ML_BATCH_SIZE")
     worker_ml_interval_seconds: int = Field(default=60, alias="WORKER_ML_INTERVAL_SECONDS")
     worker_agent_interval_seconds: int = Field(default=300, alias="WORKER_AGENT_INTERVAL_SECONDS")

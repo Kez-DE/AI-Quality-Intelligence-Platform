@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from contextlib import asynccontextmanager
 from typing import Optional
@@ -14,13 +14,13 @@ from typing import Optional
 from ingest import ingest_dataset
 from ingest import get_supabase
 from agent import chat_completion, get_agent_status, run_chat_agent
-from auth_guard import AuthUser, get_current_user, require_admin, require_ops_staff
+from auth_guard import AuthUser, can_view_team, get_current_user, require_admin, require_ops_staff, scoped_team
 from users_admin import router as users_router, audit_router
 from rate_limiter import RateLimiter, check_rate_limit
 from clean import mask_pii
 from env_config import get_settings
 from core.paths import DEFAULT_DATA_FILE
-from services.agent_context import AGENT_SYSTEM_PROMPT, GUEST_SYSTEM_PROMPT, build_agent_data_context
+from services.agent_context import AGENT_SYSTEM_PROMPT, GUEST_SYSTEM_PROMPT, build_agent_data_context, build_agent_system_prompt
 from services.live_stream import get_live_stream_status, set_scheduler, start_live_stream, stop_live_stream
 from services.ticket_workflow import ticket_workflow_state
 
@@ -124,7 +124,7 @@ app.include_router(audit_router)
 @app.get("/api/me")
 def whoami(user: AuthUser = Depends(get_current_user)):
     """Trả về danh tính + role của user đang đăng nhập (frontend dùng để render nav theo quyền)."""
-    return {"status": "success", "data": {"id": user.id, "email": user.email, "role": user.role}}
+    return {"status": "success", "data": {"id": user.id, "email": user.email, "role": user.role, "department": user.department}}
 
 
 @app.get("/")
@@ -175,16 +175,24 @@ def recent_feedback(
     return {"status": "success", "data": data}
 
 @app.get("/api/alerts/recent")
-def recent_alerts(limit: int = Query(default=100, ge=1, le=500), _: AuthUser = Depends(require_ops_staff)):
-    """Alerts chỉ dành cho ops staff (staff/manager/admin). Guest không được xem."""
+def recent_alerts(limit: int = Query(default=100, ge=1, le=500), user: AuthUser = Depends(require_ops_staff)):
+    """Alerts chỉ dành cho ops staff (staff/manager/admin). Guest không được xem.
+
+    Admin xem tất cả; ops khác chỉ xem alert thuộc các task của phòng mình
+    (alerts không có cột team nên lọc gián tiếp qua tasks.assigned_team)."""
     try:
         db = get_supabase()
-        data = db.table("alerts") \
-            .select("*") \
-            .order("created_at", desc=True) \
-            .limit(limit) \
-            .execute() \
-            .data or []
+        q = db.table("alerts").select("*")
+        if user.role != "admin":
+            own_team = scoped_team(user, None)  # raise 403 nếu chưa gán phòng
+            task_rows = db.table("tasks").select("id").eq("assigned_team", own_team).execute().data or []
+            task_ids = [t["id"] for t in task_rows if t.get("id")]
+            if not task_ids:
+                return {"status": "success", "data": []}
+            q = q.in_("task_id", task_ids)
+        data = q.order("created_at", desc=True).limit(limit).execute().data or []
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot read alerts: {str(exc)[:300]}") from exc
     return {"status": "success", "data": data}
@@ -202,9 +210,7 @@ def list_tasks(
     try:
         db = get_supabase()
         q = db.table("tasks").select("*")
-        effective_team = team
-        if user.role == "manager" and user.department:
-            effective_team = user.department
+        effective_team = scoped_team(user, team)
         if status:
             q = q.eq("status", status)
         if effective_team:
@@ -235,17 +241,25 @@ def list_task_alerts(task_id: str, _: AuthUser = Depends(require_ops_staff)):
     return {"status": "success", "data": data}
 
 @app.patch("/api/tasks/{task_id}/status")
-def update_task_status(task_id: str, payload: StatusUpdateReq, _: AuthUser = Depends(require_ops_staff)):
+def update_task_status(task_id: str, payload: StatusUpdateReq, user: AuthUser = Depends(require_ops_staff)):
     new_status = payload.status
     if new_status not in {"open", "in_progress", "resolved"}:
         raise HTTPException(status_code=400, detail="Invalid task status")
     try:
         db = get_supabase()
+        if user.role != "admin":
+            rows = db.table("tasks").select("assigned_team").eq("id", task_id).limit(1).execute().data or []
+            if not rows:
+                raise HTTPException(status_code=404, detail="Task not found")
+            if not can_view_team(user, rows[0].get("assigned_team")):
+                raise HTTPException(status_code=403, detail="Bạn không có quyền cập nhật task của phòng ban khác.")
         data = db.table("tasks") \
             .update({"status": new_status, "updated_at": "now()"}) \
             .eq("id", task_id) \
             .execute() \
             .data or []
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot update task: {str(exc)[:300]}") from exc
     if not data:
@@ -253,7 +267,7 @@ def update_task_status(task_id: str, payload: StatusUpdateReq, _: AuthUser = Dep
     return {"status": "success", "data": data[0]}
 
 @app.patch("/api/tasks/{task_id}/assign")
-def assign_task(task_id: str, payload: AssignTaskReq, _: AuthUser = Depends(require_ops_staff)):
+def assign_task(task_id: str, payload: AssignTaskReq, user: AuthUser = Depends(require_ops_staff)):
     update_fields: dict = {}
     if payload.owner_id is not None:
         update_fields["owner_id"] = payload.owner_id
@@ -264,6 +278,12 @@ def assign_task(task_id: str, payload: AssignTaskReq, _: AuthUser = Depends(requ
     update_fields["updated_at"] = "now()"
     try:
         db = get_supabase()
+        if user.role != "admin":
+            rows = db.table("tasks").select("assigned_team").eq("id", task_id).limit(1).execute().data or []
+            if not rows:
+                raise HTTPException(status_code=404, detail="Task not found")
+            if not can_view_team(user, rows[0].get("assigned_team")):
+                raise HTTPException(status_code=403, detail="Bạn không có quyền gán task của phòng ban khác.")
         data = db.table("tasks") \
             .update(update_fields) \
             .eq("id", task_id) \
@@ -319,9 +339,7 @@ def list_reports(
     try:
         db = get_supabase()
         q = db.table("department_reports").select("*", count="exact")
-        effective_team = team
-        if user.role == "manager" and user.department:
-            effective_team = user.department
+        effective_team = scoped_team(user, team)
         if effective_team:
             q = q.eq("team", effective_team)
         offset = (page - 1) * limit
@@ -343,6 +361,11 @@ def list_reports(
 def approve_report(report_id: str, user: AuthUser = Depends(require_ops_staff)):
     """Trưởng phòng duyệt báo cáo trước khi chia việc."""
     db = get_supabase()
+    existing = db.table("department_reports").select("team").eq("id", report_id).limit(1).execute().data or []
+    if not existing:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if not can_view_team(user, existing[0].get("team")):
+        raise HTTPException(status_code=403, detail="Bạn không có quyền duyệt báo cáo của phòng ban khác.")
     try:
         data = db.table("department_reports").update({
             "approved": True,
@@ -381,17 +404,30 @@ def alert_workflow_status(_: AuthUser = Depends(require_ops_staff)):
     return {"status": "success", "data": dict(ticket_workflow_state)}
 
 @app.patch("/api/alerts/{alert_id}/status")
-def update_alert_status(alert_id: str, payload: dict, _: AuthUser = Depends(require_ops_staff)):
+def update_alert_status(alert_id: str, payload: dict, user: AuthUser = Depends(require_ops_staff)):
     new_status = payload.get("status")
     if new_status not in {"open", "in_progress", "resolved"}:
         raise HTTPException(status_code=400, detail="Invalid alert status")
     try:
         db = get_supabase()
+        if user.role != "admin":
+            rows = db.table("alerts").select("task_id").eq("id", alert_id).limit(1).execute().data or []
+            if not rows:
+                raise HTTPException(status_code=404, detail="Alert not found")
+            task_id = rows[0].get("task_id")
+            task_team = None
+            if task_id:
+                task = db.table("tasks").select("assigned_team").eq("id", task_id).limit(1).execute().data or []
+                task_team = task[0].get("assigned_team") if task else None
+            if not can_view_team(user, task_team):
+                raise HTTPException(status_code=403, detail="Bạn không có quyền cập nhật alert của phòng ban khác.")
         data = db.table("alerts") \
             .update({"status": new_status}) \
             .eq("id", alert_id) \
             .execute() \
             .data or []
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot update alert: {str(exc)[:300]}") from exc
     if not data:
@@ -411,6 +447,157 @@ def agent_logs(limit: int = Query(default=50, ge=1, le=500), _: AuthUser = Depen
         lines = f.readlines()[-limit:]
     return {"status": "success", "data": [line.rstrip("\n") for line in lines]}
 
+@app.get("/api/agent/ai-log")
+def agent_ai_log(
+    limit: int = Query(default=100, ge=1, le=500),
+    agent: str = Query(default=""),
+    team: str = Query(default=""),
+    user: AuthUser = Depends(require_ops_staff),
+):
+    """AI-log vận hành (6 agent nghiệp vụ + chat agent), bóc theo phòng ban.
+
+    - admin: xem mọi phòng; lọc theo ?team nếu truyền (vd team=guest, team=Safety).
+    - ops đã gán phòng: CHỈ thấy log phòng mình (ép team, bỏ qua ?team).
+    - ops chưa gán phòng: 403."""
+    from agents.ai_log import read_recent
+    if user.role == "admin":
+        scope = team or ""  # admin: tôn trọng filter tùy chọn (rỗng = tất cả)
+    else:
+        scope = scoped_team(user, None)  # ép phòng của ops; raise 403 nếu chưa gán
+    return {"status": "success", "data": read_recent(limit=limit, agent_name=agent, team=scope)}
+
+
+# Tên + cờ env của 6 agent nghiệp vụ — khớp orchestrator._agent_enabled.
+AGENT_REGISTRY = [
+    {"name": "ingestion_agent", "label": "Ingestion / Classifier", "step": 1, "flag": None,
+     "desc": "Làm sạch PII, phân loại topic/sentiment/severity", "uses_llm": False},
+    {"name": "router_agent", "label": "Router", "step": 2, "flag": None,
+     "desc": "Định tuyến ticket về đúng phòng ban", "uses_llm": False},
+    {"name": "ticket_agent", "label": "Ticket", "step": 3, "flag": "AGENT_ALERT_ENABLED",
+     "desc": "Tạo/cập nhật/dedup ticket, gán SLA + priority", "uses_llm": False},
+    {"name": "task_agent", "label": "Task", "step": 4, "flag": "AGENT_TASK_ENABLED",
+     "desc": "Gom cụm alert thành task", "uses_llm": True},
+    {"name": "insight_agent", "label": "Insight", "step": 5, "flag": "AGENT_INSIGHT_ENABLED",
+     "desc": "Tổng hợp metric feedback theo phòng ban", "uses_llm": False},
+    {"name": "analyst_agent", "label": "Analyst", "step": 6, "flag": "AGENT_ANALYST_ENABLED",
+     "desc": "Phân tích root-cause bằng LLM, đề xuất action", "uses_llm": True},
+    {"name": "alert_agent", "label": "Alert / Escalation", "step": 7, "flag": "AGENT_ALERT_ENABLED",
+     "desc": "Phân cấp WATCH/WARNING/CRITICAL, cooldown dedup", "uses_llm": True},
+]
+
+
+def _flag_enabled(flag: str | None) -> bool:
+    """Đọc cờ env per-agent (mặc định bật) — khớp orchestrator._agent_enabled."""
+    if not flag:
+        return True
+    val = os.getenv(flag)
+    if val is None:
+        return True
+    return val.strip().lower() in {"1", "true", "yes", "on"}
+
+
+@app.get("/api/agent/stats")
+def agent_stats(
+    hours: int = Query(default=24, ge=1, le=720),
+    _: AuthUser = Depends(require_admin),
+):
+    """Thống kê vận hành từng agent từ bảng agent_run_logs (chỉ admin).
+
+    Trả về cho mỗi agent: tổng lượt chạy, success/failed/fallback, error_rate,
+    latency trung bình, lần chạy gần nhất, và trạng thái bật/tắt (cờ env).
+    """
+    from agents.common import get_db
+
+    worker_enabled = _flag_enabled("WORKER_AGENT_ENABLED")
+    interval = int(os.getenv("WORKER_AGENT_INTERVAL_SECONDS", "300"))
+
+    since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    rows: list[dict] = []
+    db_error = None
+    try:
+        db = get_db()
+        resp = db.table("agent_run_logs") \
+            .select("agent_name,status,latency_ms,created_at") \
+            .gte("created_at", since) \
+            .order("created_at", desc=True) \
+            .limit(5000) \
+            .execute()
+        rows = resp.data or []
+    except Exception as exc:  # noqa: BLE001 - stats không được làm vỡ trang
+        db_error = str(exc)[:200]
+
+    # Gom nhóm theo agent_name
+    by_agent: dict[str, dict] = {}
+    for r in rows:
+        name = r.get("agent_name") or "unknown"
+        b = by_agent.setdefault(name, {"runs": 0, "success": 0, "failed": 0,
+                                       "fallback": 0, "latency_sum": 0, "latency_n": 0,
+                                       "last_run": None})
+        b["runs"] += 1
+        st = r.get("status") or "success"
+        if st in b:
+            b[st] += 1
+        lat = r.get("latency_ms")
+        if isinstance(lat, (int, float)) and lat > 0:
+            b["latency_sum"] += lat
+            b["latency_n"] += 1
+        ts = r.get("created_at")
+        if ts and (b["last_run"] is None or ts > b["last_run"]):
+            b["last_run"] = ts
+
+    agents_out = []
+    for meta in AGENT_REGISTRY:
+        b = by_agent.get(meta["name"], {})
+        runs = b.get("runs", 0)
+        failed = b.get("failed", 0)
+        avg_lat = round(b["latency_sum"] / b["latency_n"]) if b.get("latency_n") else 0
+        agents_out.append({
+            "name": meta["name"],
+            "label": meta["label"],
+            "step": meta["step"],
+            "description": meta["desc"],
+            "uses_llm": meta["uses_llm"],
+            "enabled": worker_enabled and _flag_enabled(meta["flag"]),
+            "flag": meta["flag"],
+            "runs": runs,
+            "success": b.get("success", 0),
+            "failed": failed,
+            "fallback": b.get("fallback", 0),
+            "error_rate": round(failed / runs, 3) if runs else 0.0,
+            "avg_latency_ms": avg_lat,
+            "last_run": b.get("last_run"),
+        })
+
+    return {"status": "success", "data": {
+        "window_hours": hours,
+        "worker_enabled": worker_enabled,
+        "interval_seconds": interval,
+        "total_runs": len(rows),
+        "db_error": db_error,
+        "agents": agents_out,
+    }}
+
+
+def _log_chat_event(team: str, status: str, latency_ms: int, *, provider: str = "", model: str = "", error: str = ""):
+    """Ghi ai-log cho 1 lượt chat agent, gắn phòng ban của account (guest/admin/tên phòng).
+
+    Best-effort — không bao giờ làm vỡ request chat."""
+    try:
+        from agents.ai_log import log_agent_event
+        log_agent_event(
+            agent_name="chat_agent",
+            status=status,
+            team=team,
+            source="chat",
+            latency_ms=latency_ms,
+            provider=provider,
+            model=model,
+            error_message=error,
+        )
+    except Exception:
+        pass
+
+
 @app.post("/api/agent/chat")
 def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
     if user.role == "guest":
@@ -418,22 +605,38 @@ def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
         # Guests get a restricted customer-support-only chatbot
         if not payload.messages:
             raise HTTPException(status_code=400, detail="messages must be a non-empty list")
+        # RAG công khai: lấy câu hỏi cuối của khách -> tra public KB (chính sách/FAQ).
+        last_user_q = next(
+            (m.content for m in reversed(payload.messages) if m.role == "user" and m.content.strip()),
+            "",
+        )
         normalized = [
             {"role": "system", "content": GUEST_SYSTEM_PROMPT},
         ]
+        if last_user_q:
+            try:
+                from agent.public_kb import search_public_knowledge, format_public_for_prompt
+                kb = format_public_for_prompt(search_public_knowledge(mask_pii(last_user_q), top_k=3))
+                normalized.append({"role": "system", "content": kb})
+            except Exception as exc:
+                print(f"[agent_chat] public KB lookup failed: {exc}", flush=True)
         for message in payload.messages[-30:]:
             if message.role not in {"user", "assistant", "system"} or not message.content.strip():
                 raise HTTPException(status_code=400, detail="Invalid chat message")
             # OWASP LLM: mask PII from user input before injecting into prompt
             safe_content = mask_pii(message.content) if message.role == "user" else message.content
             normalized.append({"role": message.role, "content": safe_content[:8000]})
+        _t0 = time.time()
         try:
             result = chat_completion(normalized, temperature=0.4)
         except Exception as exc:
+            _log_chat_event("guest", "error", int((time.time() - _t0) * 1000), error=str(exc)[:200])
             raise HTTPException(status_code=502, detail=f"Agent model error: {str(exc)[:300]}") from exc
         # OWASP LLM: mask PII from LLM output before returning to client
         if isinstance(result.get("content"), str):
             result["content"] = mask_pii(result["content"])
+        _log_chat_event("guest", "success", int((time.time() - _t0) * 1000),
+                        provider=result.get("provider", ""), model=result.get("model", ""))
         return {"status": "success", "data": result}
 
     # Staff / manager / admin — apply a higher rate limit to prevent LLM API key abuse
@@ -441,9 +644,11 @@ def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
 
     if not payload.messages:
         raise HTTPException(status_code=400, detail="messages must be a non-empty list")
+    # ops đã gán phòng -> scope mọi dữ liệu/tool về đúng phòng; admin -> None (toàn hệ thống)
+    scope_team = user.department if (user.role != "admin" and user.department) else None
     normalized = [
-        {"role": "system", "content": AGENT_SYSTEM_PROMPT},
-        {"role": "system", "content": build_agent_data_context()},
+        {"role": "system", "content": build_agent_system_prompt(user)},
+        {"role": "system", "content": build_agent_data_context(user)},
     ]
     for message in payload.messages[-30:]:
         if message.role not in {"user", "assistant", "system"} or not message.content.strip():
@@ -451,13 +656,19 @@ def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
         # OWASP LLM: mask PII from user input before injecting into prompt
         safe_content = mask_pii(message.content) if message.role == "user" else message.content
         normalized.append({"role": message.role, "content": safe_content[:8000]})
+    # Log theo phòng: ops -> phòng của mình; admin -> "admin" (toàn hệ thống).
+    log_team = scope_team or ("admin" if user.role == "admin" else "unassigned")
+    _t0 = time.time()
     try:
-        result = run_chat_agent(normalized, temperature=0.4)
+        result = run_chat_agent(normalized, temperature=0.4, scope_team=scope_team)
     except Exception as exc:
+        _log_chat_event(log_team, "error", int((time.time() - _t0) * 1000), error=str(exc)[:200])
         raise HTTPException(status_code=502, detail=f"Agent model error: {str(exc)[:300]}") from exc
     # OWASP LLM: mask PII from LLM output before returning to client
     if isinstance(result.get("content"), str):
         result["content"] = mask_pii(result["content"])
+    _log_chat_event(log_team, "success", int((time.time() - _t0) * 1000),
+                    provider=result.get("provider", ""), model=result.get("model", ""))
     return {"status": "success", "data": result}
 
 @app.post("/api/ingest-real-dataset")
@@ -741,14 +952,21 @@ def reclassify_feedback(
 @app.get("/api/insights/departments")
 def list_department_insights(
     hours: int = Query(default=24, ge=1, le=720),
-    _: AuthUser = Depends(require_ops_staff),
+    user: AuthUser = Depends(require_ops_staff),
 ):
-    """Chạy orchestrator: tổng hợp insight + root-cause cho mọi phòng ban."""
+    """Chạy orchestrator: tổng hợp insight + root-cause cho mọi phòng ban.
+
+    Admin thấy mọi phòng; ops khác chỉ thấy phòng của mình (chưa gán phòng -> 403)."""
     from agents.orchestrator import run_agent_pipeline
     try:
         result = run_agent_pipeline(hours=hours)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Agent pipeline error: {str(exc)[:300]}") from exc
+    if user.role != "admin":
+        own_team = scoped_team(user, None)  # raise 403 nếu chưa gán phòng
+        data = result.get("data") if isinstance(result, dict) else None
+        if isinstance(data, dict):
+            result["data"] = {k: v for k, v in data.items() if k == own_team}
     return {"status": "success", "data": result}
 
 @app.get("/api/insights/departments/{team}")
@@ -756,9 +974,11 @@ def get_department_insights(
     team: str,
     hours: int = Query(default=24, ge=1, le=720),
     with_analysis: bool = Query(default=True),
-    _: AuthUser = Depends(require_ops_staff),
+    user: AuthUser = Depends(require_ops_staff),
 ):
     """Insight cho 1 phòng ban; with_analysis=true thì gọi LLM phân tích root cause."""
+    if not can_view_team(user, team):
+        raise HTTPException(status_code=403, detail="Bạn không có quyền xem dữ liệu của phòng ban này.")
     from agents.insight_agent import generate_department_insights
     from agents.analyst_agent import analyze_root_cause
     try:

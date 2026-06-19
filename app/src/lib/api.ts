@@ -9,11 +9,32 @@ export const API_BASE = import.meta.env.VITE_BACKEND_API_URL ?? "http://127.0.0.
 
 export type Role = "admin" | "manager" | "staff" | "guest";
 
+export type Department = "IT" | "Safety" | "CSKH" | "Vận hành" | "Pricing" | "Marketing" | null;
+
+/** 6 phòng ban — khớp backend TEAMS / profiles.department. */
+export const ALL_TEAMS = ["IT", "Safety", "CSKH", "Vận hành", "Pricing", "Marketing"] as const;
+
 export type Me = {
   id: string;
   email: string | null;
   role: Role;
+  department: Department;
 };
+
+/** Danh sách phòng ban user được phép xem.
+ *  - admin: cả 6 phòng.
+ *  - ops đã gán phòng: chỉ phòng của mình.
+ *  - ops chưa gán phòng: rỗng (không thấy gì → render thông báo liên hệ admin). */
+export function visibleTeams(me: Me | null | undefined): string[] {
+  if (!me) return [];
+  if (me.role === "admin") return [...ALL_TEAMS];
+  return me.department ? [me.department] : [];
+}
+
+/** ops user (manager/staff) chưa được gán phòng ban → không có quyền xem dữ liệu phòng nào. */
+export function isUnassignedOps(me: Me | null | undefined): boolean {
+  return !!me && me.role !== "admin" && !me.department;
+}
 
 /** Lấy access_token hiện tại từ Supabase session. */
 async function getAccessToken(): Promise<string | null> {

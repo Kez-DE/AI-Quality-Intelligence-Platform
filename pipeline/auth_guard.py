@@ -72,3 +72,34 @@ def require_admin(user: AuthUser = Depends(get_current_user)) -> AuthUser:
     if user.role != "admin":
         raise HTTPException(status_code=403, detail="Yêu cầu quyền admin")
     return user
+
+
+def can_view_team(user: AuthUser, team: str) -> bool:
+    """Kiểm tra user có quyền xem dữ liệu của một phòng ban cụ thể không.
+
+    - admin: xem mọi phòng.
+    - ops (manager/staff) đã được gán phòng: chỉ xem đúng phòng của mình.
+    - ops chưa được gán phòng: không xem được phòng nào.
+    """
+    if user.role == "admin":
+        return True
+    if not user.department:
+        return False
+    return user.department == team
+
+
+def scoped_team(user: AuthUser, requested_team: str | None) -> str | None:
+    """Trả về team mà query NÊN lọc theo, dựa trên quyền của user.
+
+    - admin: tôn trọng requested_team (None = xem tất cả các phòng).
+    - ops đã gán phòng: luôn ép về phòng của user (bỏ qua requested_team).
+    - ops chưa gán phòng: raise 403 kèm hướng dẫn liên hệ admin.
+    """
+    if user.role == "admin":
+        return requested_team
+    if not user.department:
+        raise HTTPException(
+            status_code=403,
+            detail="Bạn chưa được gán phòng ban. Vui lòng liên hệ admin.",
+        )
+    return user.department

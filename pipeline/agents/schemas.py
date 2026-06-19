@@ -17,6 +17,8 @@ class RouterOutput(BaseModel):
     sla_hours: int = 24
     routed_by: str
     is_override: bool = False
+    priority: Optional[str] = None
+    description: Optional[str] = None
 
 class ActionItem(BaseModel):
     action: str
