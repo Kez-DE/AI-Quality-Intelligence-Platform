@@ -1,53 +1,239 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, Send, Loader2, Bot, User as UserIcon, Trash2, Edit2 } from "lucide-react";
+import {
+  Sparkles,
+  Send,
+  Loader2,
+  Bot,
+  User as UserIcon,
+  Trash2,
+  Edit2,
+  Copy,
+  Check,
+  AlertCircle,
+} from "lucide-react";
 import { toast } from "sonner";
-import { apiFetch, useMe } from "@/lib/api";
+import { apiFetch, useMe, type Role } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/chat")({
   component: ChatPage,
 });
 
-type Msg = { id?: string; role: "user" | "assistant"; content: string };
+type AgentMeta = {
+  provider?: string;
+  model?: string;
+  latency_ms?: number;
+};
+
+type Msg = { id?: string; role: "user" | "assistant"; content: string; meta?: AgentMeta };
 
 type AgentChatResponse = {
-  data?: {
+  data?: AgentMeta & {
     content?: string;
-    provider?: string;
-    model?: string;
-    latency_ms?: number;
   };
 };
 
-const SUGGESTED = [
-  "Tổng hợp 5 vấn đề chất lượng dịch vụ nổi cộm tuần qua",
-  "Khu vực nào đang có phản hồi tiêu cực tăng bất thường?",
-  "Đề xuất hành động cho spike khiếu nại thanh toán",
-  "Phân tích pattern phàn nàn của tài xế DRV-2841",
-];
+const REQUEST_HISTORY_LIMIT = 24;
+const ASSISTANT_BLOCK_DELAY_MS = 380;
+const MAX_ASSISTANT_BLOCKS = 6;
+
+type ChatRoleConfig = {
+  title: string;
+  subtitle: string;
+  emptyTitle: string;
+  placeholder: string;
+  suggestions: string[];
+};
+
+const CHAT_ROLE_CONFIG: Record<Role, ChatRoleConfig> = {
+  guest: {
+    title: "Hỗ trợ Trực tuyến",
+    subtitle: "Giải đáp hướng dẫn dùng dịch vụ và gửi khiếu nại.",
+    emptyTitle: "Xin chào! Tôi có thể giúp gì cho bạn?",
+    placeholder: "Nhập câu hỏi về đặt xe, thanh toán, tài khoản hoặc khiếu nại...",
+    suggestions: [
+      "Làm sao để gửi phản hồi về tài xế?",
+      "Làm sao để biết khiếu nại đã được xử lý chưa?",
+      "Tôi muốn báo cáo sự cố an toàn",
+      "Tôi cần hỗ trợ về thanh toán chuyến đi",
+    ],
+  },
+  staff: {
+    title: "AI Tác nghiệp",
+    subtitle: "Trả lời theo checklist xử lý, ticket và việc cần làm của phòng bạn.",
+    emptyTitle: "Trợ lý tác nghiệp sẵn sàng",
+    placeholder: "Hỏi về ticket ưu tiên, checklist xử lý, SLA hoặc SOP của phòng bạn...",
+    suggestions: [
+      "Ticket nào cần xử lý trước trong phòng tôi?",
+      "Cho tôi checklist xử lý phản hồi P5",
+      "Có task nào sắp trễ SLA không?",
+      "Quy trình xử lý lỗi thanh toán là gì?",
+    ],
+  },
+  manager: {
+    title: "AI Quản lý",
+    subtitle: "Tổng hợp xu hướng, ưu tiên P0/P1/P2 và đề xuất điều phối cho phòng bạn.",
+    emptyTitle: "Trợ lý quản lý sẵn sàng",
+    placeholder: "Hỏi về xu hướng, SLA, phân bổ nguồn lực hoặc rủi ro của phòng bạn...",
+    suggestions: [
+      "Tóm tắt rủi ro chính của phòng tôi trong 24h qua",
+      "Task nào có nguy cơ trễ SLA?",
+      "Ưu tiên P0/P1 tuần này là gì?",
+      "Đề xuất phân công cho spike mới nhất",
+    ],
+  },
+  admin: {
+    title: "AI Admin",
+    subtitle: "Phân tích toàn hệ thống, so sánh phòng ban và theo dõi pipeline/agent.",
+    emptyTitle: "Trợ lý toàn hệ thống sẵn sàng",
+    placeholder: "Hỏi về toàn hệ thống, phòng ban, agent, pipeline hoặc rủi ro vận hành...",
+    suggestions: [
+      "Tổng quan toàn hệ thống 24h qua",
+      "So sánh khu vực hoặc phòng ban có rủi ro cao",
+      "Agent/pipeline có vấn đề gì cần chú ý?",
+      "Đề xuất hành động liên phòng cho các spike P5",
+    ],
+  },
+};
+
+type AssistantBlock = {
+  title?: string;
+  body: string;
+};
+
+const markdownComponents = {
+  p: ({ children }: any) => <p className="mb-2 last:mb-0">{children}</p>,
+  ul: ({ children }: any) => (
+    <ul className="mb-2 ml-4 list-disc space-y-1 last:mb-0">{children}</ul>
+  ),
+  ol: ({ children }: any) => (
+    <ol className="mb-2 ml-4 list-decimal space-y-1 last:mb-0">{children}</ol>
+  ),
+  li: ({ children }: any) => <li className="pl-1">{children}</li>,
+  strong: ({ children }: any) => (
+    <strong className="font-semibold text-xanh-deep">{children}</strong>
+  ),
+  code: ({ children }: any) => (
+    <code className="rounded bg-white/70 px-1 py-0.5 font-mono text-[0.85em] text-xanh-deep">
+      {children}
+    </code>
+  ),
+};
+
+function matchBlockTitle(line: string): string | null {
+  const trimmed = line.trim();
+  const markdownHeading = trimmed.match(/^#{1,6}\s+(.{2,90})$/);
+  if (markdownHeading) return markdownHeading[1].trim();
+
+  const boldHeading = trimmed.match(/^\*\*([^*]{2,90})\*\*:?\s*$/);
+  if (boldHeading) return boldHeading[1].trim();
+
+  const numberedHeading = trimmed.match(/^\d+\.\s+(.{2,90})$/);
+  if (numberedHeading && !/[.!?]$/.test(numberedHeading[1].trim())) {
+    return numberedHeading[1].trim();
+  }
+
+  return null;
+}
+
+function splitAssistantBlocks(content: string): AssistantBlock[] {
+  const normalized = content.trim().replace(/\r\n/g, "\n");
+  if (!normalized) return [];
+
+  let blocks: AssistantBlock[] = [];
+  let currentTitle: string | undefined;
+  let currentLines: string[] = [];
+
+  const pushCurrent = () => {
+    const body = currentLines.join("\n").trim();
+    if (!body && !currentTitle) return;
+    blocks.push(body ? { title: currentTitle, body } : { body: currentTitle ?? "" });
+    currentTitle = undefined;
+    currentLines = [];
+  };
+
+  for (const rawLine of normalized.split("\n")) {
+    const title = matchBlockTitle(rawLine);
+    if (title) {
+      pushCurrent();
+      currentTitle = title;
+    } else {
+      currentLines.push(rawLine);
+    }
+  }
+  pushCurrent();
+
+  if (blocks.length <= 1) {
+    const paragraphs = normalized
+      .split(/\n{2,}/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (paragraphs.length > 1) {
+      blocks = paragraphs.map((body) => ({ body }));
+    }
+  }
+
+  if (blocks.length <= 1 && normalized.length > 420) {
+    const sentences =
+      normalized
+        .match(/[^.!?]+[.!?]+(?:\s|$)|[^.!?]+$/g)
+        ?.map((part) => part.trim())
+        .filter(Boolean) ?? [];
+    const chunks: string[] = [];
+    let chunk = "";
+    for (const sentence of sentences) {
+      const next = chunk ? `${chunk} ${sentence}` : sentence;
+      if (next.length > 360 && chunk) {
+        chunks.push(chunk);
+        chunk = sentence;
+      } else {
+        chunk = next;
+      }
+    }
+    if (chunk) chunks.push(chunk);
+    if (chunks.length > 1) {
+      blocks = chunks.map((body) => ({ body }));
+    }
+  }
+
+  if (blocks.length > MAX_ASSISTANT_BLOCKS) {
+    const visible = blocks.slice(0, MAX_ASSISTANT_BLOCKS - 1);
+    const rest = blocks.slice(MAX_ASSISTANT_BLOCKS - 1);
+    blocks = [
+      ...visible,
+      {
+        title: "Chi tiết bổ sung",
+        body: rest
+          .map((block) => [block.title, block.body].filter(Boolean).join("\n"))
+          .join("\n\n"),
+      },
+    ];
+  }
+
+  return blocks.length ? blocks : [{ body: normalized }];
+}
 
 function ChatPage() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const { data: me } = useMe();
-  
-  const isGuest = me?.role === "guest";
-  const suggestions = isGuest 
-    ? [
-        "Làm sao để gửi phản hồi về tài xế?",
-        "Làm sao để biết khiếu nại đã được xử lý chưa?",
-        "Làm thế nào để tải nhiều phản hồi cùng lúc?",
-        "Tôi muốn báo cáo sự cố an toàn"
-      ]
-    : SUGGESTED;
-  
-  const title = isGuest ? "Hỗ trợ Trực tuyến (CSKH)" : "AI Assistant";
-  const subtitle = isGuest 
-    ? "Hỗ trợ giải đáp các thắc mắc và hướng dẫn gửi khiếu nại."
-    : "Trợ lý AI giúp diễn giải dữ liệu phản hồi và đề xuất hành động vận hành.";
+
+  const role = me?.role ?? "guest";
+  const chatConfig = CHAT_ROLE_CONFIG[role];
+  const scopeText =
+    role === "admin"
+      ? "Toàn hệ thống"
+      : role === "guest"
+        ? "Khách hàng"
+        : me?.department
+          ? `Phòng ${me.department}`
+          : "Chưa gán phòng ban";
 
   useEffect(() => {
     supabase
@@ -62,6 +248,8 @@ function ChatPage() {
 
   async function clearChat() {
     try {
+      setError(null);
+      setCopiedIndex(null);
       setMessages([]);
       const { data: u } = await supabase.auth.getUser();
       if (u?.user) {
@@ -78,21 +266,29 @@ function ChatPage() {
     if (loading) return;
     const targetMsg = messages[index];
     if (targetMsg.role !== "user") return;
-    
+
     const newMessages = messages.slice(0, index);
     const textToEdit = targetMsg.content;
-    
+
     setInput(textToEdit);
+    setError(null);
     setMessages(newMessages);
-    
+
     const { data: u } = await supabase.auth.getUser();
     if (u?.user) {
-      const idsToDelete = messages.slice(index).map(m => m.id).filter(Boolean);
+      const idsToDelete = messages
+        .slice(index)
+        .map((m) => m.id)
+        .filter(Boolean);
       if (idsToDelete.length > 0) {
         // @ts-ignore
-        supabase.from("chat_messages").delete().in("id", idsToDelete).then(({error}) => {
-          if (error) console.error("Edit delete error:", error);
-        });
+        supabase
+          .from("chat_messages")
+          .delete()
+          .in("id", idsToDelete)
+          .then(({ error }) => {
+            if (error) console.error("Edit delete error:", error);
+          });
       }
     }
   }
@@ -106,6 +302,8 @@ function ChatPage() {
     if (!content || loading) return;
     setInput("");
     setLoading(true);
+    setError(null);
+    setCopiedIndex(null);
 
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) {
@@ -119,29 +317,59 @@ function ChatPage() {
     setMessages(next);
 
     // persist user message
-    await supabase
-      .from("chat_messages")
-      .insert({ user_id: u.user.id, role: "user", content });
+    await supabase.from("chat_messages").insert({ user_id: u.user.id, role: "user", content });
 
     try {
       const reply = await apiFetch<AgentChatResponse>("/api/agent/chat", {
         method: "POST",
         body: JSON.stringify({
-          messages: next.map(({ role, content }) => ({ role, content })),
+          messages: next
+            .slice(-REQUEST_HISTORY_LIMIT)
+            .map(({ role, content }) => ({ role, content })),
         }),
       });
       const replyContent = reply.data?.content?.trim();
       if (!replyContent) throw new Error("AI không trả về nội dung.");
 
-      const aMsg: Msg = { role: "assistant", content: replyContent };
+      const aMsg: Msg = {
+        role: "assistant",
+        content: replyContent,
+        meta: {
+          provider: reply.data?.provider,
+          model: reply.data?.model,
+          latency_ms: reply.data?.latency_ms,
+        },
+      };
       setMessages((m) => [...m, aMsg]);
       await supabase
         .from("chat_messages")
         .insert({ user_id: u.user.id, role: "assistant", content: replyContent });
     } catch (err: any) {
-      toast.error(err.message ?? "AI lỗi");
+      const message = err.message ?? "AI lỗi";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function copyMessage(content: string, index: number) {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedIndex(index);
+      window.setTimeout(
+        () => setCopiedIndex((current) => (current === index ? null : current)),
+        1600,
+      );
+    } catch {
+      toast.error("Không thể sao chép nội dung.");
+    }
+  }
+
+  function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      send();
     }
   }
 
@@ -151,10 +379,10 @@ function ChatPage() {
         <div>
           <h1 className="font-display text-3xl font-bold flex items-center gap-2">
             <Sparkles className="h-6 w-6 text-xanh-green" />
-            {title}
+            {chatConfig.title}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {subtitle}
+            {chatConfig.subtitle} <span className="font-medium text-xanh-deep">({scopeText})</span>
           </p>
         </div>
         <button
@@ -176,14 +404,12 @@ function ChatPage() {
               >
                 <Bot className="h-7 w-7" />
               </div>
-              <h3 className="font-display font-semibold mt-3">
-                {isGuest ? "Xin chào! Tôi có thể giúp gì cho bạn?" : "Hỏi gì AI cũng đáp"}
-              </h3>
+              <h3 className="font-display font-semibold mt-3">{chatConfig.emptyTitle}</h3>
               <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
                 Bắt đầu bằng một trong các gợi ý dưới đây hoặc gõ câu hỏi của bạn.
               </p>
               <div className="grid sm:grid-cols-2 gap-2 max-w-xl mx-auto mt-5">
-                {suggestions.map((s) => (
+                {chatConfig.suggestions.map((s) => (
                   <button
                     key={s}
                     onClick={() => send(s)}
@@ -197,39 +423,50 @@ function ChatPage() {
           )}
 
           {messages.map((m, i) => (
-            <Bubble 
-              key={m.id ?? i} 
-              role={m.role} 
-              content={m.content} 
+            <Bubble
+              key={m.id ?? i}
+              role={m.role}
+              content={m.content}
+              meta={m.meta}
               isLast={i === messages.length - 1 || (m.role === "user" && i === messages.length - 2)}
               onEdit={m.role === "user" ? () => editMessage(i) : undefined}
+              onCopy={m.role === "assistant" ? () => copyMessage(m.content, i) : undefined}
+              copied={copiedIndex === i}
             />
           ))}
 
-          {loading && (
-            <Bubble role="assistant" content="" loading />
-          )}
+          {loading && <Bubble role="assistant" content="" loading />}
           <div ref={bottomRef} />
         </div>
+
+        {error && (
+          <div className="border-t border-border bg-destructive/10 px-4 py-2 text-sm text-destructive flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span className="flex-1">{error}</span>
+          </div>
+        )}
 
         <form
           onSubmit={(e) => {
             e.preventDefault();
             send();
           }}
-          className="border-t border-border p-3 flex gap-2 bg-white"
+          className="border-t border-border p-3 flex items-end gap-2 bg-white"
         >
-          <input
+          <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Hỏi AI về dữ liệu phản hồi, xu hướng, đề xuất hành động..."
-            className="flex-1 h-11 px-4 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-xanh-green/40"
+            onKeyDown={handleComposerKeyDown}
+            placeholder={chatConfig.placeholder}
+            rows={1}
+            className="min-h-11 max-h-32 flex-1 resize-none rounded-xl border border-border px-4 py-3 text-sm leading-5 focus:outline-none focus:ring-2 focus:ring-xanh-green/40"
             disabled={loading}
           />
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="h-11 px-4 rounded-xl text-white font-semibold flex items-center gap-2 shadow-[var(--shadow-green)] disabled:opacity-60"
+            aria-label="Gửi tin nhắn"
+            className="h-11 w-11 rounded-xl text-white font-semibold grid place-items-center shadow-[var(--shadow-green)] disabled:opacity-60 shrink-0"
             style={{ background: "var(--gradient-green)" }}
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -243,43 +480,60 @@ function ChatPage() {
 function Bubble({
   role,
   content,
+  meta,
   loading,
   isLast,
   onEdit,
+  onCopy,
+  copied,
 }: {
   role: "user" | "assistant";
   content: string;
+  meta?: AgentMeta;
   loading?: boolean;
   isLast?: boolean;
   onEdit?: () => void;
+  onCopy?: () => void;
+  copied?: boolean;
 }) {
   const isUser = role === "user";
-  return (
-    <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}>
-      <div
-        className={`h-8 w-8 rounded-lg grid place-items-center shrink-0 ${
-          isUser ? "bg-xanh-deep text-white" : "text-white"
-        }`}
-        style={!isUser ? { background: "var(--gradient-green)" } : undefined}
-      >
-        {isUser ? <UserIcon className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-      </div>
-      <div
-        className={`relative group max-w-[80%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap leading-relaxed ${
-          isUser
-            ? "bg-xanh-deep text-white rounded-tr-sm"
-            : "bg-xanh-mint/40 text-foreground border border-xanh-green/20 rounded-tl-sm"
-        }`}
-      >
+  const metaText = [meta?.provider, meta?.model, meta?.latency_ms ? `${meta.latency_ms}ms` : ""]
+    .filter(Boolean)
+    .join(" · ");
+
+  if (!isUser) {
+    return (
+      <div className="flex gap-3">
+        <div
+          className="h-8 w-8 rounded-lg grid place-items-center shrink-0 text-white"
+          style={{ background: "var(--gradient-green)" }}
+        >
+          <Bot className="h-4 w-4" />
+        </div>
         {loading ? (
-          <span className="inline-flex gap-1">
-            <Dot /> <Dot d={150} /> <Dot d={300} />
-          </span>
+          <ThinkingBlocks />
         ) : (
-          content
+          <AssistantResponse
+            content={content}
+            metaText={metaText}
+            animate={!!isLast}
+            copied={copied}
+            onCopy={onCopy}
+          />
         )}
-        
-        {isUser && onEdit && isLast && (
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex gap-3 flex-row-reverse">
+      <div className="h-8 w-8 rounded-lg grid place-items-center shrink-0 bg-xanh-deep text-white">
+        <UserIcon className="h-4 w-4" />
+      </div>
+      <div className="relative group max-w-[82%] rounded-2xl rounded-tr-sm bg-xanh-deep px-4 py-2.5 text-sm leading-relaxed text-white whitespace-pre-wrap">
+        {content}
+
+        {onEdit && isLast && (
           <button
             onClick={onEdit}
             title="Sửa câu hỏi"
@@ -289,6 +543,106 @@ function Bubble({
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+function AssistantResponse({
+  content,
+  metaText,
+  animate,
+  onCopy,
+  copied,
+}: {
+  content: string;
+  metaText: string;
+  animate: boolean;
+  onCopy?: () => void;
+  copied?: boolean;
+}) {
+  const blocks = splitAssistantBlocks(content);
+  const [visibleCount, setVisibleCount] = useState(
+    animate ? Math.min(1, blocks.length) : blocks.length,
+  );
+
+  useEffect(() => {
+    if (!animate) {
+      setVisibleCount(blocks.length);
+      return;
+    }
+
+    setVisibleCount(Math.min(1, blocks.length));
+    const timers = blocks.slice(1).map((_, index) =>
+      window.setTimeout(
+        () => {
+          setVisibleCount(index + 2);
+        },
+        (index + 1) * ASSISTANT_BLOCK_DELAY_MS,
+      ),
+    );
+
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [animate, blocks.length, content]);
+
+  return (
+    <div className="group relative max-w-[86%] space-y-2">
+      {blocks.slice(0, visibleCount).map((block, index) => (
+        <div
+          key={`${index}-${block.title ?? block.body.slice(0, 24)}`}
+          className="rounded-xl border border-xanh-green/20 bg-xanh-mint/40 px-4 py-3 text-sm leading-relaxed text-foreground shadow-sm animate-in fade-in slide-in-from-bottom-1 duration-300"
+        >
+          <div className="flex gap-3">
+            <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-xanh-green ring-4 ring-xanh-green/15" />
+            <div className="min-w-0 flex-1">
+              {block.title && (
+                <div className="mb-1 font-semibold text-xanh-deep">{block.title}</div>
+              )}
+              <ReactMarkdown components={markdownComponents}>{block.body}</ReactMarkdown>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {visibleCount < blocks.length && (
+        <div className="inline-flex rounded-xl border border-border bg-white px-3 py-2 shadow-sm animate-in fade-in duration-200">
+          <Dot /> <Dot d={150} /> <Dot d={300} />
+        </div>
+      )}
+
+      {visibleCount >= blocks.length && metaText && (
+        <div className="px-1 text-[11px] text-muted-foreground">{metaText}</div>
+      )}
+
+      {onCopy && visibleCount >= blocks.length && (
+        <button
+          onClick={onCopy}
+          title="Sao chép câu trả lời"
+          className="absolute -right-10 top-1 p-1.5 rounded-full bg-white border border-border text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-xanh-deep"
+        >
+          {copied ? <Check className="h-4 w-4 text-xanh-green" /> : <Copy className="h-4 w-4" />}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ThinkingBlocks() {
+  return (
+    <div className="max-w-[86%] space-y-2">
+      {[0, 1, 2].map((index) => (
+        <div
+          key={index}
+          className="rounded-xl border border-xanh-green/20 bg-xanh-mint/30 px-4 py-3 shadow-sm animate-pulse"
+          style={{ animationDelay: `${index * 160}ms` }}
+        >
+          <div className="flex items-center gap-3">
+            <span className="h-2 w-2 rounded-full bg-xanh-green/70" />
+            <span
+              className={`h-2 rounded-full bg-xanh-deep/15 ${index === 0 ? "w-40" : index === 1 ? "w-56" : "w-32"}`}
+            />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

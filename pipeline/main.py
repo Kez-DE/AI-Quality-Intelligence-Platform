@@ -598,6 +598,24 @@ def _log_chat_event(team: str, status: str, latency_ms: int, *, provider: str = 
         pass
 
 
+CHAT_HISTORY_LIMIT = 30
+CLIENT_CHAT_ROLES = {"user", "assistant"}
+
+
+def _append_safe_client_history(normalized: list[dict], messages: list[ChatMessageReq]) -> None:
+    """Append user-visible chat history, ignoring client-supplied system prompts."""
+    for message in messages[-CHAT_HISTORY_LIMIT:]:
+        role = message.role
+        content = message.content.strip()
+        if role == "system":
+            continue
+        if role not in CLIENT_CHAT_ROLES or not content:
+            raise HTTPException(status_code=400, detail="Invalid chat message")
+        # OWASP LLM: mask PII from user input before injecting into prompt.
+        safe_content = mask_pii(content) if role == "user" else content
+        normalized.append({"role": role, "content": safe_content[:8000]})
+
+
 @app.post("/api/agent/chat")
 def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
     if user.role == "guest":
@@ -620,12 +638,7 @@ def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
                 normalized.append({"role": "system", "content": kb})
             except Exception as exc:
                 print(f"[agent_chat] public KB lookup failed: {exc}", flush=True)
-        for message in payload.messages[-30:]:
-            if message.role not in {"user", "assistant", "system"} or not message.content.strip():
-                raise HTTPException(status_code=400, detail="Invalid chat message")
-            # OWASP LLM: mask PII from user input before injecting into prompt
-            safe_content = mask_pii(message.content) if message.role == "user" else message.content
-            normalized.append({"role": message.role, "content": safe_content[:8000]})
+        _append_safe_client_history(normalized, payload.messages)
         _t0 = time.time()
         try:
             result = chat_completion(normalized, temperature=0.4)
@@ -644,18 +657,15 @@ def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
 
     if not payload.messages:
         raise HTTPException(status_code=400, detail="messages must be a non-empty list")
+    if user.role in {"manager", "staff"} and not user.department:
+        raise HTTPException(status_code=403, detail="Bạn chưa được gán phòng ban. Vui lòng liên hệ admin.")
     # ops đã gán phòng -> scope mọi dữ liệu/tool về đúng phòng; admin -> None (toàn hệ thống)
     scope_team = user.department if (user.role != "admin" and user.department) else None
     normalized = [
         {"role": "system", "content": build_agent_system_prompt(user)},
         {"role": "system", "content": build_agent_data_context(user)},
     ]
-    for message in payload.messages[-30:]:
-        if message.role not in {"user", "assistant", "system"} or not message.content.strip():
-            raise HTTPException(status_code=400, detail="Invalid chat message")
-        # OWASP LLM: mask PII from user input before injecting into prompt
-        safe_content = mask_pii(message.content) if message.role == "user" else message.content
-        normalized.append({"role": message.role, "content": safe_content[:8000]})
+    _append_safe_client_history(normalized, payload.messages)
     # Log theo phòng: ops -> phòng của mình; admin -> "admin" (toàn hệ thống).
     log_team = scope_team or ("admin" if user.role == "admin" else "unassigned")
     _t0 = time.time()
