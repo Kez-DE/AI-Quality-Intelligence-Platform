@@ -20,10 +20,26 @@ import unicodedata
 from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
-# data/knowledge_base nằm ở gốc repo (../../data tính từ pipeline/agent/).
-_KB_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "data", "knowledge_base")
-)
+# Định vị data/knowledge_base bền ở cả local lẫn Docker:
+#  - Local: pipeline/agent/knowledge_base.py -> ../../data/knowledge_base (gốc repo).
+#  - Docker backend: nội dung pipeline/ nằm ở /app, data ở /app/data -> /app/data/knowledge_base.
+# Thử lần lượt các ứng viên, lấy thư mục đầu tiên tồn tại.
+def _resolve_kb_dir() -> str:
+    here = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.environ.get("KNOWLEDGE_BASE_DIR"),
+        os.path.normpath(os.path.join(here, "..", "..", "data", "knowledge_base")),  # local repo
+        os.path.normpath(os.path.join(here, "..", "data", "knowledge_base")),         # docker: /app/agent -> /app/data
+        "/app/data/knowledge_base",                                                    # docker tuyệt đối
+    ]
+    for c in candidates:
+        if c and os.path.isdir(c):
+            return c
+    # Fallback: trả ứng viên local để thông báo lỗi rõ ràng nếu thiếu data.
+    return candidates[1]
+
+
+_KB_DIR = _resolve_kb_dir()
 
 # Từ dừng tiếng Việt/Anh phổ biến — loại để điểm tập trung vào từ khóa nghiệp vụ.
 _STOPWORDS = {
