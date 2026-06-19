@@ -7,6 +7,7 @@ import { useTheme } from "@/hooks/useTheme";
 import NotificationPanel from "@/components/NotificationPanel";
 import {
   Bell,
+  Bot,
   Building2,
   Car,
   FileText,
@@ -21,7 +22,6 @@ import {
   Headphones,
   Activity,
   User as UserIcon,
-  HeartPulse,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -43,13 +43,14 @@ const NAV: NavItem[] = [
   { to: "/support", label: "CSKH Support", icon: Headphones, roles: AUTHENTICATED_ROLES },
   { to: "/reports", label: "Báo cáo AI", icon: FileText, roles: ["admin", "manager"] },
   { to: "/insights", label: "Phân tích phòng ban", icon: Building2, roles: AUTHENTICATED_ROLES },
+  { to: "/agent-control", label: "Điều khiển Agent", icon: Bot, roles: ["admin"] },
   { to: "/chat", label: "AI Chat", icon: Sparkles, roles: ALL_ROLES },
 ];
 
 // Link chỉ hiện với admin.
-const ADMIN_NAV = [
-  { to: "/admin", label: "Quản lý người dùng", icon: Shield },
-  { to: "/health", label: "System Health", icon: Activity },
+const ADMIN_NAV: NavItem[] = [
+  { to: "/admin", label: "Quản lý người dùng", icon: Shield, roles: ["admin"] },
+  { to: "/health", label: "System Health", icon: Activity, roles: ["admin"] },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {

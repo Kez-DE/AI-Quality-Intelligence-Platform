@@ -15,7 +15,8 @@ import {
   CalendarClock,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useMe, apiFetch } from "@/lib/api";
+import { useMe, apiFetch, isUnassignedOps } from "@/lib/api";
+import { NoDepartmentNotice } from "@/components/NoDepartmentNotice";
 import { regionLabel } from "@/lib/regions";
 
 export const Route = createFileRoute("/_authenticated/tasks")({
@@ -93,6 +94,7 @@ function TasksPage() {
 
   const { data: me } = useMe();
   const isManager = me?.role === "admin" || me?.role === "manager" || me?.role === "staff";
+  const isAdmin = me?.role === "admin";
 
   const buildQueryString = useCallback(() => {
     const params = new URLSearchParams();
@@ -222,6 +224,18 @@ function TasksPage() {
     );
   }
 
+  if (isUnassignedOps(me)) {
+    return (
+      <div className="space-y-6">
+        <h1 className="font-display text-3xl font-bold flex items-center gap-2">
+          <Kanban className="h-8 w-8 text-xanh-deep" />
+          Task Manager
+        </h1>
+        <NoDepartmentNotice />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
       <div>
@@ -261,21 +275,32 @@ function TasksPage() {
             </div>
           </div>
 
-          {/* Team Filter */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-mono text-muted-foreground">Team:</span>
-            <select
-              value={filterTeam}
-              onChange={(e) => setFilterTeam(e.target.value)}
-              className="px-3 py-1.5 text-xs font-semibold border border-border rounded-lg bg-white text-xanh-deep focus:outline-none focus:ring-2 focus:ring-xanh-green/30"
-            >
-              {TEAMS.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Team Filter — chỉ admin chọn được phòng; ops khác bị backend ép về phòng mình */}
+          {isAdmin ? (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-mono text-muted-foreground">Team:</span>
+              <select
+                value={filterTeam}
+                onChange={(e) => setFilterTeam(e.target.value)}
+                className="px-3 py-1.5 text-xs font-semibold border border-border rounded-lg bg-white text-xanh-deep focus:outline-none focus:ring-2 focus:ring-xanh-green/30"
+              >
+                {TEAMS.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            me?.department && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-mono text-muted-foreground">Team:</span>
+                <span className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-muted/40 text-xanh-deep">
+                  {me.department}
+                </span>
+              </div>
+            )
+          )}
 
           {/* Priority Filter */}
           <div className="flex items-center gap-1.5">

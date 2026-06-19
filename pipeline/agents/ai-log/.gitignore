@@ -1,0 +1,3 @@
+# Log vận hành 6 agent — sinh runtime, không commit
+*.jsonl
+!.gitignore

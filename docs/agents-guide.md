@@ -61,6 +61,7 @@ Feedback mới vào hệ thống
 **File:** `pipeline/agents/ingestion_agent.py`
 
 **Nhiệm vụ:**
+
 - Nhận feedback thô (text + channel + area)
 - Clean PII: mask SĐT → `[SĐT]`, email → `[EMAIL]`
 - Phân loại ML: TF-IDF + LinearSVC → topic (7 lớp) + sentiment
@@ -69,6 +70,7 @@ Feedback mới vào hệ thống
 - Đánh dấu `needs_review` cho P5/safety/confidence thấp
 
 **Input:**
+
 ```python
 {
     "text": "Tài xế say xỉn lái xe nguy hiểm",
@@ -78,6 +80,7 @@ Feedback mới vào hệ thống
 ```
 
 **Output:**
+
 ```python
 {
     "status": "success",
@@ -100,17 +103,20 @@ Feedback mới vào hệ thống
 **File:** `pipeline/agents/router_agent.py`
 
 **Nhiệm vụ:**
+
 - Đọc `data/taxonomy/routing_table.json`
 - Map topic → phòng ban + SLA
 - P5/P0 luôn override → Safety (SLA 1h)
 - Thay đổi routing chỉ cần sửa JSON, không sửa code
 
 **Input:**
+
 ```python
 route_ticket(topic="App Issue", severity="P3")
 ```
 
 **Output:**
+
 ```python
 {
     "team": "IT",
@@ -121,6 +127,7 @@ route_ticket(topic="App Issue", severity="P3")
 ```
 
 **Config:** `data/taxonomy/routing_table.json`
+
 ```json
 {
     "routes": [
@@ -142,6 +149,7 @@ route_ticket(topic="App Issue", severity="P3")
 **File:** `pipeline/agents/ticket_agent.py`
 
 **Nhiệm vụ:**
+
 - Tạo ticket mới hoặc cập nhật ticket cũ (dedup)
 - Dedup key: `area + topic + severity` trong cooldown 60 phút
 - Gán priority scoring: severity × case_count × has_p5
@@ -149,6 +157,7 @@ route_ticket(topic="App Issue", severity="P3")
 - Gán SLA (due_at) theo routing output
 
 **Input:**
+
 ```python
 create_or_update_ticket(
     area="HN-Cau-Giay",
@@ -164,6 +173,7 @@ create_or_update_ticket(
 ```
 
 **Output:**
+
 ```python
 {
     "action": "created",  # hoặc "updated" nếu dedup
@@ -182,6 +192,7 @@ create_or_update_ticket(
 **File:** `pipeline/agents/insight_agent.py`
 
 **Nhiệm vụ:**
+
 - Tổng hợp metric theo phòng ban trong N giờ qua
 - Phân bố severity (CRITICAL/WARNING/WATCH/INFO)
 - Top topics + count
@@ -189,11 +200,13 @@ create_or_update_ticket(
 - Sample feedback gần nhất (3 mẫu)
 
 **Input:**
+
 ```python
 generate_department_insights(team="Safety", hours=24)
 ```
 
 **Output:**
+
 ```python
 {
     "team": "Safety",
@@ -212,6 +225,7 @@ generate_department_insights(team="Safety", hours=24)
 **File:** `pipeline/agents/analyst_agent.py`
 
 **Nhiệm vụ:**
+
 - Nhận insight từ Agent 4
 - Gọi LLM phân tích root cause xuyên suốt nhiều ticket
 - Đánh giá risk level: LOW / MEDIUM / HIGH / CRITICAL
@@ -219,6 +233,7 @@ generate_department_insights(team="Safety", hours=24)
 - Đề xuất 3 action items có deadline
 
 **Output (LLM):**
+
 ```json
 {
     "root_cause_summary": "Nhiều tài xế khu vực Cầu Giấy vi phạm quy trình an toàn sau ca đêm",
@@ -240,6 +255,7 @@ generate_department_insights(team="Safety", hours=24)
 **File:** `pipeline/agents/alert_agent.py`
 
 **Nhiệm vụ:**
+
 - Nhận danh sách feedback P4/P5 theo khu vực
 - Phân cấp cảnh báo:
   - 🟡 WATCH: ≥3 case tiêu cực
@@ -249,6 +265,7 @@ generate_department_insights(team="Safety", hours=24)
 - Ngưỡng cấu hình qua `data/taxonomy/severity_rules.json`
 
 **Config:** `data/taxonomy/severity_rules.json`
+
 ```json
 {
     "alert_escalation": {
@@ -269,6 +286,7 @@ generate_department_insights(team="Safety", hours=24)
 **VAI TRÒ:** Không phải agent nghiệp vụ. Chỉ điều phối pipeline, retry, logging, schedule.
 
 **Luồng 7 bước:**
+
 1. Quét feedback P4/P5 trong N giờ → nhóm theo area
 2. Alert Agent: phân cấp cảnh báo từng khu vực
 3. Ticket Agent: tạo/cập nhật ticket cho area vượt ngưỡng
@@ -278,6 +296,7 @@ generate_department_insights(team="Safety", hours=24)
 7. Analyst Agent: root-cause cho phòng có rủi ro
 
 **Kích hoạt:**
+
 - Tự động: APScheduler mỗi 10 phút
 - Thủ công: `POST /api/agent/run?hours=24` (admin only)
 
@@ -285,14 +304,16 @@ generate_department_insights(team="Safety", hours=24)
 
 ## Nguyên tắc thiết kế
 
-| Nguyên tắc | Giải thích |
-|-------------|-----------|
-| **Hybrid Fast/Slow** | ML classify 100% data (Fast, cost=0), LLM chỉ cho root-cause/report (Slow) |
-| **Config-driven** | Routing + threshold nằm trong JSON, đổi không cần sửa code |
-| **Graceful degradation** | Mọi agent có fallback khi LLM lỗi/thiếu key |
-| **Tiết kiệm quota** | Analyst chỉ chạy cho phòng CÓ feedback tiêu cực |
-| **Idempotent** | Ticket dedup tránh tạo trùng khi scheduler chạy lại |
-| **Audit trail** | Mọi agent run ghi log: agent_name, input_hash, status, latency |
+
+| Nguyên tắc               | Giải thích                                                                 |
+| ------------------------ | -------------------------------------------------------------------------- |
+| **Hybrid Fast/Slow**     | ML classify 100% data (Fast, cost=0), LLM chỉ cho root-cause/report (Slow) |
+| **Config-driven**        | Routing + threshold nằm trong JSON, đổi không cần sửa code                 |
+| **Graceful degradation** | Mọi agent có fallback khi LLM lỗi/thiếu key                                |
+| **Tiết kiệm quota**      | Analyst chỉ chạy cho phòng CÓ feedback tiêu cực                            |
+| **Idempotent**           | Ticket dedup tránh tạo trùng khi scheduler chạy lại                        |
+| **Audit trail**          | Mọi agent run ghi log: agent_name, input_hash, status, latency             |
+
 
 ---
 
@@ -354,3 +375,4 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 3. Import vào `orchestrator.py` và thêm vào pipeline
 4. Thêm endpoint trong `main.py` nếu cần expose API
 5. Cập nhật `MASTER_BLUEPRINT.md`
+

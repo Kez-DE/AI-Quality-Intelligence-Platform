@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Loader2, FileText, Calendar, Building2, CheckCircle2, ClipboardCopy, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { useMe, apiFetch } from "@/lib/api";
+import { useMe, apiFetch, isUnassignedOps } from "@/lib/api";
+import { NoDepartmentNotice } from "@/components/NoDepartmentNotice";
 import ReactMarkdown from 'react-markdown';
 
 export const Route = createFileRoute("/_authenticated/reports")({
@@ -27,6 +28,7 @@ function ReportsPage() {
   const [selectedTeam, setSelectedTeam] = useState<string>("All");
   const { data: me } = useMe();
   const isManager = me?.role === "admin" || me?.role === "manager";
+  const isAdmin = me?.role === "admin";
 
   async function loadData(team?: string) {
     if (!isManager) {
@@ -57,6 +59,18 @@ function ReportsPage() {
     );
   }
 
+  if (isUnassignedOps(me)) {
+    return (
+      <div className="space-y-6 max-w-4xl mx-auto">
+        <h1 className="font-display text-3xl font-bold flex items-center gap-2">
+          <FileText className="h-8 w-8 text-xanh-deep" />
+          Báo cáo Tự động (AI)
+        </h1>
+        <NoDepartmentNotice />
+      </div>
+    );
+  }
+
   async function handleApprove(reportId: string) {
     try {
       await apiFetch(`/api/reports/${reportId}/approve`, { method: "PATCH" });
@@ -83,7 +97,6 @@ function ReportsPage() {
   }
 
   const teams = ["All", "Safety", "CSKH", "IT", "Vận hành", "Pricing", "Marketing"];
-
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 max-w-4xl mx-auto">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
@@ -97,16 +110,25 @@ function ReportsPage() {
           </p>
         </div>
         
-        <div className="flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-muted-foreground" />
-          <select 
-            className="border-border bg-white text-sm rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-xanh-green/50"
-            value={selectedTeam}
-            onChange={(e) => setSelectedTeam(e.target.value)}
-          >
-            {teams.map(t => <option key={t} value={t}>{t === "All" ? "Tất cả phòng ban" : `Phòng ${t}`}</option>)}
-          </select>
-        </div>
+        {isAdmin ? (
+          <div className="flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <select
+              className="border-border bg-white text-sm rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-xanh-green/50"
+              value={selectedTeam}
+              onChange={(e) => setSelectedTeam(e.target.value)}
+            >
+              {teams.map(t => <option key={t} value={t}>{t === "All" ? "Tất cả phòng ban" : `Phòng ${t}`}</option>)}
+            </select>
+          </div>
+        ) : (
+          me?.department && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Building2 className="h-4 w-4" />
+              Phòng {me.department}
+            </div>
+          )
+        )}
       </div>
 
       {loading ? (

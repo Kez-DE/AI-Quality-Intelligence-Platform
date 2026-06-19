@@ -22,7 +22,7 @@ def main():
     scheduler.add_job(
         advance_ticket_workflow,
         "interval",
-        seconds=int(os.getenv("WORKER_TICKET_WORKFLOW_INTERVAL_SECONDS", "5")),
+        seconds=int(os.getenv("WORKER_TICKET_WORKFLOW_INTERVAL_SECONDS", "15")),
         id="auto_ticket_workflow",
         replace_existing=True,
         max_instances=1,
