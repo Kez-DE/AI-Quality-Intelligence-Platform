@@ -24,13 +24,16 @@ data/
 │   ├── tech/             2 file lỗi kỹ thuật (thanh toán, không nhận cước)
 │   └── tickets/          1 file case study P5 làm few-shot cho AI
 ├── public_kb/            FAQ khách hàng cho chatbot guest (audience: public)
-├── taxonomy/             routing_table.json, severity_rules.json, safety_keywords.json
+├── taxonomy/             routing_table.json, severity_rules.json
 ├── reference/            area_catalog.json (16 khu vực HN/HCM/ĐN), enrichment
 ├── raw/                  Dataset review công khai (Google Play + App Store)
-└── processed/            seed_real_clean.json — nguồn ingest chính
+├── processed/            seed_real_clean.json — nguồn ingest chính
+├── train/                seed_train_labeled + train/test split cho ML
+├── demo/                 seed_demo_150.json cho demo nhanh
+└── auxiliary/data2/      Dataset phụ trợ/thí nghiệm, không thay runtime
 ```
 
-Mỗi file trong `knowledge_base/` có YAML frontmatter `department` để RAG lọc theo phòng. KB nội bộ chỉ phủ 4 phòng (Safety, CSKH, Vận hành, IT); `public_kb/` gắn `topic_group` theo phòng nhưng mở cho mọi khách. Xem [agents-guide.md](agents-guide.md) và [rbac-departments.md](rbac-departments.md).
+Mỗi file trong `knowledge_base/` có YAML frontmatter `department` để RAG lọc theo phòng. KB nội bộ chỉ phủ 4 phòng (Safety, CSKH, Vận hành, IT); `public_kb/` gắn `topic_group` theo phòng nhưng mở cho mọi khách. `data/taxonomy/` không chứa `safety_keywords.json`; file keyword này chỉ nằm trong `data/auxiliary/data2/taxonomy/` để thí nghiệm Data_2. Xem [agents-guide.md](agents-guide.md), [rbac-departments.md](rbac-departments.md), và [`../data/README.md`](../data/README.md).
 
 ## Hạ tầng: 6 Railway service
 

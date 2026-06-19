@@ -5,21 +5,37 @@ audience: public
 topic_group: Safety
 source_url: https://www.greensm.com/vn-vi/helps
 source: greensm_help_center
+source_checked_at: 2026-06-19
 ---
 
-# Hỏi đáp khách hàng — An toàn & sự cố
+# An toàn & sự cố
 
-## 1.1. Tôi gặp tai nạn/sự cố nghiêm trọng trong chuyến xe
+## Tai nạn hoặc sự cố nghiêm trọng trong chuyến xe
 
-Chúng tôi rất tiếc nếu chuyến xe của bạn gặp phải tai nạn/sự cố nghiêm trọng. Bạn hãy thực hiện theo các hướng dẫn sau để giảm thiểu tối đa các tổn thất: 1/ Đảm bảo an toàn: Bình tĩnh quan sát, di chuyển ra khỏi khu vực nguy hiểm nếu có thể và gửi tín hiệu cảnh báo cho các phương tiện khác. Tránh xung đột, căng thẳng giữa các bên; 2/ Kiểm tra thương tích: Nếu bạn hoặc ai đó trong xe bị thương, hãy kiểm tra tình trạng thương tích và cung cấp sơ cứu cần thiết. Đến cơ sở chăm sóc y tế thích hợp gần nhất, hoặc nếu có thương tích nghiêm trọng, hãy gọi cấp cứu 115 ngay lập tức. 3/ Báo cảnh sát: Báo cáo sự cố ngay cho cảnh sát (113) bằng cách gọi điện thoại hoặc thông báo ngay cho các bên liên quan, cơ quan chức năng và thu thập biên bản/xác nhận (nếu có). 4/ Làm bản ghi: Nếu có thể, ghi lại thông tin về tai nạn hoặc sự cố, bao gồm các chi tiết như vị trí, thời gian, thông tin của người lái xe đối diện nếu có (thông tin người lái xe, loại xe, màu xe), điều kiện thời tiết và mô tả về sự cố. Cung cấp thông tin này cho cảnh sát khi họ đến hiện trường. 5/ Liên hệ với bảo hiểm: Sau khi đảm bảo an toàn và báo cáo sự cố, liên hệ với công ty bảo hiểm của bạn để thông báo về tai nạn và bắt đầu quá trình xử lý bồi thường. Lưu ý: giữ lại tất cả các giấy tờ liên quan cần thiết để chứng minh về thiệt hại (như Biên bản công an, Hóa đơn/biên lai y tế,…),hình ảnh, nhân chứng (nếu có) để chứng minh cho yêu cầu bồi thường bảo hiểm cũng như các yêu cầu khác từ cơ quan chức năng. 6/ Giữ bình tĩnh: Trong tình huống khẩn cấp như vậy, việc giữ bình tĩnh là rất quan trọng. Hãy cố gắng làm mọi thứ có thể để giải quyết tình huống một cách hợp lý và an toàn. Nhớ rằng, việc phản ứng nhanh chóng và tỉnh táo trong các tình huống khẩn cấp như vậy có thể làm giảm thiểu thiệt hại, bảo vệ sức khỏe và an toàn của bạn và người khác. Ngoài ra, bạn cũng có thể liên hệ tới chúng tôi qua Hotline 1555 để được hỗ trợ kịp thời.
+Khi có tai nạn hoặc sự cố nghiêm trọng, ưu tiên đầu tiên là đưa bản thân và người
+xung quanh ra khỏi khu vực nguy hiểm nếu có thể. Kiểm tra tình trạng thương tích;
+nếu có người bị thương nặng, gọi cấp cứu 115. Nếu sự cố cần cơ quan chức năng,
+gọi cảnh sát 113 và giữ lại biên bản/xác nhận khi có.
 
-## Các chủ đề khác trong nhóm này
+Khách nên ghi lại thông tin cần thiết như thời gian, vị trí, biển số xe, mô tả sự
+cố, ảnh hiện trường và nhân chứng nếu có. Sau khi đảm bảo an toàn, liên hệ
+Hotline 1555 hoặc mục Hỗ trợ trong ứng dụng để Green SM tiếp nhận và hướng dẫn
+các bước tiếp theo.
 
-Với các vấn đề sau, vui lòng xem chi tiết trong mục Trung tâm hỗ trợ trên ứng dụng Green SM, hoặc liên hệ Hotline 1555:
+## Chuyến xe không an toàn
 
-- Di chuyển an toàn cùng bảo hiểm chuyến đi Green SM Care
-- Tôi nên làm gì khi thấy chuyến xe không an toàn
-- Thông tin tài xế và xe không giống trên ứng dụng
-- Tài xế có thái độ khiếm nhã, hành vi quấy rối tôi
-- Tài xế lái xe không an toàn
-- Bảo hiểm hàng hoá dành riêng cho khách hàng
+Nếu cảm thấy tài xế lái xe không an toàn, có dấu hiệu say xỉn, đe dọa hoặc gây
+nguy hiểm, khách nên yêu cầu dừng ở nơi an toàn và liên hệ hỗ trợ ngay. Cung cấp
+mã chuyến, thời gian, vị trí và mô tả hành vi để bộ phận hỗ trợ kiểm tra.
+
+## Thông tin tài xế hoặc xe không giống trên ứng dụng
+
+Trước khi lên xe, khách nên kiểm tra tên tài xế, biển số và loại xe với thông tin
+trên ứng dụng. Nếu thông tin không khớp, không nên tiếp tục chuyến đi; hãy báo
+qua ứng dụng hoặc Hotline 1555 để được hỗ trợ.
+
+## Hành vi quấy rối hoặc khiếm nhã
+
+Nếu gặp hành vi quấy rối, đe dọa hoặc khiếm nhã, khách nên ưu tiên rời khỏi tình
+huống nguy hiểm, lưu lại bằng chứng nếu an toàn và liên hệ Green SM qua kênh hỗ
+trợ chính thức. Trong trường hợp khẩn cấp, hãy gọi cơ quan chức năng trước.

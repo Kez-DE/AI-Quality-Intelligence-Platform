@@ -1,76 +1,85 @@
-# Knowledge Base (RAG) — AI Quality Intelligence Platform
+# Knowledge Base Nội Bộ — RAG Cho Ops Chat
 
-Bộ tài liệu nội bộ (mock, phục vụ demo Giai đoạn 4) làm nguồn tri thức cho RAG.
-Mục tiêu: AI Agent trích dẫn đúng SOP/SLA thay vì "bịa" câu trả lời.
+Folder này chứa tài liệu nội bộ **mock** dùng cho demo RAG của admin/manager/staff.
+Đây không phải SOP/SLA chính thức của Green SM. Nội dung được tự soạn để mô phỏng
+các quy trình xử lý sự cố thường gặp và để agent có nguồn trích dẫn ổn định khi
+trả lời câu hỏi nghiệp vụ.
 
-> ⚠️ **Dữ liệu mock.** Đây KHÔNG phải tài liệu chính thức của XanhSM. Nội dung được
-> xây dựng giả lập, bám sát taxonomy nghiệp vụ thật (`data/taxonomy/`) để demo luồng RAG.
-> Không crawl từ nguồn ngoài — toàn bộ là tài liệu tĩnh tự soạn.
+## Cách runtime đọc KB
 
-## Cấu trúc thư mục
+Runtime hiện tại không dùng pgvector, migration `knowledge_chunks`, hay script
+`agent.ingest_knowledge`. Retriever thật nằm ở
+`pipeline/agent/knowledge_base.py` và hoạt động như sau:
 
-```
+1. Load mọi file `.md` dưới `data/knowledge_base/`, trừ `README.md`.
+2. Parse YAML frontmatter bằng parser đơn giản trong code.
+3. Chunk nội dung theo heading cấp 2 (`##`).
+4. Tìm kiếm bằng keyword/BM25-lite, có bỏ dấu tiếng Việt và boost theo title/tags.
+5. Nếu có `department`, chỉ trả tài liệu đúng phòng ban để khớp RBAC.
+
+Pricing và Marketing chưa có tài liệu nội bộ trong folder này; khi lọc đúng hai
+phòng đó, retriever trả rỗng là hành vi mong muốn để tránh leak tài liệu phòng
+khác.
+
+## Cấu trúc
+
+```text
 data/knowledge_base/
-├── README.md              # File này — quy ước & manifest
-├── sop/                   # Cẩm nang Vận hành (Standard Operating Procedures)
+├── README.md
+├── sla/
+│   └── sla_boi_thuong_chuan.md
+├── sop/
+│   ├── sop_gian_lan_cuoc.md
+│   ├── sop_mat_do_tren_xe.md
 │   ├── sop_tai_nan_giao_thong.md
 │   ├── sop_tai_xe_quay_roi.md
-│   ├── sop_mat_do_tren_xe.md
-│   ├── sop_gian_lan_cuoc.md
 │   └── sop_thai_do_tai_xe.md
-├── sla/                   # SLA & Chính sách Bồi thường
-│   └── sla_boi_thuong_chuan.md
-├── tech/                  # Hướng dẫn Kỹ thuật (App & System)
-│   ├── tech_loi_thanh_toan.md
-│   └── tech_loi_khong_nhan_cuoc.md
-└── tickets/               # Lịch sử Ticket mẫu (few-shot case study)
+├── tech/
+│   ├── tech_loi_khong_nhan_cuoc.md
+│   └── tech_loi_thanh_toan.md
+└── tickets/
     └── ticket_case_studies_p5.md
 ```
 
-## Quy ước cho script chunk (làm ở lượt sau)
+## Manifest tài liệu
 
-Mỗi file `.md` có **YAML frontmatter** mô tả metadata cấp tài liệu:
+| File | Department | Category | Severity scope | Vai trò |
+| :--- | :--- | :--- | :--- | :--- |
+| `sla/sla_boi_thuong_chuan.md` | CSKH | `sla` | P1-P5 | SLA đóng ticket và bồi thường demo |
+| `sop/sop_tai_nan_giao_thong.md` | Safety | `safety` | P5 | Quy trình tai nạn giao thông |
+| `sop/sop_tai_xe_quay_roi.md` | Safety | `safety` | P5 | Quy trình quấy rối/đe dọa an toàn |
+| `sop/sop_gian_lan_cuoc.md` | Safety | `fraud` | P4-P5 | Quy trình gian lận cước/vòi vĩnh |
+| `sop/sop_mat_do_tren_xe.md` | CSKH | `lost_item` | P2-P3 | Quy trình mất đồ/bỏ quên đồ |
+| `sop/sop_thai_do_tai_xe.md` | Vận hành | `attitude` | P3-P4 | Quy trình thái độ tài xế |
+| `tech/tech_loi_thanh_toan.md` | IT | `app` | P2-P3 | Hướng dẫn lỗi thanh toán |
+| `tech/tech_loi_khong_nhan_cuoc.md` | IT | `app` | P2-P3 | Hướng dẫn lỗi không nhận cuốc/định vị |
+| `tickets/ticket_case_studies_p5.md` | Safety | `case_study` | P4-P5 | Case study few-shot cho P5 |
+
+## Frontmatter bắt buộc
+
+Mỗi file KB cần có block metadata ở đầu file:
 
 ```yaml
 ---
-document_title: Quy trình xử lý tai nạn giao thông 2026
-category: safety          # safety | fraud | attitude | lost_item | app | sla | case_study
-department: Safety        # Safety | Vận hành | IT | CSKH | Pricing
-severity_scope: [P4, P5]  # mức severity tài liệu này áp dụng
-source: mock              # luôn là mock cho dataset demo
-tags: [tai-nan, khan-cap, cong-an]
+document_title: Quy trình xử lý Tai nạn Giao thông (SOP-SAFETY-01)
+category: safety
+department: Safety
+severity_scope: [P5]
+source: mock
+tags: [tai-nan, khan-cap, cong-an, cap-cuu, bao-hiem]
 ---
 ```
 
-**Chiến lược chunk (Semantic Chunking):**
-- Cắt theo từng heading cấp 2 (`##`) — mỗi section là một chunk độc lập, giữ nguyên ngữ cảnh.
-- Mỗi chunk lý tưởng 300–800 token; section nào quá dài thì script tách tiếp theo heading cấp 3 (`###`).
-- Metadata của mỗi chunk = frontmatter của file + tiêu đề section (`heading`) để Hybrid Search lọc đúng phòng ban/thể loại.
+Các key đang được code dùng trực tiếp: `document_title`, `category`,
+`department`, `tags`. `severity_scope` giúp người đọc hiểu phạm vi áp dụng nhưng
+chưa được dùng để filter trong retriever hiện tại.
 
-**Mapping sang bảng `knowledge_chunks` (Supabase pgvector):**
-
-| Cột | Nguồn |
-| :--- | :--- |
-| `document_title` | `frontmatter.document_title` |
-| `content` | text của section (gồm cả heading) |
-| `metadata` | `{category, department, severity_scope, tags, heading, source, source_file}` |
-| `embedding` | `vector(1024)` — sinh bằng **bge-m3** ở bước ingest |
-
-## Config đã chốt
-
-- **Generate (LLM):** DeepSeek `deepseek-v4-flash` (qua `pipeline/agent/model_router.py`).
-- **Embedding:** `BAAI/bge-m3` chạy local → `vector(1024)` (DeepSeek không có embedding API).
-- **Migration:** `supabase/migrations/20260617120000_knowledge_chunks_rag.sql` (bảng + hàm `match_knowledge_chunks`).
-
-## Cách nạp dữ liệu (ingest)
+## Kiểm tra nhanh
 
 ```bash
-# Áp migration lên Supabase trước (CLI hoặc dán SQL Editor), rồi:
 cd pipeline
-python -m agent.ingest_knowledge --dry-run   # xem trước chunk, không ghi DB
-python -m agent.ingest_knowledge             # embed bge-m3 + upsert vào knowledge_chunks
-python -m agent.ingest_knowledge --reset     # xóa sạch rồi nạp lại
+python -m agent.knowledge_base
 ```
 
-Cần `SUPABASE_SERVICE_ROLE_KEY` trong `.env`. Lần chạy đầu sẽ tải model bge-m3 (~2GB).
-```
+Lệnh trên in đường dẫn KB, số chunk đã load và một vài kết quả truy vấn mẫu. Nếu
+muốn kiểm tra chatbot guest, dùng `python -m agent.public_kb`.

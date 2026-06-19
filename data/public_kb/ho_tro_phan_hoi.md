@@ -5,21 +5,34 @@ audience: public
 topic_group: CSKH
 source_url: https://www.greensm.com/vn-vi/helps
 source: greensm_help_center
+source_checked_at: 2026-06-19
 ---
 
-# Hỏi đáp khách hàng — Hỗ trợ & phản hồi
+# Hỗ trợ & phản hồi
 
-## 6.1. Ứng dụng không hoạt động hoặc báo lỗi
+## Ứng dụng không hoạt động hoặc báo lỗi
 
-Những bước khi ứng dụng Green SM gặp sự cố: 1/ Kiểm tra kết nối mạng: Thử truy cập trình duyệt internet. Nếu không thể truy cập thì có thể thiết bị đang gặp vấn đề về kết nối mạng. Hãy liên hệ nhà mạng để hỗ trợ khôi phục lại kết nối. 2/ Cập nhật ứng dụng: Kiểm tra phiên bản mới nhất trên kho ứng dụng Google hoặc App Store. 3/ Khởi động lại ứng dụng: Tắt ứng dụng và mở lại. Nếu cần, khởi động lại điện thoại. 4/ Liên hệ với Green SM: Nếu vấn đề vẫn tồn tại, vui lòng đính kèm hình chụp lỗi trên ứng dụng để được hỗ trợ.
+Nếu ứng dụng Green SM gặp lỗi, trước tiên kiểm tra kết nối mạng bằng cách thử mở
+một trang web hoặc ứng dụng khác. Sau đó kiểm tra bản cập nhật trên Google Play
+hoặc App Store, tắt mở lại ứng dụng và khởi động lại điện thoại nếu cần.
 
-## 6.4. Hướng dẫn gửi yêu cầu hỗ trợ trên ứng dụng
+Nếu lỗi vẫn còn, gửi yêu cầu hỗ trợ và đính kèm ảnh chụp màn hình hoặc mô tả lỗi
+để bộ phận hỗ trợ kiểm tra.
 
-Bạn cần hỗ trợ, vui lòng liên hệ Trung tâm hỗ trợ tại mục Tài khoản trên ứng dụng 1\. Chọn Tài khoản dưới thanh điều hướng, Chọn Trung tâm hỗ trợ ![Support method](https://www.greensm.com/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fsupport-method-vn-1.06160521.png&w=3840&q=75) 2\. Lựa chọn thông tin cần hỗ trợ và tạo yêu cầu ![Support method](https://www.greensm.com/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fsupport-method-vn-2.5b79f256.png&w=3840&q=75) Tải ứng dụng Green SM Trải nghiệm thuận tiện Thêm nhiều ưu đãi ![Download app qrcode](https://www.greensm.com/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fweb-to-app-vn.1ad5b5c3.png&w=256&q=75) [](https://vn.greensm.com/3eCA/8li1xfm7) ![Download app qrcode](https://www.greensm.com/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fweb-to-app-vn.1ad5b5c3.png&w=256&q=75) [](https://vn.greensm.com/3eCA/8li1xfm7) ![Download app qrcode](https://www.greensm.com/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fweb-to-app-vn.1ad5b5c3.png&w=256&q=75) ![Download app](https://www.greensm.com/_next/image?url=%2F_next%2Fstatic%2Fmedia%2FBannerMBVIVNlarge.56995ec0.png&w=3840&q=75) ![Download app](https://www.greensm.com/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fdownload-app-img-1-in.c95a5c11.png&w=3840&q=75) Chúng tôi sử dụng cookie để cải thiện trải nghiệm của khách hàng. Bằng cách nhấp "Đồng ý tất cả", bạn đồng ý với việc sử dụng cookie. Hãy "Tìm hiểu thêm" để hiểu chi tiết hơn về mục đích của từng loại cookies. Từ chốiĐồng ý tất cả CÔNG TY CỔ PHẦN DI CHUYỂN XANH VÀ THÔNG MINH GSM Hotline: 1555 Email: support.vn@greensm.com Tòa Văn phòng Symphony, đường Chu Huy Mân, khu đô thị Vinhomes Riverside, Phường Phúc Lợi, Thành phố Hà Nội, Việt Nam GREEN SM[Trang chủ](https://www.greensm.com/vn-vi) [Về Green SM](https://www.greensm.com/vn-vi/about) [Giới thiệu ứng dụng Green SM](https://www.greensm.com/vn-vi/download) Người dùng[Green SM Car](https://www.greensm.com/vn-vi/greensm-car) [Green SM Mini](https://www.greensm.com/vn-vi/greensm-mini) [Green SM Premium](https://www.greensm.com/vn-vi/greensm-premium) [Green SM Limo](https://www.greensm.com/vn-vi/greensm-limo) [Green Airport](https://www.greensm.com/vn-vi/green-airport) [Green Tour](https://www.greensm.com/vn-vi/green-tour) [Green Liên Tỉnh](https://www.greensm.com/vn-vi/green-lien-tinh) [Green SM Bike](https://www.greensm.com/vn-vi/greensm-bike) [Green SM Food](https://www.greensm.com/vn-vi/greensm-ngon) [Green SM Express](https://www.greensm.com/vn-vi/green-express) [Green SM Van](https://www.greensm.com/vn-vi/green-van) [Gói hội viên](https://www.greensm.com/vn-vi/green-subscription) [Thẻ quà tặng](https://www.greensm.com/vn-vi/green-gift-card) Doanh nghiệp[Green Business](https://www.greensm.com/vn-vi/business-transport) [Green SM Merchant](https://www.greensm.com/vn-vi/greensm-merchant) [Thẻ doanh nghiệp](https://www.greensm.com/vn-vi/business-payment) [Green Partner](https://www.greensm.com/vn-vi) [Green Ads](https://www.greensm.com/vn-vi) Khám phá[Tài xế Ô tô](https://www.greensm.com/vn-vi/driver-car) [Tài xế Xe máy](https://www.greensm.com/vn-vi/driver-bike) [Green SM Platform](https://www.greensm.com/vn-vi/driver-platform) [Trung tâm Tài xế](https://www.greensm.com/vn-vi/driver-center) Tổng hợp[Tin tức](https://www.greensm.com/vn-vi/news) [Trung tâm hỗ trợ](https://www.greensm.com/vn-vi/helps) [Tuyển dụng](https://www.greensm.com/vn-vi/career) [Ưu đãi](https://www.greensm.com/vn-vi/promotions) MẠNG XÃ HỘI [![Facebook](https://www.greensm.com/_next/image?url=%2F_next%2Fstatic%2Fmedia%2FFacebook.a00cce1e.png&w=48&q=75)](https://facebook.com/GreenSMOfficial) [![LinkedIn](https://www.greensm.com/_next/image?url=%2F_next%2Fstatic%2Fmedia%2FLinkin.a50151d4.png&w=48&q=75)](https://www.linkedin.com/company/greensmartmobility/) [![Zalo](https://www.greensm.com/_next/image?url=%2F_next%2Fstatic%2Fmedia%2FZaloOA.31732fd8.png&w=48&q=75)](https://zalo.me/XanhSMOfficial) [![Vcreator](https://www.greensm.com/_next/image?url=%2F_next%2Fstatic%2Fmedia%2FVCreator.13afb07b.png&w=96&q=75)](https://vcreator.global/xanhsm) Việt Nam Mã số doanh nghiệp: 0110269067 do Sở Kế hoạch và Đầu tư thành phố Hà Nội cấp lần đầu ngày 01/03/2023. Giấy phép vận tải số 9620/GPKDVT do Sở Giao thông vận tải thành phố Hà Nội cấp lần thứ nhất ngày 06/03/2023. Văn bản xác nhận hoạt động bưu chính số 6150/XN-BTTTT do Bộ Thông Tin và Truyền Thông cấp ngày 13/12/2023. ![Bo Cong Thuong](https://www.greensm.com/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Flogo-BCT.db26ec9f.png&w=1200&q=75) © 2024 GSM. All rights reserved | [Điều khoản & Pháp lý](https://www.greensm.com/vn-vi/terms-policies) | [Chính sách bảo vệ dữ liệu cá nhân](https://www.greensm.com/vn-vi/terms-policies/privacy-notice) | [Quy tắc bảo vệ quyền lợi người tiêu dùng](https://www.greensm.com/vn-vi/terms-policies/consumer-protection-policy) | Cài đặt cookies [![google play](https://www.greensm.com/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fgoogle-play.a780b8a5.png&w=384&q=75)](https://vn.greensm.com/3eCA/8li1xfm7) ![google play](https://www.greensm.com/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fgoogle-play.a780b8a5.png&w=384&q=75) ![Download app qrcode](https://www.greensm.com/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fweb-to-app-vn.1ad5b5c3.png&w=256&q=75) [![apple store](https://www.greensm.com/_next/static/media/apple-store.1dee0106.png)](https://vn.greensm.com/3eCA/8li1xfm7) ![apple store](https://www.greensm.com/_next/static/media/apple-store.1dee0106.png) ![Download app qrcode](https://www.greensm.com/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fweb-to-app-vn.1ad5b5c3.png&w=256&q=75) Trải nghiệm ứng dụng ngay ![Download app qrcode](https://www.greensm.com/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fweb-to-app-vn.1ad5b5c3.png&w=256&q=75) ![Download app qrcode](https://www.greensm.com/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fweb-to-app-vn.1ad5b5c3.png&w=256&q=75)
+## Gửi yêu cầu hỗ trợ trong ứng dụng
 
-## Các chủ đề khác trong nhóm này
+Trong ứng dụng, vào **Tài khoản** rồi chọn **Trung tâm hỗ trợ**. Chọn nhóm vấn đề
+phù hợp, điền thông tin cần hỗ trợ và tạo yêu cầu. Khách nên kèm mã chuyến, ảnh
+giao dịch hoặc ảnh lỗi nếu có.
 
-Với các vấn đề sau, vui lòng xem chi tiết trong mục Trung tâm hỗ trợ trên ứng dụng Green SM, hoặc liên hệ Hotline 1555:
+## Không tìm được điểm đón hoặc điểm đến
 
-- Tôi không tìm được điểm đón/điểm đến trên ứng dụng
-- Tôi muốn góp ý về các tính năng trên ứng dụng
+Khách nên kiểm tra quyền truy cập vị trí, kết nối mạng và thử nhập địa chỉ cụ thể
+hơn. Nếu địa điểm vẫn không hiển thị hoặc bản đồ sai, gửi phản hồi qua Trung tâm
+hỗ trợ để Green SM ghi nhận và kiểm tra dữ liệu bản đồ.
+
+## Góp ý tính năng
+
+Góp ý về ứng dụng hoặc trải nghiệm dịch vụ có thể gửi qua Trung tâm hỗ trợ trong
+ứng dụng. Với phản hồi sau chuyến đi, khách cũng có thể đánh giá sao và để lại
+nhận xét ngay sau khi chuyến kết thúc.

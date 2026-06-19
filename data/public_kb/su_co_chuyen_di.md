@@ -5,67 +5,40 @@ audience: public
 topic_group: CSKH
 source_url: https://www.greensm.com/vn-vi/helps
 source: bien_soan_tu_quy_trinh_chung
+source_checked_at: 2026-06-19
 ---
 
-# Hướng dẫn xử lý các sự cố thường gặp
-
-> Lưu ý: tài liệu này hướng dẫn quy trình chung và kênh hỗ trợ chính thức. Mức phí,
-> thời hạn hoàn tiền và điều kiện cụ thể áp dụng theo chính sách hiện hành của Green SM
-> tại thời điểm phát sinh — vui lòng xác nhận qua ứng dụng hoặc Hotline 1555.
+# Sự cố chuyến đi
 
 ## Hủy chuyến xe
 
-Bạn có thể hủy chuyến ngay trên ứng dụng ở màn hình chờ tài xế (chọn chuyến đang đặt →
-"Hủy chuyến"). Lưu ý:
+Khách có thể hủy chuyến trên ứng dụng khi chuyến đang ở trạng thái chờ hoặc đã có
+tài xế nhận, tùy giao diện hiển thị tại thời điểm đó. Phí hủy, nếu có, phụ thuộc
+chính sách hiện hành và trạng thái chuyến.
 
-- Hủy sớm trước khi tài xế nhận/đến thường không phát sinh phí.
-- Hủy sau khi tài xế đã nhận và di chuyển đến đón có thể bị tính phí hủy theo chính sách.
-- Nếu tài xế yêu cầu bạn tự hủy với lý do không hợp lý, đừng tự hủy — hãy phản ánh qua
-  mục Hỗ trợ trong ứng dụng hoặc Hotline 1555 để không bị tính phí oan.
-
-## Bị trừ tiền khi chuyến đã hủy, hoặc bị trừ hai lần
-
-Nếu chuyến đã hủy mà vẫn bị trừ tiền, hoặc bị trừ trùng (hai lần) cho một chuyến:
-
-1. Kiểm tra lịch sử chuyến đi và biên lai trong ứng dụng (mục Tài khoản → Lịch sử chuyến).
-2. Đối chiếu với sao kê ngân hàng/ví — đôi khi là giao dịch "tạm giữ" (pre-authorization)
-   sẽ tự hoàn lại sau vài ngày làm việc, không phải trừ thật.
-3. Nếu vẫn bị trừ sai, gửi yêu cầu hỗ trợ kèm mã chuyến + ảnh chụp giao dịch qua mục Hỗ trợ
-   trong ứng dụng hoặc Hotline 1555 để được kiểm tra và hoàn tiền nếu đúng.
-
-Số tiền hoàn (nếu có) được xử lý theo chính sách và thời gian xử lý của đơn vị thanh toán.
+Nếu tài xế yêu cầu khách tự hủy với lý do không hợp lý, hoặc chuyến bị hoàn thành
+dù tài xế không xuất hiện, khách nên gửi phản ánh qua Trung tâm hỗ trợ kèm mã
+chuyến.
 
 ## Bỏ quên đồ trên xe
 
-*(Các cách hỏi thường gặp: để quên đồ, mất đồ, quên điện thoại/ví/túi trên taxi, tìm lại đồ.)*
+Khi phát hiện bỏ quên đồ, kiểm tra lịch sử chuyến để xác định chuyến vừa đi và
+liên hệ lại tài xế qua ứng dụng nếu còn khả dụng. Nếu không liên hệ được, gửi yêu
+cầu hỗ trợ kèm mã chuyến, mô tả món đồ, thời gian và thông tin nhận dạng.
 
-1. Kiểm tra lịch sử chuyến để xác định tài xế/chuyến vừa đi.
-2. Liên hệ lại tài xế qua ứng dụng (gọi/nhắn trong chi tiết chuyến) ngay khi phát hiện.
-3. Nếu không liên hệ được, báo qua mục Hỗ trợ trong ứng dụng hoặc Hotline 1555 kèm mã
-   chuyến và mô tả món đồ để được hỗ trợ tìm lại.
+## Chất lượng xe không đảm bảo
 
-## Chất lượng xe không đảm bảo / thiếu trang thiết bị
+Với vấn đề như xe không sạch, điều hòa không hoạt động, thiếu trang thiết bị hoặc
+chất lượng xe không đúng kỳ vọng, khách nên đánh giá chuyến đi và gửi phản ánh
+kèm ảnh nếu có. Thông tin này giúp Green SM kiểm tra và cải thiện dịch vụ.
 
-*(Các cách hỏi thường gặp: xe bẩn, xe cũ, xe hôi, điều hòa không mát, thiếu dây an toàn, xe không sạch sẽ.)*
+## Tài xế đi sai lộ trình hoặc đón nhầm khách
 
-Phản ánh ngay sau chuyến đi bằng cách **đánh giá sao cho tài xế** và để lại nhận xét, hoặc
-gửi phản ánh chi tiết (kèm mã chuyến, ảnh nếu có) qua mục Hỗ trợ trong ứng dụng / Hotline 1555.
-Phản hồi của bạn giúp Green SM cải thiện chất lượng dịch vụ.
+Nếu tài xế đi sai lộ trình, đón nhầm khách, hoặc thông tin xe/tài xế không khớp
+ứng dụng, khách nên ưu tiên an toàn, không tiếp tục chuyến nếu thấy rủi ro và gửi
+phản ánh qua kênh hỗ trợ chính thức.
 
-## Hóa đơn VAT & chênh lệch số tiền
+## Phản ánh chất lượng món ăn hoặc dịch vụ giao hàng
 
-- Yêu cầu xuất hóa đơn VAT cho chuyến đi qua mục hỗ trợ/hóa đơn trong ứng dụng, cung cấp
-  thông tin xuất hóa đơn theo hướng dẫn.
-- Số tiền trên ứng dụng và trên hóa đơn VAT có thể khác nhau do cách hiển thị giá đã gồm/
-  chưa gồm thuế và các khoản phí — chi tiết theo quy định hóa đơn hiện hành. Nếu cần làm rõ,
-  liên hệ Hotline 1555.
-
-## Phản ánh chất lượng món ăn (dịch vụ giao đồ ăn)
-
-Phản ánh về chất lượng món ăn qua mục Hỗ trợ trong ứng dụng kèm mã đơn và ảnh (nếu có) để
-được tiếp nhận và xử lý.
-
-## Góp ý về tính năng ứng dụng
-
-Gửi góp ý qua mục Hỗ trợ / Gửi yêu cầu hỗ trợ trong ứng dụng. Mọi góp ý đều được ghi nhận
-để cải thiện trải nghiệm.
+Với dịch vụ giao đồ ăn/giao hàng, khách nên gửi phản ánh trong ứng dụng kèm mã
+đơn, ảnh sản phẩm và mô tả vấn đề để được tiếp nhận.

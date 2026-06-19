@@ -5,19 +5,34 @@ audience: public
 topic_group: Marketing
 source_url: https://www.greensm.com/vn-vi/helps
 source: greensm_help_center
+source_checked_at: 2026-06-19
 ---
 
-# Hỏi đáp khách hàng — Khuyến mãi & ưu đãi
+# Khuyến mãi & ưu đãi
 
-## 4.1. Sử dụng mã khuyến mãi và ưu đãi giảm giá
+## Sử dụng mã khuyến mãi
 
-Để dùng mã khuyến mãi/ưu đãi giảm giá: 1/ Tại màn hình đặt xe, nhập Điểm đón và Điểm đến. 2/ Chọn dịch vụ di chuyển. 3/ Nhấn “Ưu đãi” trên nút “Đặt xe”, nhập mã. 4/ Kiểm tra cước phí sau giảm và chọn thanh toán. 5/ Bấm “Đặt xe” và bắt đầu chuyến đi cùng Green SM. \* Xem các chương trình ưu đãi độc quyền khác tại biểu tượng Thông báo hoặc dưới trang chính trên ứng dụng.
+Tại màn hình đặt xe, nhập điểm đón và điểm đến, chọn dịch vụ di chuyển rồi chọn
+mục **Ưu đãi** gần nút đặt xe. Nhập hoặc chọn mã khuyến mãi, kiểm tra lại cước
+phí sau giảm và xác nhận đặt xe.
 
-## Các chủ đề khác trong nhóm này
+Khách nên kiểm tra điều kiện áp dụng của từng mã như thời hạn, khu vực, loại dịch
+vụ, phương thức thanh toán và tài khoản đủ điều kiện.
 
-Với các vấn đề sau, vui lòng xem chi tiết trong mục Trung tâm hỗ trợ trên ứng dụng Green SM, hoặc liên hệ Hotline 1555:
+## Quên nhập mã khuyến mãi
 
-- Tôi quên nhập mã khuyến mãi
-- Hướng dẫn kiểm tra hạng thành viên và đổi điểm Xanh
-- Tôi không sử dụng được mã khuyến mãi/mã ưu đãi
-- Tôi không nhận được điểm Xanh cho chuyến xe
+Nếu quên nhập mã trước khi đặt chuyến, khách nên kiểm tra điều kiện chương trình
+trên ứng dụng hoặc liên hệ Trung tâm hỗ trợ. Việc áp dụng lại ưu đãi sau chuyến
+phụ thuộc chính sách của từng chương trình tại thời điểm phát sinh.
+
+## Không sử dụng được mã
+
+Các nguyên nhân thường gặp gồm mã hết hạn, không đúng loại dịch vụ/khu vực, không
+đủ điều kiện tài khoản, không đúng phương thức thanh toán hoặc đã dùng hết lượt.
+Khách nên chụp màn hình lỗi và gửi Trung tâm hỗ trợ nếu cần kiểm tra.
+
+## Điểm Xanh, hạng thành viên và ưu đãi khác
+
+Thông tin hạng thành viên, điểm thưởng và ưu đãi có thể thay đổi theo từng chương
+trình. Khách nên kiểm tra mục thông báo, ưu đãi hoặc thành viên trong ứng dụng để
+xem điều kiện hiện hành.

@@ -149,10 +149,14 @@ C2-App-116/
 │   └── ml/                 Model .joblib + script train
 ├── supabase/               Migration SQL + cấu hình
 ├── data/
-│   ├── knowledge_base/     KB nội bộ cho RAG theo phòng (sop/sla/tech/tickets)
-│   ├── public_kb/          FAQ khách cho chatbot guest
-│   ├── taxonomy/           routing_table, severity_rules, safety_keywords
-│   └── raw/ processed/     Dataset review + nhãn
+│   ├── README.md           Manifest dữ liệu, provenance, quy tắc sử dụng
+│   ├── knowledge_base/     KB nội bộ mock cho RAG theo phòng
+│   ├── public_kb/          FAQ công khai cho chatbot guest
+│   ├── taxonomy/           routing_table.json, severity_rules.json
+│   ├── reference/          area_catalog + enrichment summary
+│   ├── raw/ processed/     Public reviews + dataset runtime đã clean
+│   ├── train/ demo/        Split ML + seed demo 150 review
+│   └── auxiliary/data2/    Dataset phụ trợ/thí nghiệm, không thay runtime
 ├── docs/                   Tài liệu chi tiết (xem mục Tài liệu)
 ├── Todo.md                 Backlog cải tiến
 ├── JOURNAL.md              Nhật ký cohort
@@ -217,6 +221,15 @@ Kịch bản chi tiết: [`docs/demo-script.md`](docs/demo-script.md)
 | [`docs/ai-systems.md`](docs/ai-systems.md) | 4 lớp AI, LLM router, luồng dữ liệu theo worker |
 | [`docs/agents-guide.md`](docs/agents-guide.md) | 8 agent + orchestrator: thứ tự thực thi, I/O, routing |
 | [`docs/rbac-departments.md`](docs/rbac-departments.md) | Phân quyền role + scope theo phòng ban |
+
+**Dữ liệu & KB**
+
+| File | Nội dung |
+|------|----------|
+| [`data/README.md`](data/README.md) | Manifest dữ liệu, provenance, dataset runtime, Data_2 phụ trợ |
+| [`data/knowledge_base/README.md`](data/knowledge_base/README.md) | KB nội bộ mock, frontmatter, cách retriever ops đọc Markdown |
+| [`data/public_kb/README.md`](data/public_kb/README.md) | KB công khai cho guest chatbot, manifest và quy tắc biên tập |
+| [`data/auxiliary/data2/README.md`](data/auxiliary/data2/README.md) | Data_2 phụ trợ cho safety spike và thí nghiệm balanced-label |
 
 **Vận hành**
 
