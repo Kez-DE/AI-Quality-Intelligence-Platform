@@ -20,7 +20,7 @@ from rate_limiter import RateLimiter, check_rate_limit
 from clean import mask_pii
 from env_config import get_settings
 from core.paths import DEFAULT_DATA_FILE
-from services.agent_context import AGENT_SYSTEM_PROMPT, GUEST_SYSTEM_PROMPT, build_agent_data_context
+from services.agent_context import AGENT_SYSTEM_PROMPT, GUEST_SYSTEM_PROMPT, build_agent_data_context, build_agent_system_prompt
 from services.live_stream import get_live_stream_status, set_scheduler, start_live_stream, stop_live_stream
 from services.ticket_workflow import ticket_workflow_state
 
@@ -601,9 +601,11 @@ def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
 
     if not payload.messages:
         raise HTTPException(status_code=400, detail="messages must be a non-empty list")
+    # ops đã gán phòng -> scope mọi dữ liệu/tool về đúng phòng; admin -> None (toàn hệ thống)
+    scope_team = user.department if (user.role != "admin" and user.department) else None
     normalized = [
-        {"role": "system", "content": AGENT_SYSTEM_PROMPT},
-        {"role": "system", "content": build_agent_data_context()},
+        {"role": "system", "content": build_agent_system_prompt(user)},
+        {"role": "system", "content": build_agent_data_context(user)},
     ]
     for message in payload.messages[-30:]:
         if message.role not in {"user", "assistant", "system"} or not message.content.strip():
@@ -612,7 +614,7 @@ def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
         safe_content = mask_pii(message.content) if message.role == "user" else message.content
         normalized.append({"role": message.role, "content": safe_content[:8000]})
     try:
-        result = run_chat_agent(normalized, temperature=0.4)
+        result = run_chat_agent(normalized, temperature=0.4, scope_team=scope_team)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Agent model error: {str(exc)[:300]}") from exc
     # OWASP LLM: mask PII from LLM output before returning to client

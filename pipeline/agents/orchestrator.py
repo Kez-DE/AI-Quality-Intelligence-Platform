@@ -105,6 +105,8 @@ def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
                         spike_analysis.get("description", "")
                         + f"\n\n**Action Plan:** {spike_analysis.get('action', '')}"
                         + f"\n**Assigned Team:** {route_res.get('team')}"
+                        + f"\n**Priority:** {route_res.get('priority') or ''}"
+                        + f"\n**Routing Note:** {route_res.get('description') or ''}"
                     ),
                     severity=alert_decision.get("severity", "CRITICAL"),
                     team=route_res.get("team"),

@@ -11,8 +11,12 @@ from clean import mask_pii
 from .model_router import chat_completion, ChatMessage
 from .chat_tools import TOOLS_DEFINITIONS, execute_tool
 
-def run_chat_agent(messages: list[ChatMessage], temperature: float = 0.3, max_loops: int = 5) -> dict:
-    """Chạy vòng lặp ReAct agent để LLM tự gọi công cụ (nếu cần) trước khi trả lời."""
+def run_chat_agent(messages: list[ChatMessage], temperature: float = 0.3, max_loops: int = 5, scope_team: str | None = None) -> dict:
+    """Chạy vòng lặp ReAct agent để LLM tự gọi công cụ (nếu cần) trước khi trả lời.
+
+    scope_team: phòng ban của ops user. Nếu set, mọi tool bị ép lọc về đúng phòng
+    này (chống rò rỉ dữ liệu chéo phòng). None = admin/toàn hệ thống.
+    """
     # Lọc PII từ input messages
     current_messages = []
     for m in messages:
@@ -65,8 +69,8 @@ def run_chat_agent(messages: list[ChatMessage], temperature: float = 0.3, max_lo
             except Exception:
                 args = {}
                 
-            # Thực thi hàm truy vấn dữ liệu thực tế
-            tool_result = execute_tool(name, args)
+            # Thực thi hàm truy vấn dữ liệu thực tế (ép scope theo phòng ban của ops)
+            tool_result = execute_tool(name, args, scope_team=scope_team)
             
             # Lọc PII từ tool context (nếu có user feedback raw) để tránh leak lên prompt lần 2
             safe_tool_result = mask_pii(str(tool_result))

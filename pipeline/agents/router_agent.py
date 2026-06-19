@@ -25,8 +25,15 @@ def load_routing_table() -> Dict[str, Any]:
         return json.load(f)
 
 
-def route_ticket(topic: str, severity: Any) -> Dict[str, Any]:
-    """Định tuyến ticket về đúng phòng ban. P5/P0 ép về Safety (Safety-first)."""
+def route_ticket(topic: str, severity: Any, sentiment: str | None = None) -> Dict[str, Any]:
+    """Định tuyến ticket về đúng phòng ban.
+
+    Thứ tự ưu tiên:
+      1. Severity override — P5/P0 ép về Safety (Safety-first), thắng tất cả.
+      2. Sentiment override — feedback positive về Marketing (cảm nhận thương hiệu).
+      3. Topic match — theo bảng routes.
+      4. Default team.
+    """
     start_time = time.time()
     routing_config = load_routing_table()
 
@@ -40,6 +47,8 @@ def route_ticket(topic: str, severity: Any) -> Dict[str, Any]:
                 sla_hours=override.get("sla_hours", 1),
                 routed_by=f"router_agent ({ov_sev} Override)",
                 is_override=True,
+                priority=override.get("priority_default"),
+                description=override.get("description"),
             )
             log_agent_run(
                 run_id=f"router_{int(time.time())}",
@@ -51,7 +60,30 @@ def route_ticket(topic: str, severity: Any) -> Dict[str, Any]:
             )
             return output.model_dump()
 
-    # 2. Routing theo topic
+    # 2. Sentiment override (positive -> Marketing)
+    if sentiment:
+        str_sentiment = str(sentiment).strip().lower()
+        for override in routing_config.get("sentiment_overrides", []):
+            if str(override.get("sentiment", "")).strip().lower() == str_sentiment:
+                output = RouterOutput(
+                    team=override.get("team", "Marketing"),
+                    sla_hours=override.get("sla_hours", 48),
+                    routed_by=f"router_agent ({str_sentiment} Sentiment)",
+                    is_override=True,
+                    priority=override.get("priority_default"),
+                    description=override.get("description"),
+                )
+                log_agent_run(
+                    run_id=f"router_{int(time.time())}",
+                    agent_name="router_agent",
+                    status="success",
+                    latency_ms=int((time.time() - start_time) * 1000),
+                    output_summary=f"Routed to {output.team} (Sentiment)",
+                    input_hash=f"{topic}_{severity}_{str_sentiment}"
+                )
+                return output.model_dump()
+
+    # 3. Routing theo topic
     for route in routing_config.get("routes", []):
         if route.get("topic") == topic:
             output = RouterOutput(
@@ -59,6 +91,8 @@ def route_ticket(topic: str, severity: Any) -> Dict[str, Any]:
                 sla_hours=route.get("sla_hours", 24),
                 routed_by="router_agent (Topic Match)",
                 is_override=False,
+                priority=route.get("priority_default"),
+                description=route.get("description"),
             )
             log_agent_run(
                 run_id=f"router_{int(time.time())}",
@@ -70,7 +104,7 @@ def route_ticket(topic: str, severity: Any) -> Dict[str, Any]:
             )
             return output.model_dump()
 
-    # 3. Default
+    # 4. Default
     output = RouterOutput(
         team=routing_config.get("default_team", "CSKH"),
         sla_hours=24,
@@ -91,3 +125,4 @@ def route_ticket(topic: str, severity: Any) -> Dict[str, Any]:
 if __name__ == "__main__":
     print(route_ticket("App Issue", 3))
     print(route_ticket("General Inquiry", 5))  # -> Safety override
+    print(route_ticket("Other", 2, sentiment="positive"))  # -> Marketing

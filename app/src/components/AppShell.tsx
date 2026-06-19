@@ -5,6 +5,7 @@ import { useMe, ROLE_LABELS, type Role } from "@/lib/api";
 import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 import { useTheme } from "@/hooks/useTheme";
 import NotificationPanel from "@/components/NotificationPanel";
+import { DepartmentBadge } from "@/components/DepartmentBadge";
 import {
   Bell,
   Bot,
@@ -88,6 +89,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex text-foreground">
+      {/* Badge phòng ban — góc trên bên phải (desktop). Guest/chưa gán phòng: ẩn. */}
+      <div className="hidden md:block fixed top-4 right-6 z-50">
+        <DepartmentBadge me={me} className="shadow-sm backdrop-blur bg-card/80" />
+      </div>
       {/* Sidebar */}
       <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border bg-card/90 text-card-foreground backdrop-blur sticky top-0 h-screen">
         <div className="p-5 border-b border-border">
@@ -179,6 +184,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <span className="font-display font-bold text-sm">xanhSM</span>
           </div>
           <div className="flex items-center gap-2">
+            <DepartmentBadge me={me} />
             {role !== "guest" && (
               <NotificationPanel
                 notifications={notifications}
