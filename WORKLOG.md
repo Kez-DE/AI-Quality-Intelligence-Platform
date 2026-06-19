@@ -192,3 +192,19 @@ Chưa phân công. TODO: ai làm module nào, deadline nội bộ.
 - **OWASP LLM (Tránh rò rỉ dữ liệu PII)**: Tích hợp hàm `mask_pii()` từ `clean.py` vào `pipeline/agent/chat_agent.py`. Lọc PII (Email, SĐT, Biển số xe) từ câu hỏi của người dùng và từ kết quả phân tích của Tool/LLM để tránh rò rỉ khi gán vào Prompt.
 - **Quản lý Cấu hình (Pydantic Settings)**: Thêm thư viện `pydantic-settings` vào `requirements.txt`. Refactor `env_config.py` để sử dụng class `Settings` quản lý toàn bộ cấu hình, loại bỏ `os.getenv` thô sơ trong `main.py`, `webhook_notifier.py` và `model_router.py` nhằm nâng cao tính an toàn (type hinting & validation).
 - **Rate Limiting**: Rà soát và xác nhận đã áp dụng giới hạn request (`chat_rate_limit` và `chat_rate_limit_staff`) cho endpoint `/api/agent/chat` nhằm phòng ngừa rủi ro bị lạm dụng API Key của LLM. Thống nhất sử dụng `httpx` thay cho `requests` trong Webhook.
+
+## 2026-06-20
+
+### Sửa lỗi luồng chấm điểm (Scoring Agent) và Cảnh báo (Spike Detector)
+- **Vấn đề**: Các cảnh báo sinh ra không sử dụng điểm rủi ro thực tế (`overall_risk`) từ `scoring_agent.py`, dẫn đến sai lệch mức độ ưu tiên.
+- **Giải pháp**: Cập nhật hàm `_severity_number` trong `spike_detector.py` để ưu tiên lấy trường `overall_risk` (chấm theo 5 chiều rủi ro) làm độ ưu tiên chuẩn. Đảm bảo vé P1-P5 phản ánh chính xác thuật toán Thác rơi (Waterfall).
+
+### Sửa lỗi hiển thị Priority bị rác (`**Routing Note:**`)
+- **Vấn đề**: `router_agent.py` không trả về `priority` ở nhánh Default, khiến chuỗi sinh ra bị rỗng, làm `task_agent.py` parse nhầm dòng liền kề thành độ ưu tiên.
+- **Giải pháp**: Bổ sung `priority="P4"` làm mặc định cho nhánh Default. Làm chặt chẽ điều kiện regex bắt Priority trong `task_agent.py` để lọc bỏ các chuỗi rác.
+
+### Sửa lỗi BUG-02 — Định tuyến sai phòng ban cho vé P5
+- **Vấn đề**: Cấu hình `severity_overrides` mặc định ép MỌI vé có mác P5 về phòng Safety. Dẫn đến một "Lỗi ứng dụng" hay "Lỗi thanh toán" nghiêm trọng (P5) bị chuyển nhầm sang Safety thay vì IT hoặc CSKH.
+- **Giải pháp**: 
+  - Cập nhật `routing_table.json`: Bổ sung mảng `topics: ["Safety", "Driver Behavior"]` vào luật ghi đè P5.
+  - Cập nhật `router_agent.py`: Chỉ cho phép override P5 sang Safety nếu chủ đề thuộc mảng nhạy cảm. Với các chủ đề khác, vé vẫn được chuyển về IT/CSKH nhưng **giữ nguyên độ ưu tiên P5** thay vì bị hạ cấp xuống ưu tiên mặc định của phòng ban đó.

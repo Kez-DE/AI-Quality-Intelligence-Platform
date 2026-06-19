@@ -28,12 +28,13 @@ def get_supabase() -> Client:
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
-def _severity_number(value: object) -> int:
+def _severity_number(row: dict) -> int:
+    if "overall_risk" in row and isinstance(row["overall_risk"], int) and row["overall_risk"] > 0:
+        return row["overall_risk"]
     try:
-        return int(str(value).upper().lstrip("P"))
+        return int(str(row.get("severity", "0")).upper().lstrip("P"))
     except (TypeError, ValueError):
         return 0
-
 
 def _group_threshold(group: dict) -> int | None:
     max_severity = group["max_severity"]
@@ -99,7 +100,7 @@ def detect_spikes(
         area = str(row.get("area") or "Unknown")
         topic = str(row.get("topic") or "Other")
         sentiment = str(row.get("sentiment") or "neutral").lower()
-        severity = _severity_number(row.get("severity"))
+        severity = _severity_number(row)
         route = route_ticket(topic, row.get("severity", "P3"), sentiment, log_run=False)
         team = route["team"]
         ticket_type = "opportunity" if team == "Marketing" and sentiment == "positive" else "incident"
@@ -177,8 +178,8 @@ def detect_spikes(
             analysis.get("description", "Không có mô tả chi tiết")
             + f"\n\n**Action Plan:** {analysis.get('action', '')}"
             + f"\n**Assigned Team:** {route['team']}"
-            + f"\n**Priority:** {route.get('priority') or ''}"
-            + f"\n**Routing Note:** {route.get('description') or ''}"
+            + f"\n**Priority:** {route.get('priority') or 'P3'}"
+            + f"\n**Routing Note:** {route.get('description') or 'Không có ghi chú'}"
         )
         severity = f"P{max(1, group['max_severity'])}"
         result = create_or_update_ticket(

@@ -166,6 +166,14 @@ def recent_feedback(
             # Guest chỉ xem feedback do chính mình gửi
             q = q.eq("user_id", user.id)
         else:
+            # Map department -> topics for staff/manager
+            if user.role in ("staff", "manager") and getattr(user, "department", None):
+                from agents.router_agent import load_routing_table
+                routing_table = load_routing_table()
+                topics = [k for k, v in routing_table.items() if v == user.department]
+                if topics:
+                    q = q.in_("topic", topics)
+            
             if needs_review is not None:
                 q = q.eq("needs_review", needs_review)
             if reviewed is not None:

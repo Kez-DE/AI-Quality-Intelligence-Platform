@@ -124,12 +124,13 @@ export function MarkdownContent({
   components?: MarkdownComponents;
 }) {
   return (
-    <ReactMarkdown
-      className={className}
-      remarkPlugins={[remarkGfm]}
-      components={{ ...defaultComponents, ...components }}
-    >
-      {normalizeMarkdownForRendering(children ?? "")}
-    </ReactMarkdown>
+    <div className={className}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{ ...defaultComponents, ...components }}
+      >
+        {normalizeMarkdownForRendering(children ?? "")}
+      </ReactMarkdown>
+    </div>
   );
 }

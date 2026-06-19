@@ -170,7 +170,7 @@ C2-App-116/
 | Trang | Admin | Manager | Staff | Guest |
 |-------|:-----:|:-------:|:-----:|:-----:|
 | Dashboard | ✅ | ✅ | ✅ | ✅ |
-| Ticket Triage (Alerts) | ✅ | ✅ | ❌ | ❌ |
+| Ticket Triage (Alerts) | ✅ | ✅ | ✅ | ❌ |
 | Phản hồi (list + HITL) | ✅ | ✅ | ✅ | ✅ |
 | Phân tích phòng ban | ✅ | ✅ | ❌ | ❌ |
 | AI Chat / Hỗ trợ CSKH | ✅ | ✅ | ✅ | ✅ |

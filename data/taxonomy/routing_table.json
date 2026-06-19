@@ -10,7 +10,7 @@
     { "topic": "Other",           "team": "CSKH",     "sla_hours": 24, "priority_default": "P4", "description": "Phản hồi chung chưa phân loại rõ — CSKH tiếp nhận." }
   ],
   "severity_overrides": [
-    { "severity": "P5", "team": "Safety", "sla_hours": 1, "priority_default": "P5", "description": "Mọi ticket mức P5 ép về Safety bất kể chủ đề (Safety-first)." }
+    { "severity": "P5", "topics": ["Safety", "Driver Behavior"], "team": "Safety", "sla_hours": 1, "priority_default": "P5", "description": "Mọi ticket mức P5 thuộc chủ đề nhạy cảm ép về Safety." }
   ],
   "sentiment_overrides": [
     { "sentiment": "positive", "team": "Marketing", "sla_hours": 48, "priority_default": "P4", "description": "Phản hồi tích cực phản ánh cảm nhận thương hiệu — chuyển Marketing theo dõi & khai thác truyền thông." }

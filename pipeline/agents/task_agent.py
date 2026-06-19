@@ -49,7 +49,9 @@ def cluster_alerts_into_tasks() -> Dict[str, Any]:
         if key not in cluster_priority:
             prio = str(alert.get("priority") or "").strip()
             if not prio and "**Priority:**" in desc:
-                prio = desc.split("**Priority:**")[1].strip().split("\n")[0].strip()
+                raw_prio = desc.split("**Priority:**")[1].strip().split("\n")[0].strip()
+                if raw_prio.startswith("P") and len(raw_prio) >= 2:
+                    prio = raw_prio[:2]
             if prio:
                 cluster_priority[key] = prio
 

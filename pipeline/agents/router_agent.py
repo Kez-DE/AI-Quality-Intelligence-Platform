@@ -46,27 +46,32 @@ def route_ticket(
 
     # 1. Severity override trước (Safety-first)
     str_sev = str(severity).upper()
+    formatted_sev = f"P{str_sev}" if str_sev.isdigit() else str_sev
+    input_hash = f"{topic}_{severity}"
+    
     for override in routing_config.get("severity_overrides", []):
         ov_sev = str(override.get("severity", "")).upper()
+        target_topics = override.get("topics", [])
         if ov_sev == str_sev or (str_sev in {"5", "P5"} and ov_sev == "P5"):
-            output = RouterOutput(
-                team=normalize_department(override.get("team"), "Safety"),
-                sla_hours=override.get("sla_hours", 1),
-                routed_by=f"router_agent ({ov_sev} Override)",
-                is_override=True,
-                priority=override.get("priority_default"),
-                description=override.get("description"),
-            )
-            if log_run:
-                log_agent_run(
-                    run_id=f"router_{int(time.time())}",
-                    agent_name="router_agent",
-                    status="success",
-                    latency_ms=int((time.time() - start_time) * 1000),
-                    output_summary=f"Routed to {output.team} (Override)",
-                    input_hash=f"{topic}_{severity}"
+            if not target_topics or topic in target_topics:
+                output = RouterOutput(
+                    team=normalize_department(override.get("team"), "Safety"),
+                    sla_hours=override.get("sla_hours", 1),
+                    routed_by=f"router_agent ({ov_sev} Override)",
+                    is_override=True,
+                    priority=override.get("priority_default"),
+                    description=override.get("description"),
                 )
-            return output.model_dump()
+                if log_run:
+                    log_agent_run(
+                        run_id=f"route_{int(time.time())}",
+                        agent_name="router_agent",
+                        status="success",
+                        latency_ms=0,
+                        output_summary=f"{output.team} (Sev Override)",
+                        input_hash=input_hash
+                    )
+                return output.model_dump()
 
     # 2. Sentiment override (positive -> Marketing)
     if sentiment:
@@ -100,7 +105,7 @@ def route_ticket(
                 sla_hours=route.get("sla_hours", 24),
                 routed_by="router_agent (Topic Match)",
                 is_override=False,
-                priority=route.get("priority_default"),
+                priority=formatted_sev if formatted_sev.startswith("P") else route.get("priority_default"),
                 description=route.get("description"),
             )
             if log_run:
@@ -118,6 +123,7 @@ def route_ticket(
     output = RouterOutput(
         team=normalize_department(routing_config.get("default_team"), "CSKH"),
         sla_hours=24,
+        priority=formatted_sev if formatted_sev.startswith("P") else "P4",
         routed_by="router_agent (Default)",
         is_override=False,
     )
