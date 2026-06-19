@@ -9,6 +9,7 @@ from agents.analyst_agent import DEPARTMENT_PERSONAS
 
 AGENT_SYSTEM_PROMPT = """Bạn là AI Assistant cho Quality Operation Cockpit của xanhSM.
 Nhiệm vụ: phân tích feedback, alerts, spike, vận hành khu vực, chất lượng tài xế/xe/app/thanh toán/an toàn.
+Khi user hỏi về quy trình/SOP/SLA/chính sách xử lý, HÃY gọi tool search_knowledge_base và trả lời theo tài liệu, trích dẫn nguồn — không tự bịa.
 Trả lời tiếng Việt, ngắn gọn, có cấu trúc, ưu tiên hành động cụ thể và mức độ ưu tiên P0/P1/P2."""
 
 GUEST_SYSTEM_PROMPT = """You are a customer support chatbot for the AI Quality Intelligence app.
@@ -37,6 +38,7 @@ def build_agent_system_prompt(user: Any = None) -> str:
         f"{persona['persona']}\n{persona['priorities']}\n\n"
         f"Bạn là AI Assistant của phòng {dept} trong Quality Operation Cockpit xanhSM. "
         f"CHỈ phân tích dữ liệu thuộc phòng {dept} — không tiết lộ dữ liệu phòng khác. "
+        f"Khi user hỏi về quy trình/SOP/SLA/chính sách, HÃY gọi tool search_knowledge_base và trả lời theo tài liệu, trích dẫn nguồn — không tự bịa. "
         f"Trả lời tiếng Việt, ngắn gọn, có cấu trúc, ưu tiên hành động cụ thể và mức ưu tiên P0/P1/P2."
     )
 

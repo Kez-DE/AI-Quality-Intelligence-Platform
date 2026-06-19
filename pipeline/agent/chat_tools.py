@@ -2,6 +2,7 @@ from datetime import datetime, timezone, timedelta
 from collections import Counter
 from agents.common import get_db
 from agents.router_agent import route_ticket
+from .knowledge_base import search_knowledge, format_for_prompt
 
 
 def _alert_team(alert: dict) -> str | None:
@@ -97,6 +98,17 @@ def get_team_priority_tasks(team_name: str) -> str:
     except Exception as e:
         return f"Lỗi truy xuất dữ liệu: {str(e)}"
 
+
+def search_knowledge_base(query: str, scope_team: str | None = None) -> str:
+    """Tra cứu SOP/SLA/quy trình nội bộ (RAG) để trả lời có trích dẫn, không bịa.
+
+    scope_team != None (ops): chỉ tìm trong tài liệu của phòng đó (khớp RBAC)."""
+    try:
+        results = search_knowledge(query, department=scope_team, top_k=3)
+        return format_for_prompt(results)
+    except Exception as e:
+        return f"Lỗi tra cứu knowledge base: {str(e)}"
+
 TOOLS_DEFINITIONS = [
     {
         "type": "function",
@@ -145,6 +157,23 @@ TOOLS_DEFINITIONS = [
                 "required": ["team_name"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_knowledge_base",
+            "description": "Tra cứu quy trình/SOP/SLA nội bộ (tai nạn, gian lận cước, thái độ tài xế, lỗi thanh toán, bồi thường...) để trả lời ĐÚNG theo tài liệu và TRÍCH DẪN nguồn, thay vì tự suy diễn. Dùng khi user hỏi 'xử lý thế nào', 'quy trình', 'chính sách', 'SLA bao lâu'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Câu hỏi hoặc từ khóa cần tra cứu trong tài liệu nội bộ"
+                    }
+                },
+                "required": ["query"]
+            }
+        }
     }
 ]
 
@@ -159,4 +188,6 @@ def execute_tool(name: str, args: dict, scope_team: str | None = None) -> str:
         # ops: luôn ép về phòng của mình; admin (scope_team=None): tôn trọng tham số.
         team = scope_team or args.get("team_name", "")
         return get_team_priority_tasks(team_name=team)
+    elif name == "search_knowledge_base":
+        return search_knowledge_base(query=args.get("query", ""), scope_team=scope_team)
     return f"Error: Tool {name} not found"
