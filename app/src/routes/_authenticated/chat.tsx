@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Sparkles,
@@ -112,6 +113,18 @@ const markdownComponents = {
     <ol className="mb-2 ml-4 list-decimal space-y-1 last:mb-0">{children}</ol>
   ),
   li: ({ children }: any) => <li className="pl-1">{children}</li>,
+  table: ({ children }: any) => (
+    <div className="my-3 overflow-x-auto rounded-lg border border-xanh-green/20 bg-white shadow-sm">
+      <table className="min-w-full border-collapse text-left text-xs">{children}</table>
+    </div>
+  ),
+  thead: ({ children }: any) => <thead className="bg-xanh-mint/70">{children}</thead>,
+  tbody: ({ children }: any) => <tbody className="divide-y divide-border">{children}</tbody>,
+  tr: ({ children }: any) => <tr className="divide-x divide-border align-top">{children}</tr>,
+  th: ({ children }: any) => (
+    <th className="whitespace-nowrap px-3 py-2 font-semibold text-xanh-deep">{children}</th>
+  ),
+  td: ({ children }: any) => <td className="min-w-32 px-3 py-2 text-foreground/90">{children}</td>,
   strong: ({ children }: any) => (
     <strong className="font-semibold text-xanh-deep">{children}</strong>
   ),
@@ -597,7 +610,9 @@ function AssistantResponse({
               {block.title && (
                 <div className="mb-1 font-semibold text-xanh-deep">{block.title}</div>
               )}
-              <ReactMarkdown components={markdownComponents}>{block.body}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                {block.body}
+              </ReactMarkdown>
             </div>
           </div>
         </div>
