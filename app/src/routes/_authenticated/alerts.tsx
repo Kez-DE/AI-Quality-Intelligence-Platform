@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   AlertTriangle,
+  BadgeDollarSign,
   CheckCircle2,
   Clock,
   Headphones,
@@ -11,13 +12,12 @@ import {
   RefreshCw,
   Shield,
   Siren,
-  Truck,
-  Users,
+  Megaphone,
   Wrench,
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
-import { apiFetch, useMe, isUnassignedOps } from "@/lib/api";
+import { ALL_TEAMS, apiFetch, useMe, isUnassignedOps } from "@/lib/api";
 import { NoDepartmentNotice } from "@/components/NoDepartmentNotice";
 
 export const Route = createFileRoute("/_authenticated/alerts")({
@@ -34,16 +34,22 @@ type Alert = {
   status: string;
   created_at: string;
   user_id: string;
+  assigned_team?: string | null;
+  topic?: string | null;
+  priority?: string | null;
+  ticket_type?: "incident" | "opportunity" | string | null;
+  routing_source?: string | null;
 };
 
 // Phân tích "assigned_team" từ description (field được nhét vào description dạng "...\\n\\n**Action Plan:** ...\\n**Assigned Team:** ...")
-function parseDescription(raw: string): {
+function alertMetadata(alert: Alert): {
   description: string;
   action: string;
   assigned_team: string;
   priority: string;
   routing_note: string;
 } {
+  const raw = alert.description ?? "";
   const actionMatch = raw.match(/\*\*Action Plan:\*\*\s*(.*)/);
   const teamMatch = raw.match(/\*\*Assigned Team:\*\*\s*(.*)/);
   const priorityMatch = raw.match(/\*\*Priority:\*\*\s*(.*)/);
@@ -52,8 +58,8 @@ function parseDescription(raw: string): {
   return {
     description: descClean,
     action: actionMatch?.[1]?.trim() ?? "",
-    assigned_team: teamMatch?.[1]?.trim() ?? "Vận Hành",
-    priority: priorityMatch?.[1]?.trim() ?? "",
+    assigned_team: normalizeTeam(alert.assigned_team ?? teamMatch?.[1]?.trim()),
+    priority: alert.priority?.trim() || priorityMatch?.[1]?.trim() || "",
     routing_note: noteMatch?.[1]?.trim() ?? "",
   };
 }
@@ -63,23 +69,46 @@ const TEAM_CONFIG: Record<
   string,
   { label: string; icon: React.ComponentType<{ className?: string }>; color: string; bg: string }
 > = {
-  "Vận Hành": { label: "Vận Hành", icon: Wrench, color: "text-blue-700", bg: "bg-blue-50 border-blue-200" },
-  "CSKH": { label: "CSKH", icon: Headphones, color: "text-purple-700", bg: "bg-purple-50 border-purple-200" },
-  "Safety": { label: "Safety", icon: Shield, color: "text-red-700", bg: "bg-red-50 border-red-200" },
-  "IT": { label: "IT", icon: Zap, color: "text-yellow-700", bg: "bg-yellow-50 border-yellow-200" },
-  "Giao Hàng": { label: "Giao Hàng", icon: Truck, color: "text-orange-700", bg: "bg-orange-50 border-orange-200" },
-  "Driver Mgmt": { label: "Driver Mgmt", icon: Users, color: "text-teal-700", bg: "bg-teal-50 border-teal-200" },
+  "Vận hành": {
+    label: "Vận hành",
+    icon: Wrench,
+    color: "text-blue-700",
+    bg: "bg-blue-50 border-blue-200",
+  },
+  CSKH: {
+    label: "CSKH",
+    icon: Headphones,
+    color: "text-purple-700",
+    bg: "bg-purple-50 border-purple-200",
+  },
+  Safety: { label: "Safety", icon: Shield, color: "text-red-700", bg: "bg-red-50 border-red-200" },
+  IT: { label: "IT", icon: Zap, color: "text-yellow-700", bg: "bg-yellow-50 border-yellow-200" },
+  Pricing: {
+    label: "Pricing",
+    icon: BadgeDollarSign,
+    color: "text-emerald-700",
+    bg: "bg-emerald-50 border-emerald-200",
+  },
+  Marketing: {
+    label: "Marketing",
+    icon: Megaphone,
+    color: "text-orange-700",
+    bg: "bg-orange-50 border-orange-200",
+  },
 };
 
-function getTeamConfig(team: string) {
-  const normalizedTeam = String(team || "");
-  for (const key of Object.keys(TEAM_CONFIG)) {
-    if (normalizedTeam.toLowerCase().includes(key.toLowerCase())) return TEAM_CONFIG[key];
-  }
-  return TEAM_CONFIG["Vận Hành"];
+function normalizeTeam(team: string | null | undefined): string {
+  const value = String(team || "").trim();
+  const lowered = value.toLocaleLowerCase("vi-VN");
+  if (lowered.includes("driver mgmt") || lowered.includes("vận hành")) return "Vận hành";
+  return ALL_TEAMS.find((candidate) => candidate.toLocaleLowerCase("vi-VN") === lowered) ?? "CSKH";
 }
 
-const TABS = ["Tất cả", "Vận Hành", "CSKH", "Safety", "IT", "Driver Mgmt"];
+function getTeamConfig(team: string) {
+  return TEAM_CONFIG[normalizeTeam(team)] ?? TEAM_CONFIG.CSKH;
+}
+
+const TABS = ["Tất cả", ...ALL_TEAMS] as const;
 
 type LiveStreamStatus = {
   running: boolean;
@@ -142,7 +171,9 @@ function AlertsPage() {
     // Realtime subscription
     const channel = supabase
       .channel("alerts-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "alerts" }, () => fetchAlerts())
+      .on("postgres_changes", { event: "*", schema: "public", table: "alerts" }, () =>
+        fetchAlerts(),
+      )
       .subscribe();
     return () => {
       window.clearInterval(polling);
@@ -157,10 +188,14 @@ function AlertsPage() {
         method: "PATCH",
         body: JSON.stringify({ status: newStatus }),
       });
-      toast.success(newStatus === "in_progress" ? "✅ Đã nhận xử lý!" : "🎉 Đã đánh dấu hoàn thành!");
+      toast.success(
+        newStatus === "in_progress" ? "✅ Đã nhận xử lý!" : "🎉 Đã đánh dấu hoàn thành!",
+      );
       fetchAlerts();
     } catch (error) {
-      toast.error("Cập nhật thất bại: " + (error instanceof Error ? error.message : "Unknown error"));
+      toast.error(
+        "Cập nhật thất bại: " + (error instanceof Error ? error.message : "Unknown error"),
+      );
     }
     setUpdating(null);
   }
@@ -169,8 +204,8 @@ function AlertsPage() {
   const filtered = alerts.filter((a) => {
     // 1. Lọc theo Team
     if (activeTab !== "Tất cả") {
-      const { assigned_team } = parseDescription(a.description ?? "");
-      if (!String(assigned_team || "").toLowerCase().includes(String(activeTab || "").toLowerCase())) return false;
+      const { assigned_team } = alertMetadata(a);
+      if (assigned_team !== activeTab) return false;
     }
     // 2. Lọc theo Severity
     if (severityFilter === "high") {
@@ -189,6 +224,12 @@ function AlertsPage() {
   const openCount = alerts.filter((a) => a.status === "open").length;
   const inProgressCount = alerts.filter((a) => a.status === "in_progress").length;
   const resolvedCount = alerts.filter((a) => a.status === "resolved").length;
+  const teamCounts = Object.fromEntries(
+    ALL_TEAMS.map((team) => [
+      team,
+      alerts.filter((alert) => alertMetadata(alert).assigned_team === team).length,
+    ]),
+  );
 
   if (!meLoading && isUnassignedOps(me)) {
     return (
@@ -242,12 +283,17 @@ function AlertsPage() {
 
       <div className="border border-border bg-white px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
         <span className="inline-flex items-center gap-2 font-semibold">
-          <span className={`h-2 w-2 rounded-full ${stream?.running ? "bg-xanh-green animate-pulse" : "bg-muted-foreground"}`} />
+          <span
+            className={`h-2 w-2 rounded-full ${stream?.running ? "bg-xanh-green animate-pulse" : "bg-muted-foreground"}`}
+          />
           {stream?.running ? "Live stream đang chạy" : "Live stream đã dừng"}
         </span>
-        <span className="text-muted-foreground">Batch: <strong className="text-foreground">{stream?.batches_ingested ?? 0}</strong></span>
         <span className="text-muted-foreground">
-          Auto-ticket: <strong className="text-foreground">
+          Batch: <strong className="text-foreground">{stream?.batches_ingested ?? 0}</strong>
+        </span>
+        <span className="text-muted-foreground">
+          Auto-ticket:{" "}
+          <strong className="text-foreground">
             {stream?.ticket_running
               ? "đang phân tích"
               : stream?.auto_ticket
@@ -257,7 +303,8 @@ function AlertsPage() {
         </span>
         {stream?.last_ticket_at && (
           <span className="text-muted-foreground">
-            Lần gần nhất: <strong className="text-foreground">batch {stream.last_ticket_batch}</strong>
+            Lần gần nhất:{" "}
+            <strong className="text-foreground">batch {stream.last_ticket_batch}</strong>
             {` · ${stream.last_ticket_result?.alerts_created ?? 0} ticket`}
           </span>
         )}
@@ -265,48 +312,52 @@ function AlertsPage() {
           <span className="text-red-600">Lỗi trigger: {stream.last_ticket_error}</span>
         )}
         <span className="text-muted-foreground">
-          Workflow: <strong className="text-foreground">
+          Workflow:{" "}
+          <strong className="text-foreground">
             {workflow?.enabled
               ? `chờ ${workflow.in_progress_after_seconds}s → xử lý → xong ${workflow.resolved_after_seconds}s`
               : "đã tắt"}
           </strong>
         </span>
-        {workflow?.last_error && <span className="text-red-600">Lỗi workflow: {workflow.last_error}</span>}
+        {workflow?.last_error && (
+          <span className="text-red-600">Lỗi workflow: {workflow.last_error}</span>
+        )}
       </div>
 
       {/* Filters: Tab Team & Dropdowns */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
         <div className="flex flex-wrap gap-2">
-          {isAdmin ? (
-            TABS.map((tab) => {
-              const cfg = tab !== "Tất cả" ? getTeamConfig(tab) : null;
-              const Icon = cfg?.icon;
-              return (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`flex items-center justify-center gap-1.5 px-4 min-h-[44px] rounded-full text-sm font-medium border transition-all ${
-                    activeTab === tab
-                      ? "border-xanh-green bg-xanh-deep text-white shadow"
-                      : "border-border bg-white text-muted-foreground hover:border-xanh-green/40 hover:text-foreground"
-                  }`}
-                >
-                  {Icon && <Icon className="h-4 w-4" />}
-                  {tab}
-                </button>
-              );
-            })
-          ) : (
-            me?.department && (
-              <span className="flex items-center gap-1.5 px-4 min-h-[44px] rounded-full text-sm font-medium border border-xanh-green bg-xanh-deep text-white">
-                Phòng {me.department}
-              </span>
-            )
-          )}
+          {isAdmin
+            ? TABS.map((tab) => {
+                const cfg = tab !== "Tất cả" ? getTeamConfig(tab) : null;
+                const Icon = cfg?.icon;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`flex items-center justify-center gap-1.5 px-4 min-h-[44px] rounded-full text-sm font-medium border transition-all ${
+                      activeTab === tab
+                        ? "border-xanh-green bg-xanh-deep text-white shadow"
+                        : "border-border bg-white text-muted-foreground hover:border-xanh-green/40 hover:text-foreground"
+                    }`}
+                  >
+                    {Icon && <Icon className="h-4 w-4" />}
+                    {tab}
+                    <span className="font-mono text-xs opacity-75">
+                      {tab === "Tất cả" ? alerts.length : teamCounts[tab]}
+                    </span>
+                  </button>
+                );
+              })
+            : me?.department && (
+                <span className="flex items-center gap-1.5 px-4 min-h-[44px] rounded-full text-sm font-medium border border-xanh-green bg-xanh-deep text-white">
+                  Phòng {me.department}
+                </span>
+              )}
         </div>
-        
+
         <div className="flex gap-2">
-          <select 
+          <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="px-3 min-h-[44px] rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-xanh-green/50"
@@ -316,7 +367,7 @@ function AlertsPage() {
             <option value="in_progress">🟡 Đang xử lý</option>
             <option value="resolved">🟢 Đã xong</option>
           </select>
-          <select 
+          <select
             value={severityFilter}
             onChange={(e) => setSeverityFilter(e.target.value)}
             className="px-3 min-h-[44px] rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-xanh-green/50"
@@ -343,7 +394,8 @@ function AlertsPage() {
       ) : (
         <div className="grid gap-4">
           {filtered.map((alert) => {
-            const { description, action, assigned_team, priority, routing_note } = parseDescription(alert.description ?? "");
+            const { description, action, assigned_team, priority, routing_note } =
+              alertMetadata(alert);
             const teamCfg = getTeamConfig(assigned_team);
             const TeamIcon = teamCfg.icon;
             const isUpdating = updating === alert.id;
@@ -352,15 +404,15 @@ function AlertsPage() {
               alert.status === "resolved"
                 ? "border-green-300 bg-green-50"
                 : alert.status === "in_progress"
-                ? "border-yellow-300 bg-yellow-50"
-                : "border-red-300 bg-white";
+                  ? "border-yellow-300 bg-yellow-50"
+                  : "border-red-300 bg-white";
 
             const statusBadge =
               alert.status === "resolved"
                 ? { label: "Đã giải quyết", cls: "bg-green-100 text-green-700" }
                 : alert.status === "in_progress"
-                ? { label: "Đang xử lý", cls: "bg-yellow-100 text-yellow-700" }
-                : { label: "Chờ xử lý", cls: "bg-red-100 text-red-700" };
+                  ? { label: "Đang xử lý", cls: "bg-yellow-100 text-yellow-700" }
+                  : { label: "Chờ xử lý", cls: "bg-red-100 text-red-700" };
 
             return (
               <div
@@ -388,7 +440,9 @@ function AlertsPage() {
                       {alert.severity}
                     </span>
                     <div>
-                      <h3 className="font-display font-bold text-base leading-snug">{alert.title}</h3>
+                      <h3 className="font-display font-bold text-base leading-snug">
+                        {alert.title}
+                      </h3>
                       <div className="flex flex-wrap gap-2 mt-1.5">
                         {/* Team badge */}
                         <span
@@ -403,6 +457,16 @@ function AlertsPage() {
                             {priority}
                           </span>
                         )}
+                        {alert.ticket_type === "opportunity" && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-orange-50 border-orange-200 text-orange-700">
+                            Cơ hội Marketing
+                          </span>
+                        )}
+                        {alert.topic && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs border bg-white border-border text-muted-foreground">
+                            {alert.topic}
+                          </span>
+                        )}
                         {/* Area */}
                         {alert.area && (
                           <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
@@ -411,7 +475,9 @@ function AlertsPage() {
                           </span>
                         )}
                         {/* Status */}
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge.cls}`}>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge.cls}`}
+                        >
                           {statusBadge.label}
                         </span>
                         {/* Time */}
@@ -431,7 +497,11 @@ function AlertsPage() {
                         disabled={isUpdating}
                         className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 min-h-[44px] rounded-xl bg-yellow-500 text-white text-sm font-semibold hover:bg-yellow-600 disabled:opacity-50 transition-colors shadow-sm"
                       >
-                        {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertTriangle className="h-4 w-4" />}
+                        {isUpdating ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4" />
+                        )}
                         Nhận xử lý
                       </button>
                     )}
@@ -441,7 +511,11 @@ function AlertsPage() {
                         disabled={isUpdating}
                         className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 min-h-[44px] rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
                       >
-                        {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                        {isUpdating ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="h-4 w-4" />
+                        )}
                         Đã giải quyết
                       </button>
                     )}
@@ -475,7 +549,9 @@ function AlertsPage() {
                       <div className="text-[10px] font-mono text-muted-foreground mb-1 uppercase">
                         🧭 Lý do định tuyến
                       </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">{routing_note}</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {routing_note}
+                      </p>
                     </div>
                   )}
                 </div>

@@ -50,7 +50,9 @@ def generate_department_insights(team: str, hours: int = 24) -> Dict[str, Any]:
     team_feedback = [
         f
         for f in all_feedback
-        if route_ticket(f.get("topic", ""), f.get("severity", 3), f.get("sentiment"))["team"] == team
+        if route_ticket(
+            f.get("topic", ""), f.get("severity", 3), f.get("sentiment"), log_run=False
+        )["team"] == team
     ]
 
     start_time = time.time()

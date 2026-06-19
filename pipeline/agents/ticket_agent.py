@@ -3,9 +3,11 @@
 import time
 import hashlib
 from typing import Any, Dict, Optional
+from datetime import datetime, timedelta, timezone
 
 from agents.common import get_db, log_agent_run
 from agents.schemas import TicketOutput
+from departments import normalize_department
 
 def create_or_update_ticket(
     area: str,
@@ -14,7 +16,11 @@ def create_or_update_ticket(
     severity: str,
     team: str,
     sla_hours: int,
-    user_id: Optional[str] = None
+    user_id: Optional[str] = None,
+    topic: Optional[str] = None,
+    priority: Optional[str] = None,
+    ticket_type: str = "incident",
+    routing_source: str = "router_agent",
 ) -> Dict[str, Any]:
     """Tạo mới hoặc cập nhật ticket."""
     start_time = time.time()
@@ -49,7 +55,8 @@ def create_or_update_ticket(
             )
             return output.model_dump()
 
-    payload = {
+    canonical_team = normalize_department(team, "CSKH")
+    legacy_payload = {
         "user_id": user_id,
         "title": title,
         "description": description,
@@ -57,15 +64,30 @@ def create_or_update_ticket(
         "area": area,
         "status": "open"
     }
+    payload = {
+        **legacy_payload,
+        "assigned_team": canonical_team,
+        "topic": topic,
+        "priority": priority,
+        "ticket_type": ticket_type,
+        "routing_source": routing_source,
+        "sla_due_at": (datetime.now(timezone.utc) + timedelta(hours=sla_hours)).isoformat(),
+    }
     
     try:
-        res = db.table("alerts").insert(payload).execute()
+        try:
+            res = db.table("alerts").insert(payload).execute()
+        except Exception as schema_exc:
+            # Cho phép backend mới chạy trong khoảng migration Supabase chưa được apply.
+            if not any(field in str(schema_exc) for field in payload.keys() - legacy_payload.keys()):
+                raise
+            res = db.table("alerts").insert(legacy_payload).execute()
         ticket_id = res.data[0]["id"] if res.data else None
         
         output = TicketOutput(
             ticket_id=ticket_id,
             action="created",
-            assigned_team=team,
+            assigned_team=canonical_team,
             status="open"
         )
         log_agent_run(
@@ -73,7 +95,7 @@ def create_or_update_ticket(
             agent_name="ticket_agent",
             status="success",
             latency_ms=int((time.time() - start_time) * 1000),
-            output_summary=f"Created ticket {ticket_id} for {team}",
+            output_summary=f"Created ticket {ticket_id} for {canonical_team}",
             input_hash=hashlib.md5(f"{area}_{title}".encode()).hexdigest()
         )
         return output.model_dump()

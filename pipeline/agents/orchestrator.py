@@ -11,21 +11,19 @@
 Orchestrator KHÔNG phải agent nghiệp vụ — chỉ điều phối, retry, logging, schedule.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 import os
 
 from agents.common import get_db, log_agent_run
 from agents.insight_agent import generate_department_insights
 from agents.analyst_agent import analyze_root_cause
-from agents.alert_agent import classify_alert_severity, process_area_alerts
-from agents.router_agent import route_ticket
-from agents.ticket_agent import create_or_update_ticket, get_overdue_tickets
+from agents.ticket_agent import get_overdue_tickets
 from agents.task_agent import cluster_alerts_into_tasks
-from llm_agent import analyze_spike
+from departments import DEPARTMENTS
 
 # Phòng ban khớp với routing_table.json (team đích của router_agent).
-TEAMS = ["IT", "Safety", "CSKH", "Vận hành", "Pricing", "Marketing"]
+TEAMS = list(DEPARTMENTS)
 
 
 def _agent_enabled(name: str) -> bool:
@@ -63,64 +61,25 @@ def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
     db = get_db()
 
     # ── Step 1-4: Alert detection + Ticket creation ──
-    alerts_created = []
-    try:
-        since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
-        response = db.table("feedback") \
-            .select("id, text, area, severity, topic") \
-            .gte("created_at", since) \
-            .in_("severity", ["P4", "P5", 4, 5]) \
-            .order("created_at", desc=True) \
-            .execute()
+    alerts_created_count = 0
+    if not _agent_enabled("alert"):
+        pipeline_log.append("Alert agent disabled (AGENT_ALERT_ENABLED=false) — skipped spike→ticket")
+    else:
+        try:
+            # Dùng cùng một detector với live stream để routing/threshold không bị lệch.
+            from spike_detector import detect_spikes
 
-        feedbacks = response.data or []
-        area_feedbacks: Dict[str, list] = {}
-        for f in feedbacks:
-            area = f.get("area", "Unknown")
-            if area not in area_feedbacks:
-                area_feedbacks[area] = []
-            area_feedbacks[area].append(f)
-
-        if not _agent_enabled("alert"):
-            pipeline_log.append("Alert agent disabled (AGENT_ALERT_ENABLED=false) — skipped spike→ticket")
-            area_feedbacks = {}
-
-        for area, fbs in area_feedbacks.items():
-            # Alert Agent đánh giá severity
-            alert_decision = process_area_alerts(area, fbs)
-            if alert_decision.get("action") == "create":
-                # Phân tích root cause cho spike
-                texts = [f.get("text", "") for f in fbs[:20]]
-                spike_analysis = analyze_spike(area, texts)
-
-                # Định tuyến
-                top_topic = fbs[0].get("topic", "Unknown") if fbs else "Unknown"
-                route_res = route_ticket(top_topic, alert_decision.get("severity"))
-
-                # Tạo ticket
-                ticket_res = create_or_update_ticket(
-                    area=area,
-                    title=spike_analysis.get("title", f"Spike tại {area}"),
-                    description=(
-                        spike_analysis.get("description", "")
-                        + f"\n\n**Action Plan:** {spike_analysis.get('action', '')}"
-                        + f"\n**Assigned Team:** {route_res.get('team')}"
-                        + f"\n**Priority:** {route_res.get('priority') or ''}"
-                        + f"\n**Routing Note:** {route_res.get('description') or ''}"
-                    ),
-                    severity=alert_decision.get("severity", "CRITICAL"),
-                    team=route_res.get("team"),
-                    sla_hours=route_res.get("sla_hours", 24),
-                )
-                alerts_created.append(ticket_res)
-
-        results["alerts_created"] = alerts_created
-        pipeline_log.append(f"Alerts: {len(alerts_created)} ticket(s) created from {len(feedbacks)} P4/P5 feedbacks")
-
-    except Exception as exc:
-        error_msg = str(exc)[:200]
-        pipeline_log.append(f"Alert processing error: {error_msg}")
-        errors["alerts"] = error_msg
+            spike_result = detect_spikes(hours=hours, max_feedback=5000, max_spikes=20)
+            alerts_created_count = int(spike_result.get("alerts_created", 0))
+            results["spike_detection"] = spike_result
+            pipeline_log.append(
+                f"Alerts: {alerts_created_count} ticket(s), "
+                f"{spike_result.get('groups_scanned', 0)} routing group(s) scanned"
+            )
+        except Exception as exc:
+            error_msg = str(exc)[:200]
+            pipeline_log.append(f"Alert processing error: {error_msg}")
+            errors["alerts"] = error_msg
 
     # ── Step 5: Task Agent — gom cụm alerts thành tasks ──
     if not _agent_enabled("task"):
@@ -219,7 +178,7 @@ def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
         "timestamp": end_time.isoformat(),
         "duration_ms": duration_ms,
         "departments_processed": len(results),
-        "alerts_created": len(alerts_created),
+        "alerts_created": alerts_created_count,
         "tasks_clustered": results.get("tasks_clustered", {}),
         "overdue_tickets": len(overdue_tickets),
         "errors": errors,

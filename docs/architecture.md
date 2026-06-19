@@ -87,10 +87,10 @@ Review (form thủ công / demo 150 / dataset 4837 / streaming)
 [4] ingest.py       ghi vào Supabase feedback (topic, sentiment, severity P1..P5,
    │                 confidence, area code, needs_review, review_reason)
    ▼
-[5] spike_detector  group by area, đếm P4/P5 trong cửa sổ thời gian → spike
+[5] spike_detector  group theo area + topic + team; áp ngưỡng risk/volume → spike
    │
    ▼
-[6] llm_agent.py    gửi review của vùng spike cho LLM → {title, root cause, action, team}
+[6] llm_agent.py    gửi review đã che PII cho LLM → {title, root cause, action}
    │
    ▼
 [7] alerts          ghi alert vào Supabase → frontend hiển thị realtime

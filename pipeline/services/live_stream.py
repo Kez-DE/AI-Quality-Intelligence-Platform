@@ -20,7 +20,7 @@ live_stream_state: dict[str, Any] = {
     "auto_ticket": os.getenv("AUTO_TICKET_ENABLED", "true").lower() == "true",
     "ticket_every_batches": int(os.getenv("AUTO_TICKET_EVERY_BATCHES", "10")),
     "ticket_max_feedback": int(os.getenv("AUTO_TICKET_MAX_FEEDBACK", "1000")),
-    "ticket_max_spikes": int(os.getenv("AUTO_TICKET_MAX_SPIKES", "1")),
+    "ticket_max_spikes": int(os.getenv("AUTO_TICKET_MAX_SPIKES", "6")),
     "ticket_running": False,
     "batches_ingested": 0,
     "last_ticket_result": None,
@@ -131,7 +131,7 @@ def start_live_stream(
     reset: bool = False,
     auto_ticket: bool = True,
     ticket_every_batches: int = 10,
-    ticket_max_spikes: int = 1,
+    ticket_max_spikes: int = 6,
 ):
     if not scheduler:
         raise ValueError("Scheduler is not initialized")

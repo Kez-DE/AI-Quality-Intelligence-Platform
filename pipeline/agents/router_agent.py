@@ -12,6 +12,7 @@ import time
 
 from agents.common import log_agent_run
 from agents.schemas import RouterOutput
+from departments import normalize_department
 
 # pipeline/agents/router_agent.py -> repo root = parent x3
 TAXONOMY_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "taxonomy"
@@ -25,7 +26,13 @@ def load_routing_table() -> Dict[str, Any]:
         return json.load(f)
 
 
-def route_ticket(topic: str, severity: Any, sentiment: str | None = None) -> Dict[str, Any]:
+def route_ticket(
+    topic: str,
+    severity: Any,
+    sentiment: str | None = None,
+    *,
+    log_run: bool = True,
+) -> Dict[str, Any]:
     """Định tuyến ticket về đúng phòng ban.
 
     Thứ tự ưu tiên:
@@ -43,21 +50,22 @@ def route_ticket(topic: str, severity: Any, sentiment: str | None = None) -> Dic
         ov_sev = str(override.get("severity", "")).upper()
         if ov_sev == str_sev or (str_sev in {"5", "P5"} and ov_sev == "P5"):
             output = RouterOutput(
-                team=override.get("team", "Safety"),
+                team=normalize_department(override.get("team"), "Safety"),
                 sla_hours=override.get("sla_hours", 1),
                 routed_by=f"router_agent ({ov_sev} Override)",
                 is_override=True,
                 priority=override.get("priority_default"),
                 description=override.get("description"),
             )
-            log_agent_run(
-                run_id=f"router_{int(time.time())}",
-                agent_name="router_agent",
-                status="success",
-                latency_ms=int((time.time() - start_time) * 1000),
-                output_summary=f"Routed to {output.team} (Override)",
-                input_hash=f"{topic}_{severity}"
-            )
+            if log_run:
+                log_agent_run(
+                    run_id=f"router_{int(time.time())}",
+                    agent_name="router_agent",
+                    status="success",
+                    latency_ms=int((time.time() - start_time) * 1000),
+                    output_summary=f"Routed to {output.team} (Override)",
+                    input_hash=f"{topic}_{severity}"
+                )
             return output.model_dump()
 
     # 2. Sentiment override (positive -> Marketing)
@@ -66,59 +74,62 @@ def route_ticket(topic: str, severity: Any, sentiment: str | None = None) -> Dic
         for override in routing_config.get("sentiment_overrides", []):
             if str(override.get("sentiment", "")).strip().lower() == str_sentiment:
                 output = RouterOutput(
-                    team=override.get("team", "Marketing"),
+                    team=normalize_department(override.get("team"), "Marketing"),
                     sla_hours=override.get("sla_hours", 48),
                     routed_by=f"router_agent ({str_sentiment} Sentiment)",
                     is_override=True,
                     priority=override.get("priority_default"),
                     description=override.get("description"),
                 )
-                log_agent_run(
-                    run_id=f"router_{int(time.time())}",
-                    agent_name="router_agent",
-                    status="success",
-                    latency_ms=int((time.time() - start_time) * 1000),
-                    output_summary=f"Routed to {output.team} (Sentiment)",
-                    input_hash=f"{topic}_{severity}_{str_sentiment}"
-                )
+                if log_run:
+                    log_agent_run(
+                        run_id=f"router_{int(time.time())}",
+                        agent_name="router_agent",
+                        status="success",
+                        latency_ms=int((time.time() - start_time) * 1000),
+                        output_summary=f"Routed to {output.team} (Sentiment)",
+                        input_hash=f"{topic}_{severity}_{str_sentiment}"
+                    )
                 return output.model_dump()
 
     # 3. Routing theo topic
     for route in routing_config.get("routes", []):
         if route.get("topic") == topic:
             output = RouterOutput(
-                team=route.get("team"),
+                team=normalize_department(route.get("team"), "CSKH"),
                 sla_hours=route.get("sla_hours", 24),
                 routed_by="router_agent (Topic Match)",
                 is_override=False,
                 priority=route.get("priority_default"),
                 description=route.get("description"),
             )
-            log_agent_run(
-                run_id=f"router_{int(time.time())}",
-                agent_name="router_agent",
-                status="success",
-                latency_ms=int((time.time() - start_time) * 1000),
-                output_summary=f"Routed to {output.team} (Topic Match)",
-                input_hash=f"{topic}_{severity}"
-            )
+            if log_run:
+                log_agent_run(
+                    run_id=f"router_{int(time.time())}",
+                    agent_name="router_agent",
+                    status="success",
+                    latency_ms=int((time.time() - start_time) * 1000),
+                    output_summary=f"Routed to {output.team} (Topic Match)",
+                    input_hash=f"{topic}_{severity}"
+                )
             return output.model_dump()
 
     # 4. Default
     output = RouterOutput(
-        team=routing_config.get("default_team", "CSKH"),
+        team=normalize_department(routing_config.get("default_team"), "CSKH"),
         sla_hours=24,
         routed_by="router_agent (Default)",
         is_override=False,
     )
-    log_agent_run(
-        run_id=f"router_{int(time.time())}",
-        agent_name="router_agent",
-        status="success",
-        latency_ms=int((time.time() - start_time) * 1000),
-        output_summary=f"Routed to {output.team} (Default)",
-        input_hash=f"{topic}_{severity}"
-    )
+    if log_run:
+        log_agent_run(
+            run_id=f"router_{int(time.time())}",
+            agent_name="router_agent",
+            status="success",
+            latency_ms=int((time.time() - start_time) * 1000),
+            output_summary=f"Routed to {output.team} (Default)",
+            input_hash=f"{topic}_{severity}"
+        )
     return output.model_dump()
 
 

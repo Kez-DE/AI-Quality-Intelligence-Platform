@@ -15,7 +15,7 @@ import {
   CalendarClock,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useMe, apiFetch, isUnassignedOps } from "@/lib/api";
+import { ALL_TEAMS, useMe, apiFetch, isUnassignedOps } from "@/lib/api";
 import { NoDepartmentNotice } from "@/components/NoDepartmentNotice";
 import { regionLabel } from "@/lib/regions";
 
@@ -58,7 +58,7 @@ type AssignableUsersResponse = {
   data: AssignableUser[];
 };
 
-const TEAMS = ["All", "Safety", "CSKH", "IT", "Vận hành", "Pricing", "Marketing"] as const;
+const TEAMS = ["All", ...ALL_TEAMS] as const;
 const STATUSES = ["All", "open", "in_progress", "resolved"] as const;
 const PRIORITIES = ["All", "P1", "P2", "P3", "P4", "P5"] as const;
 
@@ -90,7 +90,9 @@ function TasksPage() {
   const [filterOverdue, setFilterOverdue] = useState(false);
 
   // Assignment form state per task
-  const [assignForm, setAssignForm] = useState<Record<string, { owner_id: string; due_at: string }>>({});
+  const [assignForm, setAssignForm] = useState<
+    Record<string, { owner_id: string; due_at: string }>
+  >({});
 
   const { data: me } = useMe();
   const isManager = me?.role === "admin" || me?.role === "manager" || me?.role === "staff";
@@ -193,9 +195,14 @@ function TasksPage() {
       setTasks(
         tasks.map((t) =>
           t.id === taskId
-            ? { ...t, owner_id: form.owner_id, owner_email: assignedUser?.email || null, due_at: form.due_at || null }
-            : t
-        )
+            ? {
+                ...t,
+                owner_id: form.owner_id,
+                owner_email: assignedUser?.email || null,
+                due_at: form.due_at || null,
+              }
+            : t,
+        ),
       );
       toast.success("Đã gán task thành công.");
     } catch {
@@ -218,9 +225,7 @@ function TasksPage() {
 
   if (!isManager) {
     return (
-      <div className="p-8 text-center text-muted-foreground">
-        Bạn không có quyền xem trang này.
-      </div>
+      <div className="p-8 text-center text-muted-foreground">Bạn không có quyền xem trang này.</div>
     );
   }
 
@@ -244,7 +249,8 @@ function TasksPage() {
           Task Manager
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Hệ thống tự động gom nhóm các ticket (alerts) trùng lặp thành Task chung để dễ quản lý và xử lý dứt điểm.
+          Hệ thống tự động gom nhóm các ticket (alerts) trùng lặp thành Task chung để dễ quản lý và
+          xử lý dứt điểm.
         </p>
       </div>
 
@@ -395,7 +401,9 @@ function TasksPage() {
                         </span>
                       )}
                     </div>
-                    <h3 className="font-semibold text-lg text-xanh-deep leading-tight">{task.title}</h3>
+                    <h3 className="font-semibold text-lg text-xanh-deep leading-tight">
+                      {task.title}
+                    </h3>
                     <p className="text-sm text-muted-foreground line-clamp-2">{task.summary}</p>
                     {task.owner_email && (
                       <p className="text-[11px] font-mono text-xanh-green flex items-center gap-1">
@@ -419,7 +427,11 @@ function TasksPage() {
                         {new Date(task.created_at).toLocaleDateString("vi-VN")}
                       </span>
                     </div>
-                    {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                    {isExpanded ? (
+                      <ChevronUp className="h-5 w-5" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5" />
+                    )}
                   </div>
                 </div>
 
@@ -458,12 +470,15 @@ function TasksPage() {
                       </h4>
                       {task.owner_email && (
                         <p className="text-xs text-muted-foreground font-mono">
-                          Hien tai: <span className="text-xanh-green font-semibold">{task.owner_email}</span>
+                          Hien tai:{" "}
+                          <span className="text-xanh-green font-semibold">{task.owner_email}</span>
                         </p>
                       )}
                       <div className="flex flex-wrap items-end gap-3">
                         <div className="space-y-1">
-                          <label className="text-[11px] font-mono text-muted-foreground">Nguoi nhan</label>
+                          <label className="text-[11px] font-mono text-muted-foreground">
+                            Nguoi nhan
+                          </label>
                           <select
                             value={assignForm[task.id]?.owner_id || task.owner_id || ""}
                             onChange={(e) => updateAssignForm(task.id, "owner_id", e.target.value)}
@@ -478,10 +493,15 @@ function TasksPage() {
                           </select>
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[11px] font-mono text-muted-foreground">Han hoan thanh</label>
+                          <label className="text-[11px] font-mono text-muted-foreground">
+                            Han hoan thanh
+                          </label>
                           <input
                             type="date"
-                            value={assignForm[task.id]?.due_at || (task.due_at ? task.due_at.split("T")[0] : "")}
+                            value={
+                              assignForm[task.id]?.due_at ||
+                              (task.due_at ? task.due_at.split("T")[0] : "")
+                            }
                             onChange={(e) => updateAssignForm(task.id, "due_at", e.target.value)}
                             className="px-3 py-2 text-xs border border-border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-xanh-green/30"
                           />

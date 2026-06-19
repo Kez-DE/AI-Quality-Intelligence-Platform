@@ -12,6 +12,7 @@ export type LiveStreamStatus = {
   loop: boolean;
   auto_ticket: boolean;
   ticket_every_batches: number;
+  ticket_max_spikes: number;
   batches_ingested: number;
   ticket_running: boolean;
   last_result: { inserted: number; skipped: number; complete: boolean } | null;
@@ -29,6 +30,7 @@ export default function LiveStreamPanel() {
   const [reset, setReset] = useState(true);
   const [autoTicket, setAutoTicket] = useState(true);
   const [ticketEvery, setTicketEvery] = useState(10);
+  const [ticketMaxSpikes, setTicketMaxSpikes] = useState(6);
 
   const statusQuery = useQuery({
     queryKey: ["live-stream-status"],
@@ -56,6 +58,7 @@ export default function LiveStreamPanel() {
         reset: String(reset || isComplete),
         auto_ticket: String(autoTicket),
         ticket_every_batches: String(clamp(ticketEvery, 1, 100)),
+        ticket_max_spikes: String(clamp(ticketMaxSpikes, 1, 10)),
       });
       const json = await apiFetch<{ data: LiveStreamStatus }>(`/api/live-stream/start?${params}`, {
         method: "POST",
@@ -139,7 +142,7 @@ export default function LiveStreamPanel() {
         <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
           <Activity className="h-4 w-4" /> Cấu hình
         </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <NumberField
             label="Batch size"
             min={1}
@@ -163,6 +166,14 @@ export default function LiveStreamPanel() {
             value={ticketEvery}
             disabled={isRunning}
             onChange={setTicketEvery}
+          />
+          <NumberField
+            label="Tối đa ticket/lần"
+            min={1}
+            max={10}
+            value={ticketMaxSpikes}
+            disabled={isRunning}
+            onChange={setTicketMaxSpikes}
           />
         </div>
         <div className="flex flex-wrap gap-4">

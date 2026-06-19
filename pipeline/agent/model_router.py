@@ -9,6 +9,7 @@ from groq import Groq
 from openai import OpenAI
 
 from env_config import get_settings
+from clean import sanitize_pii_payload
 
 settings = get_settings()
 
@@ -301,15 +302,25 @@ def chat_completion(
     thay vì raise ngay. Chỉ raise khi TẤT CẢ provider thật đều fail (mock luôn ở cuối
     nên thực tế gần như không bao giờ raise — cùng lắm trả lời mock).
     """
+    # Privacy firewall cuối cùng: không provider hoặc log nào được nhận payload thô,
+    # kể cả khi một agent phía trên quên gọi clean_text/mask_pii.
+    safe_messages = sanitize_pii_payload(messages)
     chain = resolve_provider_chain()
-    first_user = next((m.get("content", "") for m in messages if m.get("role") == "user"), "")
+    first_user = next((m.get("content", "") for m in safe_messages if m.get("role") == "user"), "")
     last_exc: Exception | None = None
 
     for provider in chain:
         model_name = provider_model(provider)
         started = perf_counter()
         try:
-            msg_dict, usage = _call_provider(provider, messages, response_json, temperature, tools, tool_choice)
+            msg_dict, usage = _call_provider(
+                provider,
+                safe_messages,
+                response_json,
+                temperature,
+                tools,
+                tool_choice,
+            )
             latency_ms = round((perf_counter() - started) * 1000)
             global _last_latency_ms
             _last_latency_ms = latency_ms

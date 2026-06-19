@@ -1,20 +1,76 @@
-import os
-from datetime import datetime, timedelta
-from supabase import create_client, Client
+from collections import Counter
+from datetime import datetime, timedelta, timezone
+
+from supabase import Client, create_client
+
+from agents.router_agent import route_ticket
+from agents.ticket_agent import create_or_update_ticket
+from clean import mask_pii
+from departments import alert_department
+from env_config import get_settings, get_supabase_config, has_supabase_admin_key
 from llm_agent import analyze_spike
-from env_config import get_supabase_config, has_supabase_admin_key
 from webhook_notifier import send_alert_webhook
 
 SUPABASE_URL, SUPABASE_KEY = get_supabase_config()
+_settings = get_settings()
+
+# P5 tạo ngay; P4 cần một cụm nhỏ; mức thấp chỉ tạo khi có volume spike.
+CRITICAL_THRESHOLD = _settings.ticket_critical_threshold
+HIGH_RISK_THRESHOLD = _settings.ticket_high_risk_threshold
+VOLUME_SPIKE_THRESHOLD = _settings.ticket_volume_spike_threshold
+MARKETING_SPIKE_THRESHOLD = _settings.ticket_marketing_spike_threshold
+ALERT_COOLDOWN_MINUTES = _settings.ticket_alert_cooldown_minutes
+
 
 def get_supabase() -> Client:
     if not SUPABASE_URL or not SUPABASE_KEY:
         raise ValueError("Thiếu cấu hình SUPABASE_URL và SUPABASE key trong .env")
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
-SPIKE_THRESHOLD = 5  # Ngưỡng bùng nổ: >= 5 phản hồi tiêu cực cùng một khu vực
 
-def detect_spikes(hours: int = 1, max_feedback: int = 1000, max_spikes: int = 3, texts_per_area: int = 20):
+def _severity_number(value: object) -> int:
+    try:
+        return int(str(value).upper().lstrip("P"))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _group_threshold(group: dict) -> int | None:
+    max_severity = group["max_severity"]
+    if max_severity >= 5:
+        return CRITICAL_THRESHOLD
+    if max_severity >= 4:
+        return HIGH_RISK_THRESHOLD
+    if group["ticket_type"] == "opportunity":
+        return MARKETING_SPIKE_THRESHOLD
+    if group["sentiments"].get("negative", 0) > 0:
+        return VOLUME_SPIKE_THRESHOLD
+    return None
+
+
+def _is_duplicate(recent_alerts: list[dict], *, area: str, team: str, topic: str) -> bool:
+    for alert in recent_alerts:
+        if str(alert.get("area") or "Unknown") != area:
+            continue
+        if alert_department(alert) != team:
+            continue
+        existing_topic = str(alert.get("topic") or "").strip()
+        if not existing_topic or existing_topic == topic:
+            return True
+    return False
+
+
+def detect_spikes(
+    hours: int = 1,
+    max_feedback: int = 1000,
+    max_spikes: int = 3,
+    texts_per_group: int = 20,
+):
+    """Create deterministic tickets from risk or volume spikes.
+
+    Feedback is grouped by area + topic + routed department. The LLM may summarize
+    the group, but it never decides ownership, priority or SLA.
+    """
     print("[Spike Detector] Đang quét hệ thống để tìm kiếm sự cố bùng nổ...")
     if not has_supabase_admin_key():
         return {
@@ -23,103 +79,141 @@ def detect_spikes(hours: int = 1, max_feedback: int = 1000, max_spikes: int = 3,
         }
 
     db = get_supabase()
-    
-    since = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
-    
-    # Thang P1..P5, P5 = nghiêm trọng nhất. Spike chỉ quan tâm các phản hồi
-    # mức cao (P4/P5) — bao gồm Safety override (luôn ép P5).
-    response = db.table("feedback") \
-        .select("id, text, area, severity, topic") \
-        .gte("created_at", since) \
-        .in_("severity", ["P4", "P5"]) \
-        .order("created_at", desc=True) \
-        .limit(max_feedback) \
+    now = datetime.now(timezone.utc)
+    since = (now - timedelta(hours=hours)).isoformat()
+
+    response = (
+        db.table("feedback")
+        .select("id,text,area,severity,topic,sentiment")
+        .gte("created_at", since)
+        .order("created_at", desc=True)
+        .limit(max_feedback)
         .execute()
-        
-    data = response.data
+    )
+    data = response.data or []
     if not data:
-        print("[Spike Detector] Không có feedback tiêu cực nào gần đây.")
-        return {"spikes_detected": 0, "records_scanned": 0}
-        
-    # Gom nhóm theo khu vực (area)
-    area_counts = {}
-    area_texts = {}
-    area_max_sev = {}  # mức severity cao nhất quan sát được trong khu vực (P5 > P4)
+        return {"spikes_detected": 0, "records_scanned": 0, "alerts_created": 0}
 
-    def _sev_num(value: str) -> int:
-        try:
-            return int(str(value).upper().lstrip("P"))
-        except (ValueError, AttributeError):
-            return 0
-
+    groups: dict[tuple[str, str, str, str], dict] = {}
     for row in data:
-        area = row.get("area", "Unknown")
-        text = row.get("text", "")
+        area = str(row.get("area") or "Unknown")
+        topic = str(row.get("topic") or "Other")
+        sentiment = str(row.get("sentiment") or "neutral").lower()
+        severity = _severity_number(row.get("severity"))
+        route = route_ticket(topic, row.get("severity", "P3"), sentiment, log_run=False)
+        team = route["team"]
+        ticket_type = "opportunity" if team == "Marketing" and sentiment == "positive" else "incident"
+        key = (area, topic, team, ticket_type)
+        group = groups.setdefault(
+            key,
+            {
+                "area": area,
+                "topic": topic,
+                "team": team,
+                "ticket_type": ticket_type,
+                "rows": [],
+                "texts": [],
+                "sentiments": Counter(),
+                "max_severity": 0,
+            },
+        )
+        group["rows"].append(row)
+        group["sentiments"][sentiment] += 1
+        group["max_severity"] = max(group["max_severity"], severity)
+        if len(group["texts"]) < texts_per_group:
+            group["texts"].append(mask_pii(str(row.get("text") or "")))
 
-        if area not in area_counts:
-            area_counts[area] = 0
-            area_texts[area] = []
-            area_max_sev[area] = 0
+    candidates = []
+    for group in groups.values():
+        threshold = _group_threshold(group)
+        if threshold is not None and len(group["rows"]) >= threshold:
+            group["threshold"] = threshold
+            candidates.append(group)
+    candidates.sort(
+        key=lambda group: (group["max_severity"], len(group["rows"]) / group["threshold"]),
+        reverse=True,
+    )
 
-        area_counts[area] += 1
-        area_max_sev[area] = max(area_max_sev[area], _sev_num(row.get("severity")))
-        if len(area_texts[area]) < texts_per_area:
-            area_texts[area].append(text)
-        
-    spike_candidates = [
-        (area, count)
-        for area, count in area_counts.items()
-        if count >= SPIKE_THRESHOLD
-    ]
-    spike_candidates.sort(key=lambda item: item[1], reverse=True)
-    selected_spikes = spike_candidates[:max_spikes]
+    cooldown_since = (now - timedelta(minutes=ALERT_COOLDOWN_MINUTES)).isoformat()
+    try:
+        recent_alerts = (
+            db.table("alerts")
+            .select("*")
+            .gte("created_at", cooldown_since)
+            .execute()
+            .data
+            or []
+        )
+    except Exception:
+        recent_alerts = []
+
+    selected = []
+    for group in candidates:
+        if _is_duplicate(
+            recent_alerts,
+            area=group["area"],
+            team=group["team"],
+            topic=group["topic"],
+        ):
+            continue
+        selected.append(group)
+        if len(selected) >= max_spikes:
+            break
 
     profiles_res = db.table("profiles").select("id").limit(1).execute()
-    mock_user_id = profiles_res.data[0]["id"] if profiles_res.data else None
-
+    user_id = profiles_res.data[0]["id"] if profiles_res.data else None
     alerts_created = 0
 
-    for area, count in selected_spikes:
-        print(f"🚨 PHÁT HIỆN SPIKE: Khu vực {area} có {count} phàn nàn nghiêm trọng!")
-            
-        print(f"[{area}] Đang gửi dữ liệu cho AI phân tích...")
-        alert_data = analyze_spike(area, area_texts[area])
+    for group in selected:
+        area = group["area"]
+        route = route_ticket(
+            group["topic"],
+            f"P{group['max_severity']}",
+            group["sentiments"].most_common(1)[0][0],
+            log_run=False,
+        )
+        analysis = analyze_spike(area, group["texts"])
+        description = (
+            analysis.get("description", "Không có mô tả chi tiết")
+            + f"\n\n**Action Plan:** {analysis.get('action', '')}"
+            + f"\n**Assigned Team:** {route['team']}"
+            + f"\n**Priority:** {route.get('priority') or ''}"
+            + f"\n**Routing Note:** {route.get('description') or ''}"
+        )
+        severity = f"P{max(1, group['max_severity'])}"
+        result = create_or_update_ticket(
+            area=area,
+            title=analysis.get("title", f"Spike {group['topic']} tại {area}"),
+            description=description,
+            severity=severity,
+            team=route["team"],
+            sla_hours=route.get("sla_hours", 24),
+            user_id=user_id,
+            topic=group["topic"],
+            priority=route.get("priority"),
+            ticket_type=group["ticket_type"],
+            routing_source=route.get("routed_by", "router_agent"),
+        )
+        if result.get("action") == "created":
+            alerts_created += 1
+            if severity == "P5":
+                send_alert_webhook(
+                    title=analysis.get("title", f"Spike tại {area}"),
+                    severity=severity,
+                    area=area,
+                    message=description,
+                )
 
-        if mock_user_id:
-            alert_payload = {
-                "user_id": mock_user_id,
-                "title": alert_data.get("title", f"Spike tại {area}"),
-                "description": alert_data.get("description", "Không có mô tả chi tiết") + f"\n\n**Action Plan:** {alert_data.get('action', '')}\n**Assigned Team:** {alert_data.get('assigned_team', '')}",
-                "severity": f"P{area_max_sev[area]}" if area_max_sev.get(area) else "P5",
-                "area": area,
-                "status": "open"
-            }
-
-            try:
-                db.table("alerts").insert(alert_payload).execute()
-                alerts_created += 1
-                print(f"✅ Đã tạo Alert khẩn cấp cho {area} thành công!")
-                
-                if alert_payload["severity"] == "P5":
-                    send_alert_webhook(
-                        title=alert_payload["title"],
-                        severity=alert_payload["severity"],
-                        area=alert_payload["area"],
-                        message=alert_payload["description"]
-                    )
-            except Exception as e:
-                print(f"❌ Lỗi khi lưu Alert vào DB: {e}")
-        else:
-            print("❌ Không có user_id hợp lệ để lưu Alert!")
-                
     return {
-        "spikes_detected": len(selected_spikes),
-        "candidate_spikes": len(spike_candidates),
+        "spikes_detected": len(selected),
+        "candidate_spikes": len(candidates),
         "alerts_created": alerts_created,
         "records_scanned": len(data),
+        "groups_scanned": len(groups),
         "max_feedback": max_feedback,
         "max_spikes": max_spikes,
     }
+
 
 if __name__ == "__main__":
     detect_spikes()

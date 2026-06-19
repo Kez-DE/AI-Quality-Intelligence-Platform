@@ -1,10 +1,21 @@
 import re
+from typing import Any
 
 
 PUBLIC_CONTACT_EMAILS = {
     "support.vn@greensm.com",
     "dpooffice@greensm.com",
 }
+
+PHONE_PATTERN = re.compile(
+    r"(?<!\d)(?:(?:(?:\+?84)|0)[\s.\-]?(?:3|5|7|8|9)\d(?:[\s.\-]?\d){7}"
+    r"|(?:(?:\+?84)|0)[\s.\-]?2\d(?:[\s.\-]?\d){8})(?!\d)"
+)
+EMAIL_PATTERN = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}\b")
+LICENSE_PLATE_PATTERN = re.compile(
+    r"(?<!\w)\d{2}\s*[A-ZĐ]{1,2}\d?\s*[-.]?\s*\d{3}(?:[.\s-]?\d{2,3})(?!\w)",
+    re.IGNORECASE,
+)
 
 
 def mask_pii(text: str) -> str:
@@ -25,24 +36,34 @@ def mask_pii(text: str) -> str:
         protected_emails[token] = email
         return token
     
-    # Mask số điện thoại VN (ví dụ: 0912345678 -> [SĐT_ĐÃ_ẨN])
-    phone_pattern = re.compile(r'\b(0|\+84)[-\s\.]?[1-9]\d{2}[-\s\.]?\d{3}[-\s\.]?\d{3}\b')
-    text = phone_pattern.sub('[SĐT_ĐÃ_ẨN]', text)
+    # Mask số điện thoại di động VN, kể cả dạng +84/84 và có dấu phân cách.
+    text = PHONE_PATTERN.sub('[SĐT_ĐÃ_ẨN]', text)
     
     # Mask Email (ví dụ: test@gmail.com -> [EMAIL_ĐÃ_ẨN]).
     # Email hỗ trợ công khai của Green SM được allowlist để chatbot khách có thể
     # cung cấp đúng kênh liên hệ chính thức, trong khi email cá nhân vẫn bị ẩn.
-    email_pattern = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b')
-    text = email_pattern.sub(protect_public_email, text)
-    text = email_pattern.sub('[EMAIL_ĐÃ_ẨN]', text)
+    text = EMAIL_PATTERN.sub(protect_public_email, text)
+    text = EMAIL_PATTERN.sub('[EMAIL_ĐÃ_ẨN]', text)
     for token, email in protected_emails.items():
         text = text.replace(token, email)
 
-    # Mask Biển số xe VN (ví dụ: 29A-12345 hoặc 51F-123.45 -> [BIỂN_SỐ_ĐÃ_ẨN])
-    license_plate_pattern = re.compile(r'\b\d{2}[A-ZĐ]\d?[-\s]?\d{3,4}\.?\d{0,2}\b', re.IGNORECASE)
-    text = license_plate_pattern.sub('[BIỂN_SỐ_ĐÃ_ẨN]', text)
+    # Mask biển số ô tô/xe máy VN ở dạng liền, có gạch, dấu chấm hoặc khoảng trắng.
+    text = LICENSE_PLATE_PATTERN.sub('[BIỂN_SỐ_ĐÃ_ẨN]', text)
     
     return text
+
+
+def sanitize_pii_payload(value: Any) -> Any:
+    """Tạo bản sao payload và che PII trong mọi chuỗi trước khi gửi ra ngoài."""
+    if isinstance(value, str):
+        return mask_pii(value)
+    if isinstance(value, list):
+        return [sanitize_pii_payload(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(sanitize_pii_payload(item) for item in value)
+    if isinstance(value, dict):
+        return {key: sanitize_pii_payload(item) for key, item in value.items()}
+    return value
 
 def clean_text(text: str) -> str:
     """

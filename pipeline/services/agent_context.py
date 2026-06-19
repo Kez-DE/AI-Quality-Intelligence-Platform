@@ -1,11 +1,12 @@
 import os
 from collections import Counter
-from typing import Any, Optional
+from typing import Any
 
 from ingest import get_supabase
 from services.live_stream import get_live_stream_status
 from agents.router_agent import route_ticket
 from agents.analyst_agent import DEPARTMENT_PERSONAS
+from departments import alert_department
 
 AGENT_SYSTEM_PROMPT = """Bạn là AI Assistant cho Quality Operation Cockpit của xanhSM.
 Nhiệm vụ: giúp đội vận hành hiểu feedback, alerts, spike, chất lượng tài xế/xe/app/thanh toán/an toàn và quyết định bước xử lý tiếp theo.
@@ -96,14 +97,6 @@ def build_agent_system_prompt(user: Any = None) -> str:
     )
 
 
-def _alert_team(alert: dict) -> Optional[str]:
-    """Trích phòng ban được gán của một alert từ description (alerts không có cột team)."""
-    desc = alert.get("description") or ""
-    if "**Assigned Team:**" in desc:
-        return desc.split("**Assigned Team:**")[1].strip().split("\n")[0].strip()
-    return None
-
-
 def build_agent_data_context(user: Any = None) -> str:
     # Xác định phòng cần lọc: admin -> None (toàn hệ thống), ops -> phòng được gán.
     scope_team = None
@@ -128,7 +121,7 @@ DATA_CONTEXT:
             .execute() \
             .data or []
         alerts = db.table("alerts") \
-            .select("title,severity,area,status,description,created_at") \
+            .select("*") \
             .order("created_at", desc=True) \
             .limit(60) \
             .execute() \
@@ -140,9 +133,11 @@ DATA_CONTEXT:
     if scope_team:
         feedback = [
             f for f in feedback
-            if route_ticket(f.get("topic", ""), f.get("severity", 3), f.get("sentiment"))["team"] == scope_team
+            if route_ticket(
+                f.get("topic", ""), f.get("severity", 3), f.get("sentiment"), log_run=False
+            )["team"] == scope_team
         ]
-        alerts = [a for a in alerts if _alert_team(a) == scope_team]
+        alerts = [a for a in alerts if alert_department(a) == scope_team]
     alerts = alerts[:20]
 
     latest_feedback_at = max((row.get("created_at") or "" for row in feedback), default="unknown")

@@ -27,13 +27,8 @@ Hai agent này không nằm trong `run_agent_pipeline`, mà chạy ở luồng i
 Chạy trong `agent-worker` mỗi `WORKER_AGENT_INTERVAL_SECONDS` (mặc định 300s). Thứ tự thực thi đã trace từ code:
 
 ```
-Step 1-4  Lấy feedback P4/P5 trong N giờ, gom theo area.
-          Với mỗi area:
-            alert_agent.process_area_alerts(area, feedbacks)   [RULE]  → create / skip
-            nếu create:
-              llm_agent.analyze_spike(area, texts)             [LLM]   → title/desc/action
-              router_agent.route_ticket(top_topic, severity)   [RULE]  → team + SLA
-              ticket_agent.create_or_update_ticket(...)        [DB]    → insert vào alerts
+Step 1-4  spike_detector gom theo (area, topic, team), áp ngưỡng risk/volume,
+          Router Agent quyết định team/SLA/priority và LLM chỉ sinh title/desc/action.
 Step 5    task_agent.cluster_alerts_into_tasks()               [RULE + LLM/cụm mới]
 Step 5.5  ticket_agent.get_overdue_tickets(sla_hours=24)       [RULE]  → ticket quá hạn
 Step 6-7  for team in TEAMS:
@@ -82,11 +77,11 @@ Override: P5 → Safety (1h); sentiment positive → Marketing (48h). Agent ch�
 
 ### ticket_agent — tạo ticket
 
-`create_or_update_ticket(area, title, description, severity, team, sla_hours, user_id)`. Thiếu `user_id` thì lấy một id từ bảng `profiles`. INSERT vào bảng `alerts` với `status='open'`; team được nhúng vào `description` dưới dạng chuỗi `**Assigned Team:**`. `get_overdue_tickets` quét ticket quá SLA trong bảng `alerts`.
+`create_or_update_ticket(...)` ghi `assigned_team`, `topic`, `priority`, `ticket_type`, `routing_source`, `sla_due_at` vào bảng `alerts`. Markdown metadata chỉ được giữ để ticket cũ tương thích. Thiếu `user_id` thì lấy một id từ bảng `profiles`.
 
 ### task_agent — gom alert thành task
 
-`cluster_alerts_into_tasks()` đọc bảng `alerts` (task_id null, status open), gom theo `(team, area)` (team parse từ chuỗi `**Assigned Team:**` trong description). Mỗi cụm: tìm task open cùng `(assigned_team, area)` trong bảng `tasks`; chưa có thì gọi LLM sinh title/summary rồi INSERT, sau đó cập nhật `task_id` ngược vào các alert. `generate_daily_report(team)` sinh Markdown rồi upsert vào `department_reports`.
+`cluster_alerts_into_tasks()` đọc bảng `alerts` (task_id null, status open), gom theo `(assigned_team, area)`; ticket cũ fallback parse Markdown. Mỗi cụm: tìm task open cùng team/area, chưa có thì gọi LLM sinh title/summary rồi INSERT.
 
 ### insight_agent — tổng hợp metric theo phòng
 

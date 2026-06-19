@@ -10,6 +10,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Query
 
 from auth_guard import AuthUser, VALID_ROLES, require_admin
+from departments import DEPARTMENTS
 from ingest import get_supabase
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -94,7 +95,7 @@ def update_user_role(user_id: str, payload: dict, user: AuthUser = Depends(requi
 def update_user_department(user_id: str, payload: dict, user: AuthUser = Depends(require_admin)):
     """Gán phòng ban cho user. Admin only."""
     department = payload.get("department")
-    valid_departments = [None, "IT", "Safety", "CSKH", "Vận hành", "Pricing", "Marketing"]
+    valid_departments = [None, *DEPARTMENTS]
     if department not in valid_departments:
         raise HTTPException(status_code=400, detail=f"department phải thuộc {valid_departments}")
 

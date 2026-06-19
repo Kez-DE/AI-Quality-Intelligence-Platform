@@ -139,7 +139,7 @@ C2-App-116/
 │   ├── classifier.py       ML classifier (TF-IDF/LinearSVC)
 │   ├── clean.py            PII masking
 │   ├── rules.py            Rule engine tiếng Việt
-│   ├── spike_detector.py   Phát hiện spike P4/P5
+│   ├── spike_detector.py   Phát hiện risk/volume spike và route ticket theo phòng
 │   ├── llm_agent.py        LLM phân tích spike
 │   ├── agent/              Chat ReAct + RAG (nội bộ/khách) + model router
 │   ├── agents/             8 agent nghiệp vụ + orchestrator (batch)

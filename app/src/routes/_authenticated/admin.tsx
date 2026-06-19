@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, useMe, ROLE_LABELS, type Role } from "@/lib/api";
+import { ALL_TEAMS, apiFetch, useMe, ROLE_LABELS, type Role } from "@/lib/api";
 import {
   Loader2,
   ShieldAlert,
@@ -30,7 +30,7 @@ type ManagedUser = {
 };
 
 const ROLES: Role[] = ["admin", "manager", "staff", "guest"];
-const DEPARTMENTS = ["IT", "Safety", "CSKH", "Vận hành", "Pricing", "Marketing"] as const;
+const DEPARTMENTS = ALL_TEAMS;
 
 function getRoleBadgeColor(role: Role) {
   switch (role) {

@@ -20,6 +20,7 @@ from rate_limiter import RateLimiter, check_rate_limit
 from clean import mask_pii
 from env_config import get_settings
 from core.paths import DEFAULT_DATA_FILE
+from departments import alert_department
 from services.agent_context import AGENT_SYSTEM_PROMPT, GUEST_SYSTEM_PROMPT, build_agent_data_context, build_agent_system_prompt
 from services.live_stream import get_live_stream_status, set_scheduler, start_live_stream, stop_live_stream
 from services.ticket_workflow import ticket_workflow_state
@@ -178,19 +179,25 @@ def recent_feedback(
 def recent_alerts(limit: int = Query(default=100, ge=1, le=500), user: AuthUser = Depends(require_ops_staff)):
     """Alerts chỉ dành cho ops staff (staff/manager/admin). Guest không được xem.
 
-    Admin xem tất cả; ops khác chỉ xem alert thuộc các task của phòng mình
-    (alerts không có cột team nên lọc gián tiếp qua tasks.assigned_team)."""
+    Admin xem tất cả; ops khác chỉ xem alert có assigned_team thuộc phòng mình.
+    Ticket cũ chưa có field này được fallback qua Markdown/task_id."""
     try:
         db = get_supabase()
-        q = db.table("alerts").select("*")
+        fetch_limit = limit if user.role == "admin" else 500
+        data = db.table("alerts") \
+            .select("*") \
+            .order("created_at", desc=True) \
+            .limit(fetch_limit) \
+            .execute() \
+            .data or []
         if user.role != "admin":
-            own_team = scoped_team(user, None)  # raise 403 nếu chưa gán phòng
+            own_team = scoped_team(user, None)
             task_rows = db.table("tasks").select("id").eq("assigned_team", own_team).execute().data or []
-            task_ids = [t["id"] for t in task_rows if t.get("id")]
-            if not task_ids:
-                return {"status": "success", "data": []}
-            q = q.in_("task_id", task_ids)
-        data = q.order("created_at", desc=True).limit(limit).execute().data or []
+            task_ids = {t["id"] for t in task_rows if t.get("id")}
+            data = [
+                alert for alert in data
+                if alert_department(alert) == own_team or alert.get("task_id") in task_ids
+            ][:limit]
     except HTTPException:
         raise
     except Exception as exc:
@@ -411,12 +418,13 @@ def update_alert_status(alert_id: str, payload: dict, user: AuthUser = Depends(r
     try:
         db = get_supabase()
         if user.role != "admin":
-            rows = db.table("alerts").select("task_id").eq("id", alert_id).limit(1).execute().data or []
+            rows = db.table("alerts").select("*").eq("id", alert_id).limit(1).execute().data or []
             if not rows:
                 raise HTTPException(status_code=404, detail="Alert not found")
-            task_id = rows[0].get("task_id")
-            task_team = None
-            if task_id:
+            alert = rows[0]
+            task_id = alert.get("task_id")
+            task_team = alert_department(alert)
+            if not task_team and task_id:
                 task = db.table("tasks").select("assigned_team").eq("id", task_id).limit(1).execute().data or []
                 task_team = task[0].get("assigned_team") if task else None
             if not can_view_team(user, task_team):
@@ -710,7 +718,7 @@ def start_live_feedback_stream(
     reset: bool = Query(default=False),
     auto_ticket: bool = Query(default=True),
     ticket_every_batches: int = Query(default=10, ge=1, le=100),
-    ticket_max_spikes: int = Query(default=1, ge=1, le=10),
+    ticket_max_spikes: int = Query(default=6, ge=1, le=10),
     _: AuthUser = Depends(require_admin),
 ):
     """

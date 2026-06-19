@@ -61,11 +61,8 @@ Helper chung (`agents/common.py`): `get_db()`, `call_llm()` (wrap router + cache
 ### Luồng 7 bước
 
 ```
-Step 1   Lấy feedback P4/P5 trong N giờ → gom theo area
-Step 2   alert_agent.process_area_alerts(area, fbs)          [RULE]  create / skip
-Step 3   (nếu create) llm_agent.analyze_spike(area, texts)   [LLM]   title/desc/action
-         router_agent.route_ticket(topic, severity)          [RULE]  team + SLA
-Step 4   ticket_agent.create_or_update_ticket(...)           [DB]    insert alerts
+Step 1-4 spike_detector gom area + topic + team, áp ngưỡng risk/volume,
+         router_agent quyết định owner/SLA và LLM chỉ sinh title/desc/action
 Step 5   task_agent.cluster_alerts_into_tasks()              [RULE + 1 LLM/cụm mới]
 Step 5.5 ticket_agent.get_overdue_tickets(24h)               [RULE]  quá SLA
 Step 6   for team in TEAMS: insight_agent.generate(...)      [RULE]  metric theo phòng
@@ -85,7 +82,7 @@ Step 7   analyst_agent.analyze_root_cause(team, insights)    [LLM]   → departm
 | `task_agent` | Rule + LLM | gom cụm alert `(team, area)` → task (LLM đặt title/summary) | alerts → tasks_created |
 | `insight_agent` | Rule | tổng hợp metric feedback theo phòng | (team, hours) → severity dist + top topics |
 | `analyst_agent` | **LLM** | phân tích root-cause + 3 action item (fallback khi lỗi) | (team, insights) → summary + risk_level + actions |
-| `llm_agent` | **LLM** | phân tích spike khu vực → nguyên nhân gốc + action + team | (area, texts) → title/desc/action/team |
+| `llm_agent` | **LLM** | phân tích spike đã che PII → nguyên nhân gốc + action | (area, texts) → title/desc/action |
 | `scoring_agent`* | LLM + Rule | chấm 5 chiều rủi ro (safety/fraud/attitude/vehicle/compliance 0-10) → waterfall max-pooling ra điểm 1-5 | feedback → overall_risk + 5 risk vector |
 
 \* `scoring_agent` chạy chính trong `ml-worker`, không nằm trong `run_agent_pipeline`.
@@ -111,7 +108,7 @@ sklearn `Pipeline(TfidfVectorizer(ngram 1-2, max_features=30000, sublinear_tf) +
 ## D. Rule-based Components
 
 - **`rules.py`** — lớp rule chính sau ML. Ưu tiên Safety > PaymentFraud > App > Map > Payment > Supply > DriverNeg > Pricing > Delay > Positive. Có **negation guard tiếng Việt** (`không/ko/chẳng`), gibberish detector, set `needs_review` khi confidence < 0.55 hoặc P5 hoặc safety override.
-- **`spike_detector.py`** — `SPIKE_THRESHOLD=5`: area ≥5 phàn nàn P4/P5 → spike → gọi `analyze_spike` (LLM). Cần `SUPABASE_SERVICE_ROLE_KEY` (bypass RLS).
+- **`spike_detector.py`** — gom theo `(area, topic, team)`: P5 tạo ngay, P4 cần cụm 3, P2/P3 tiêu cực cần volume 10, tích cực đủ 5 tạo Marketing opportunity. Router quyết định phòng; LLM không được tự gán team.
 - **`scoring_agent.calculate_overall_risk()`** — waterfall max-pooling 5 chiều → thang 1-5.
 - **`services/ticket_workflow.py`** — vòng đời ticket theo thời gian: open → in_progress (10s) → resolved (30s).
 - **`services/live_stream.py`** — scheduler nạp dataset theo batch, cứ N batch chạy auto spike detection.

@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 
 from agents.common import get_db, log_agent_run
 from agents.common import call_llm
+from departments import alert_department
 
 def cluster_alerts_into_tasks() -> Dict[str, Any]:
     """
@@ -30,20 +31,13 @@ def cluster_alerts_into_tasks() -> Dict[str, Any]:
     if not unassigned_alerts:
         return {"status": "success", "message": "No unassigned alerts found."}
 
-    # Group alerts by (team, area)
-    # Trong alerts schema hiện tại: area có sẵn. assigned_team nằm trong description (từ format **Assigned Team:**) hoặc cần trích xuất.
-    # Vì schema alerts không có cột assigned_team, ta parse từ description
+    # Group alerts by canonical team + area; legacy rows fallback to Markdown metadata.
     clusters = {}
     cluster_priority = {}  # (team, area) -> priority parse từ router (vd "P4"), nếu có
     for alert in unassigned_alerts:
         area = alert.get("area", "Unknown")
         desc = alert.get("description", "")
-        team = "Unknown"
-        # Parse team from description: "**Assigned Team:** Safety"
-        if "**Assigned Team:**" in desc:
-            parts = desc.split("**Assigned Team:**")
-            if len(parts) > 1:
-                team = parts[1].strip().split("\n")[0]
+        team = alert_department(alert, "CSKH")
 
         # We can also extract topic from title if we strictly want to cluster by topic. For now, cluster by area & team.
         key = (team, area)
@@ -52,8 +46,10 @@ def cluster_alerts_into_tasks() -> Dict[str, Any]:
         clusters[key].append(alert)
 
         # Parse priority do Router gán: "**Priority:** P4". Giữ priority đầu tiên hợp lệ cho cụm.
-        if key not in cluster_priority and "**Priority:**" in desc:
-            prio = desc.split("**Priority:**")[1].strip().split("\n")[0].strip()
+        if key not in cluster_priority:
+            prio = str(alert.get("priority") or "").strip()
+            if not prio and "**Priority:**" in desc:
+                prio = desc.split("**Priority:**")[1].strip().split("\n")[0].strip()
             if prio:
                 cluster_priority[key] = prio
 

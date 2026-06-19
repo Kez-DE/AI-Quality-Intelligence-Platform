@@ -2,15 +2,8 @@ from datetime import datetime, timezone, timedelta
 from collections import Counter
 from agents.common import get_db
 from agents.router_agent import route_ticket
+from departments import alert_department
 from .knowledge_base import search_knowledge, format_for_prompt
-
-
-def _alert_team(alert: dict) -> str | None:
-    """Trích phòng ban của alert từ description (alerts không có cột team)."""
-    desc = alert.get("description") or ""
-    if "**Assigned Team:**" in desc:
-        return desc.split("**Assigned Team:**")[1].strip().split("\n")[0].strip()
-    return None
 
 
 def get_hot_areas(hours: int = 24, limit: int = 5, scope_team: str | None = None) -> str:
@@ -30,7 +23,9 @@ def get_hot_areas(hours: int = 24, limit: int = 5, scope_team: str | None = None
         if scope_team:
             feedback = [
                 f for f in feedback
-                if route_ticket(f.get("topic", ""), f.get("severity", 3), f.get("sentiment"))["team"] == scope_team
+                if route_ticket(
+                    f.get("topic", ""), f.get("severity", 3), f.get("sentiment"), log_run=False
+                )["team"] == scope_team
             ]
 
         # Đếm theo area
@@ -52,7 +47,7 @@ def get_sla_tickets(scope_team: str | None = None) -> str:
     try:
         db = get_db()
         alerts = db.table("alerts") \
-            .select("id,title,area,status,severity,description,created_at") \
+            .select("*") \
             .in_("status", ["open", "in_progress"]) \
             .order("created_at", desc=False) \
             .limit(40) \
@@ -60,7 +55,7 @@ def get_sla_tickets(scope_team: str | None = None) -> str:
 
         # Lọc theo phòng ban nếu là ops (qua assigned_team trong description)
         if scope_team:
-            alerts = [a for a in alerts if _alert_team(a) == scope_team]
+            alerts = [a for a in alerts if alert_department(a) == scope_team]
         alerts = alerts[:10]
 
         if not alerts:
@@ -69,7 +64,7 @@ def get_sla_tickets(scope_team: str | None = None) -> str:
 
         result = ["Danh sách ticket tồn đọng lâu nhất (Nguy cơ SLA):"]
         for a in alerts:
-            team = _alert_team(a) or "—"
+            team = alert_department(a) or "—"
             result.append(f"- [ID: {a.get('id')}] [{a.get('severity')}] {team} | {a.get('area')}: {a.get('title')}")
         return "\n".join(result)
     except Exception as e:

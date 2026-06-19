@@ -10,7 +10,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useMe, apiFetch, isUnassignedOps } from "@/lib/api";
+import { ALL_TEAMS, useMe, apiFetch, isUnassignedOps } from "@/lib/api";
 import { NoDepartmentNotice } from "@/components/NoDepartmentNotice";
 import { MarkdownContent } from "@/components/MarkdownContent";
 
@@ -108,7 +108,7 @@ function ReportsPage() {
     }
   }
 
-  const teams = ["All", "Safety", "CSKH", "IT", "Vận hành", "Pricing", "Marketing"];
+  const teams = ["All", ...ALL_TEAMS];
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 max-w-4xl mx-auto">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
