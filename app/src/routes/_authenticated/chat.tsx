@@ -1,7 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Sparkles,
@@ -16,6 +14,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { MarkdownContent } from "@/components/MarkdownContent";
 import { apiFetch, useMe, type Role } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/chat")({
@@ -610,9 +609,7 @@ function AssistantResponse({
               {block.title && (
                 <div className="mb-1 font-semibold text-xanh-deep">{block.title}</div>
               )}
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                {block.body}
-              </ReactMarkdown>
+              <MarkdownContent components={markdownComponents}>{block.body}</MarkdownContent>
             </div>
           </div>
         </div>
