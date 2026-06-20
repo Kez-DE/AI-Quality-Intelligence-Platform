@@ -18,6 +18,7 @@ import os
 from agents.common import get_db, log_agent_run
 from agents.insight_agent import generate_department_insights
 from agents.analyst_agent import analyze_root_cause
+from agents.report_builder import build_department_report_markdown, store_department_report
 from agents.ticket_agent import get_overdue_tickets
 from agents.task_agent import cluster_alerts_into_tasks
 from departments import DEPARTMENTS
@@ -112,44 +113,35 @@ def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
             # Agent 4: Insight Agent
             insights = generate_department_insights(team, hours=hours)
 
-            if insights.get("total_feedback", 0) > 0 and analyst_on:
-                # Agent 5: Analyst Agent — phân tích root cause
-                analysis_res = analyze_root_cause(team, insights)
+            if insights.get("total_feedback", 0) > 0:
+                analysis_res = (
+                    analyze_root_cause(team, insights)
+                    if analyst_on
+                    else {"status": "disabled", "analysis": None}
+                )
                 insights["analysis"] = analysis_res
 
-                # Nếu có rủi ro, lưu báo cáo Markdown cho trưởng phòng
-                analysis = analysis_res.get("analysis")
-                if analysis:
-                    risk_level = analysis.get("risk_level", "MEDIUM")
-
-                    md = f"### 1. Nguyên nhân gốc rễ (Root Cause)\n{analysis.get('root_cause_summary', 'N/A')}\n\n"
-                    md += f"### 2. Mức độ rủi ro hiện tại (Risk Level)\n**{risk_level}**\n\n"
-                    md += "### 3. Dự báo 24-48h tới (Forecast)\nTheo xu hướng hiện tại, cần theo dõi sát các vấn đề trên.\n\n"
-                    md += "### 4. Đề xuất hành động (Action Plan)\n"
-                    for act in analysis.get("action_items", []):
-                        md += f"- {act.get('action')} (Deadline: {act.get('deadline')})\n"
-
-                    # Lưu vào DB — upsert theo (team, report_date) để không trùng lặp
-                    try:
-                        db.table("department_reports").upsert({
-                            "team": team,
-                            "report_date": datetime.now(timezone.utc).date().isoformat(),
-                            "content": md,
-                        }, on_conflict="team,report_date").execute()
-                    except Exception:
-                        pass  # Bảng chưa tồn tại thì bỏ qua
+                md = build_department_report_markdown(team, insights, analysis_res)
+                try:
+                    store_result = store_department_report(
+                        db,
+                        team=team,
+                        report_date=datetime.now(timezone.utc).date().isoformat(),
+                        content=md,
+                    )
+                    if not store_result.get("stored"):
+                        pipeline_log.append(f"{team}: approved report retained")
+                except Exception as exc:
+                    errors[f"report:{team}"] = str(exc)[:200]
+                    pipeline_log.append(f"{team}: report storage error — {str(exc)[:100]}")
 
                 pipeline_log.append(
                     f"{team}: {insights['total_feedback']} feedback, "
-                    f"analyzed={'success' if analysis_res.get('status') == 'success' else 'fallback'}"
+                    f"analyzed={analysis_res.get('status', 'unknown')}"
                 )
             else:
                 insights["analysis"] = None
-                total = insights.get("total_feedback", 0)
-                if total > 0 and not analyst_on:
-                    pipeline_log.append(f"{team}: {total} feedback, analyst disabled — insight only")
-                else:
-                    pipeline_log.append(f"{team}: 0 feedback, skipped analysis")
+                pipeline_log.append(f"{team}: 0 feedback, skipped analysis")
 
             results[team] = insights
 

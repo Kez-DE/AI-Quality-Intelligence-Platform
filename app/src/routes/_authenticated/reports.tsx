@@ -1,14 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import {
-  Loader2,
-  FileText,
-  Calendar,
-  Building2,
-  CheckCircle2,
-  ClipboardCopy,
-  ShieldCheck,
-} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Loader2, FileText, Calendar, Building2, CheckCircle2, ClipboardCopy } from "lucide-react";
 import { toast } from "sonner";
 import { ALL_TEAMS, useMe, apiFetch, isUnassignedOps } from "@/lib/api";
 import { NoDepartmentNotice } from "@/components/NoDepartmentNotice";
@@ -37,26 +29,29 @@ function ReportsPage() {
   const isManager = me?.role === "admin" || me?.role === "manager";
   const isAdmin = me?.role === "admin";
 
-  async function loadData(team?: string) {
-    if (!isManager) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      const path = team && team !== "All" ? `/api/reports?team=${team}` : "/api/reports";
-      const json = await apiFetch<{ data: Report[] }>(path);
-      setReports(json.data || []);
-    } catch (err) {
-      toast.error("Không thể tải danh sách báo cáo.");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const loadData = useCallback(
+    async (team?: string) => {
+      if (!isManager) {
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      try {
+        const path = team && team !== "All" ? `/api/reports?team=${team}` : "/api/reports";
+        const json = await apiFetch<{ data: Report[] }>(path);
+        setReports(json.data || []);
+      } catch {
+        toast.error("Không thể tải danh sách báo cáo.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [isManager],
+  );
 
   useEffect(() => {
-    if (me?.role && isManager) loadData(selectedTeam);
-  }, [me?.role, selectedTeam]);
+    if (me?.role && isManager) void loadData(selectedTeam);
+  }, [isManager, loadData, me?.role, selectedTeam]);
 
   if (!isManager) {
     return (
@@ -110,7 +105,7 @@ function ReportsPage() {
 
   const teams = ["All", ...ALL_TEAMS];
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 max-w-4xl mx-auto">
+    <div className="mx-auto max-w-6xl space-y-6 animate-in fade-in slide-in-from-bottom-2">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h1 className="font-display text-3xl font-bold flex items-center gap-2">
@@ -152,7 +147,7 @@ function ReportsPage() {
           <Loader2 className="h-8 w-8 animate-spin text-xanh-green" />
         </div>
       ) : reports.length === 0 ? (
-        <div className="text-center p-12 border border-border rounded-2xl bg-white text-muted-foreground shadow-sm">
+        <div className="border border-border bg-white p-12 text-center text-muted-foreground shadow-sm rounded-lg">
           Chưa có báo cáo nào được sinh ra cho phòng ban này.
         </div>
       ) : (
@@ -166,10 +161,10 @@ function ReportsPage() {
             return (
               <div
                 key={report.id}
-                className={`rounded-2xl border bg-white shadow-[var(--shadow-card)] overflow-hidden ${hasCritical ? "border-red-500/50 shadow-red-500/10" : hasWarning ? "border-amber-500/50 shadow-amber-500/10" : "border-border"}`}
+                className={`overflow-hidden rounded-lg border bg-white shadow-[var(--shadow-card)] ${hasCritical ? "border-red-500/50 shadow-red-500/10" : hasWarning ? "border-amber-500/50 shadow-amber-500/10" : "border-border"}`}
               >
                 <div
-                  className={`p-5 border-b border-border flex justify-between items-center ${hasCritical ? "bg-red-50" : hasWarning ? "bg-amber-50" : "bg-muted/5"}`}
+                  className={`flex flex-wrap items-center justify-between gap-3 border-b border-border p-5 ${hasCritical ? "bg-red-50" : hasWarning ? "bg-amber-50" : "bg-muted/5"}`}
                 >
                   <div className="flex items-center gap-3">
                     <div
@@ -192,6 +187,17 @@ function ReportsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {!report.approved && (
+                      <button
+                        type="button"
+                        onClick={() => handleApprove(report.id)}
+                        title="Duyệt báo cáo"
+                        aria-label="Duyệt báo cáo"
+                        className="grid h-8 w-8 place-items-center rounded-md border border-green-200 bg-green-50 text-green-700 transition-colors hover:bg-green-100"
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                      </button>
+                    )}
                     {report.approved ? (
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 flex items-center gap-1">
                         <CheckCircle2 className="h-3 w-3" /> Đã duyệt
@@ -214,9 +220,18 @@ function ReportsPage() {
                     <span className="text-[10px] text-muted-foreground font-mono bg-muted px-2 py-1 rounded">
                       AI Generated
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyMarkdown(content)}
+                      title="Sao chép báo cáo Markdown"
+                      aria-label="Sao chép báo cáo Markdown"
+                      className="grid h-8 w-8 place-items-center rounded-md border border-border bg-white text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <ClipboardCopy className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
-                <div className="p-6 prose prose-sm max-w-none prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-a:text-xanh-green prose-headings:text-xanh-deep text-slate-700">
+                <div className="p-5 sm:p-7">
                   <MarkdownContent>{content}</MarkdownContent>
                 </div>
               </div>

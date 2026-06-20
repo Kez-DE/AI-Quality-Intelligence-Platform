@@ -139,46 +139,27 @@ Trả về định dạng JSON:
     }
 
 def generate_daily_report(team: str) -> Dict[str, Any]:
-    """Sinh báo cáo định kỳ cho phòng ban, tối ưu LLM token."""
+    """Generate one report through the same insight/analyst path as orchestrator."""
     start_time = time.time()
     db = get_db()
-    
-    # Lấy metrics từ DB
-    try:
-        # Get tasks
-        tasks_res = db.table("tasks").select("*").eq("assigned_team", team).execute()
-        tasks = tasks_res.data or []
-        open_tasks = [t for t in tasks if t["status"] in ["open", "in_progress"]]
-        
-        if not open_tasks:
-            return {"status": "skipped", "message": f"No open tasks for {team}"}
-            
-        task_summary = "\n".join([f"- {t['title']} (Khu vực: {t.get('area', 'Chung')}, Ưu tiên: {t['priority']})" for t in open_tasks])
-        
-        prompt = f"""Bạn là một AI Analyst. Hãy viết một báo cáo ngắn gọn (định dạng Markdown) gửi Trưởng phòng {team} tổng hợp tình hình vận hành ngày hôm nay.
-Dưới đây là các Task đang mở của phòng {team}:
-{task_summary}
 
-Yêu cầu Báo cáo (Khoảng 150-200 chữ, phải có 4 mục sau):
-### 1. Nguyên nhân gốc rễ (Root Cause)
-[Phân tích nguyên nhân đằng sau các Task]
-### 2. Mức độ rủi ro hiện tại (Risk Level)
-[Đánh giá: LOW / WARNING / CRITICAL]
-### 3. Dự báo 24-48h tới (Forecast)
-[Dự báo tình hình]
-### 4. Đề xuất hành động (Action Plan)
-[3 hành động cụ thể kèm deadline]
-"""
-        content = call_llm("You are an AI Analyst.", prompt, "text")
-        
-        report_data = {
-            "team": team,
-            "report_date": datetime.utcnow().date().isoformat(),
-            "content": content
-        }
-        # upsert theo (team, report_date) để không tạo báo cáo trùng trong cùng ngày
-        db.table("department_reports").upsert(report_data, on_conflict="team,report_date").execute()
-        
+    try:
+        from agents.analyst_agent import analyze_root_cause
+        from agents.insight_agent import generate_department_insights
+        from agents.report_builder import build_department_report_markdown, store_department_report
+
+        insights = generate_department_insights(team, hours=24)
+        if insights.get("total_feedback", 0) <= 0:
+            return {"status": "skipped", "message": f"No feedback for {team}"}
+        analysis = analyze_root_cause(team, insights)
+        content = build_department_report_markdown(team, insights, analysis)
+        stored = store_department_report(
+            db,
+            team=team,
+            report_date=datetime.utcnow().date().isoformat(),
+            content=content,
+        )
+
         log_agent_run(
             run_id=f"report_{team}_{int(time.time())}",
             agent_name="task_agent",
@@ -186,8 +167,8 @@ Yêu cầu Báo cáo (Khoảng 150-200 chữ, phải có 4 mục sau):
             latency_ms=int((time.time() - start_time) * 1000),
             output_summary=f"Generated report for {team}"
         )
-        return {"status": "success", "team": team}
-        
+        return {"status": "success", "team": team, **stored}
+
     except Exception as e:
         return {"status": "error", "error": str(e)}
 

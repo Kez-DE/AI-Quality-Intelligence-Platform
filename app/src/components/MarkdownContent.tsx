@@ -2,6 +2,27 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 const defaultComponents: Components = {
+  h1: ({ children }) => (
+    <h1 className="mb-4 text-xl font-bold text-xanh-deep sm:text-2xl">{children}</h1>
+  ),
+  h2: ({ children }) => (
+    <h2 className="mb-3 mt-7 border-b border-border pb-2 text-lg font-semibold text-xanh-deep">
+      {children}
+    </h2>
+  ),
+  h3: ({ children }) => (
+    <h3 className="mb-2 mt-5 text-base font-semibold text-foreground">{children}</h3>
+  ),
+  p: ({ children }) => <p className="my-3 leading-7 text-foreground/85">{children}</p>,
+  ul: ({ children }) => <ul className="my-3 list-disc space-y-1 pl-6">{children}</ul>,
+  ol: ({ children }) => <ol className="my-3 list-decimal space-y-1 pl-6">{children}</ol>,
+  li: ({ children }) => <li className="leading-6 text-foreground/85">{children}</li>,
+  blockquote: ({ children }) => (
+    <blockquote className="my-4 border-l-4 border-xanh-green bg-muted/40 px-4 py-2 text-sm text-muted-foreground">
+      {children}
+    </blockquote>
+  ),
+  strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
   table: ({ children }) => (
     <div className="my-3 overflow-x-auto rounded-lg border border-border bg-white shadow-sm">
       <table className="min-w-full border-collapse text-left text-sm">{children}</table>

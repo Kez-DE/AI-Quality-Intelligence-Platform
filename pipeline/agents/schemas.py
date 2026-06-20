@@ -23,11 +23,15 @@ class RouterOutput(BaseModel):
 class ActionItem(BaseModel):
     action: str
     deadline: Optional[str] = None
+    owner: Optional[str] = None
+    success_metric: Optional[str] = None
+    priority: Optional[str] = None
 
 class AnalystAnalysis(BaseModel):
     root_cause_summary: str
     risk_level: str
     action_items: List[ActionItem] = Field(default_factory=list)
+    evidence: List[str] = Field(default_factory=list)
 
 class AnalystOutput(BaseModel):
     status: str
@@ -43,12 +47,20 @@ class RecentSample(BaseModel):
     text: str
     area: Optional[str] = None
 
+class TopArea(BaseModel):
+    area: str
+    count: int
+
 class InsightOutput(BaseModel):
     team: str
     period_hours: int
     total_feedback: int
     severity_distribution: Dict[str, int]
+    sentiment_distribution: Dict[str, int] = Field(default_factory=dict)
+    task_status_distribution: Dict[str, int] = Field(default_factory=dict)
+    overdue_tasks: int = 0
     top_topics: List[TopTopic]
+    top_areas: List[TopArea] = Field(default_factory=list)
     recent_samples: List[RecentSample]
 
 class AlertOutput(BaseModel):

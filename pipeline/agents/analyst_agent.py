@@ -78,7 +78,19 @@ DEPARTMENT_PERSONAS: Dict[str, Dict[str, Any]] = {
 }
 
 
-def _fallback_analysis(team: str, insights: Dict[str, Any], risk_level: str = "MEDIUM") -> Dict[str, Any]:
+def derive_risk_level(insights: Dict[str, Any]) -> str:
+    """Derive report risk from measured severity, not LLM judgement."""
+    severity = insights.get("severity_distribution") or {}
+    if int(severity.get("CRITICAL", 0)) > 0:
+        return "CRITICAL"
+    if int(severity.get("WARNING", 0)) > 0:
+        return "HIGH"
+    if int(severity.get("WATCH", 0)) > 0:
+        return "MEDIUM"
+    return "LOW"
+
+
+def _fallback_analysis(team: str, insights: Dict[str, Any]) -> Dict[str, Any]:
     top_topics = insights.get("top_topics") or []
     first_topic = top_topics[0] if isinstance(top_topics, list) and top_topics else {}
     top_topic = first_topic.get("topic") if isinstance(first_topic, dict) else None
@@ -87,20 +99,30 @@ def _fallback_analysis(team: str, insights: Dict[str, Any], risk_level: str = "M
     persona = DEPARTMENT_PERSONAS.get(team)
     if persona and persona.get("fallback_actions"):
         action_items = [
-            ActionItem(action=action, deadline=deadline)
-            for action, deadline in persona["fallback_actions"]
+            ActionItem(
+                action=action,
+                deadline=deadline,
+                owner=team,
+                success_metric="Hoàn thành và ghi nhận kết quả xử lý",
+                priority=f"P{index}",
+            )
+            for index, (action, deadline) in enumerate(persona["fallback_actions"], start=1)
         ]
     else:
         action_items = [
-            ActionItem(action=f"Rà soát ticket gần đây của phòng {team}", deadline="24h"),
-            ActionItem(action="Liên hệ khách hàng bị ảnh hưởng", deadline="48h"),
-            ActionItem(action="Cập nhật quy trình nội bộ", deadline="1w"),
+            ActionItem(action=f"Rà soát ticket gần đây của phòng {team}", deadline="24h", owner=team, priority="P1"),
+            ActionItem(action="Liên hệ khách hàng bị ảnh hưởng", deadline="48h", owner=team, priority="P2"),
+            ActionItem(action="Cập nhật quy trình nội bộ", deadline="1w", owner=team, priority="P3"),
         ]
 
     analysis = AnalystAnalysis(
-        root_cause_summary=f"Nhiều phàn nàn liên quan đến {top_topic}",
-        risk_level=risk_level,
+        root_cause_summary=(
+            f"Dữ liệu ghi nhận nhiều phản hồi liên quan đến {top_topic}; "
+            "chưa đủ bằng chứng để khẳng định nguyên nhân gốc rễ và cần xác minh thêm."
+        ),
+        risk_level=derive_risk_level(insights),
         action_items=action_items,
+        evidence=[f"Chủ đề nổi bật trong kỳ: {top_topic}"],
     )
     output = AnalystOutput(status="fallback", analysis=analysis)
     return output.model_dump()
@@ -118,6 +140,15 @@ def analyze_root_cause(team: str, insights: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "skipped", "reason": "No usable sample text to analyze", "analysis": None}
 
     combined_texts = "\n- ".join(texts)
+    aggregate_facts = {
+        "total_feedback": insights.get("total_feedback", 0),
+        "severity_distribution": insights.get("severity_distribution", {}),
+        "sentiment_distribution": insights.get("sentiment_distribution", {}),
+        "task_status_distribution": insights.get("task_status_distribution", {}),
+        "overdue_tasks": insights.get("overdue_tasks", 0),
+        "top_topics": insights.get("top_topics", []),
+        "top_areas": insights.get("top_areas", []),
+    }
 
     persona = DEPARTMENT_PERSONAS.get(team)
     if persona:
@@ -126,21 +157,24 @@ def analyze_root_cause(team: str, insights: Dict[str, Any]) -> Dict[str, Any]:
         persona_intro = ""
 
     system_prompt = f"""{persona_intro}Bạn là chuyên gia phân tích vận hành cho phòng {team}.
-Nhiệm vụ: đọc các phản hồi tiêu cực gần đây và tìm NGUYÊN NHÂN GỐC RỄ (root cause),
-không chỉ tóm tắt. Tìm các vấn đề mang tính hệ thống.
+Nhiệm vụ: đưa ra nhận định nguyên nhân cần xác minh và kế hoạch cải tiến cho phòng {team}.
+Chỉ sử dụng số liệu và mẫu phản hồi được cung cấp. Không tự tạo số liệu, xu hướng,
+tác động tài chính hoặc nguyên nhân không có bằng chứng. Nếu chưa đủ bằng chứng, phải nói rõ.
 
 Trả về JSON đúng cấu trúc:
 {{
-  "root_cause_summary": "1-2 câu tóm tắt vấn đề hệ thống chính",
+  "root_cause_summary": "1-2 câu, ghi rõ đây là nhận định cần xác minh nếu dữ liệu chưa đủ",
   "risk_level": "LOW | MEDIUM | HIGH | CRITICAL",
+  "evidence": ["2-4 bằng chứng ngắn lấy từ số liệu được cung cấp"],
   "action_items": [
-    {{"action": "Hành động cụ thể 1", "deadline": "24h"}},
-    {{"action": "Hành động cụ thể 2", "deadline": "48h"}},
-    {{"action": "Hành động cụ thể 3", "deadline": "1w"}}
+    {{"priority": "P1", "action": "Hành động cụ thể", "owner": "{team}", "deadline": "24h", "success_metric": "Kết quả đo được"}}
   ]
 }}"""
 
-    user_prompt = f"Phân tích các phản hồi gần đây cho phòng {team}:\n- {combined_texts}"
+    user_prompt = (
+        f"Số liệu tổng hợp:\n{json.dumps(aggregate_facts, ensure_ascii=False)}\n\n"
+        f"Mẫu phản hồi gần đây:\n- {combined_texts}"
+    )
     
     start_time = time.time()
     response_text = call_llm(system_prompt, user_prompt, response_format="json_object")
@@ -155,8 +189,13 @@ Trả về JSON đúng cấu trúc:
         if response_text:
             parsed = parse_json_response(response_text)
             analysis = AnalystAnalysis.model_validate(parsed)
-            if analysis.risk_level not in {"LOW", "MEDIUM", "HIGH", "CRITICAL"}:
-                analysis.risk_level = "MEDIUM"
+            analysis.risk_level = derive_risk_level(insights)
+            for index, action in enumerate(analysis.action_items[:5], start=1):
+                action.priority = action.priority or f"P{min(index, 3)}"
+                action.owner = action.owner or team
+                action.deadline = action.deadline or "48h"
+                action.success_metric = action.success_metric or "Hoàn thành và ghi nhận kết quả"
+            analysis.action_items = analysis.action_items[:5]
                 
             output = AnalystOutput(status="success", analysis=analysis)
             
