@@ -741,7 +741,7 @@ def ingest_real_dataset(
 @app.post("/api/live-stream/start")
 def start_live_feedback_stream(
     batch_size: int = Query(default=150, ge=1, le=500),
-    interval_seconds: int = Query(default=10, ge=1, le=3600),
+    interval_seconds: int = Query(default=5, ge=1, le=3600),
     loop: bool = Query(default=False),
     reset: bool = Query(default=False),
     auto_ticket: bool = Query(default=True),

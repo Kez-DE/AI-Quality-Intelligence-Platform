@@ -41,7 +41,7 @@ def start_configured_live_stream():
 
     start_live_stream(
         batch_size=int(os.getenv("LIVE_STREAM_BATCH_SIZE", "150")),
-        interval_seconds=int(os.getenv("LIVE_STREAM_INTERVAL_SECONDS", "10")),
+        interval_seconds=int(os.getenv("LIVE_STREAM_INTERVAL_SECONDS", "5")),
         loop=_env_bool("LIVE_STREAM_LOOP", False),
         reset=_env_bool("LIVE_STREAM_RESET_ON_START", False),
         auto_ticket=_env_bool("AUTO_TICKET_ENABLED", True),

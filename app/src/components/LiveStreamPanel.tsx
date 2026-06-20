@@ -14,8 +14,16 @@ export type LiveStreamStatus = {
   ticket_every_batches: number;
   ticket_max_spikes: number;
   batches_ingested: number;
+  batch_running: boolean;
   ticket_running: boolean;
-  last_result: { inserted: number; skipped: number; complete: boolean } | null;
+  last_result: {
+    inserted: number;
+    failed?: number;
+    skipped?: number;
+    complete: boolean;
+    duration_seconds?: number;
+    llm_scoring_deferred?: boolean;
+  } | null;
   last_error: string | null;
   last_ticket_at: string | null;
   last_ticket_result: unknown;
@@ -35,7 +43,7 @@ type LiveStreamPreferences = {
 const PREFERENCES_KEY = "live-stream-preferences-v1";
 const DEFAULT_PREFERENCES: LiveStreamPreferences = {
   batchSize: 150,
-  interval: 10,
+  interval: 5,
   loop: false,
   reset: false,
   autoTicket: true,
@@ -69,15 +77,15 @@ function loadPreferences(): LiveStreamPreferences {
 
 export default function LiveStreamPanel() {
   const qc = useQueryClient();
-  const [initialPreferences] = useState(loadPreferences);
-  const [batchSize, setBatchSize] = useState(initialPreferences.batchSize);
-  const [interval, setIntervalSec] = useState(initialPreferences.interval);
-  const [loop, setLoop] = useState(initialPreferences.loop);
-  const [reset, setReset] = useState(initialPreferences.reset);
-  const [autoTicket, setAutoTicket] = useState(initialPreferences.autoTicket);
-  const [ticketEvery, setTicketEvery] = useState(initialPreferences.ticketEvery);
-  const [ticketMaxSpikes, setTicketMaxSpikes] = useState(initialPreferences.ticketMaxSpikes);
-  const hydratedFromServer = useRef(false);
+  const [batchSize, setBatchSize] = useState(DEFAULT_PREFERENCES.batchSize);
+  const [interval, setIntervalSec] = useState(DEFAULT_PREFERENCES.interval);
+  const [loop, setLoop] = useState(DEFAULT_PREFERENCES.loop);
+  const [reset, setReset] = useState(DEFAULT_PREFERENCES.reset);
+  const [autoTicket, setAutoTicket] = useState(DEFAULT_PREFERENCES.autoTicket);
+  const [ticketEvery, setTicketEvery] = useState(DEFAULT_PREFERENCES.ticketEvery);
+  const [ticketMaxSpikes, setTicketMaxSpikes] = useState(DEFAULT_PREFERENCES.ticketMaxSpikes);
+  const [preferencesReady, setPreferencesReady] = useState(false);
+  const wasRunning = useRef(false);
 
   const statusQuery = useQuery({
     queryKey: ["live-stream-status"],
@@ -92,11 +100,23 @@ export default function LiveStreamPanel() {
   const isRunning = s?.running ?? false;
   const isComplete = Boolean(s?.last_result?.complete && !isRunning);
 
-  // Hydrate once per mount. Refetch polling must not overwrite edits made before Start.
+  // State is initialized during SSR, so browser preferences must be loaded after mount.
   useEffect(() => {
-    if (!s || hydratedFromServer.current) return;
-    const serverHasSession = s.running || s.batches_ingested > 0 || Boolean(s.last_result);
-    if (serverHasSession) {
+    const preferences = loadPreferences();
+    setBatchSize(preferences.batchSize);
+    setIntervalSec(preferences.interval);
+    setLoop(preferences.loop);
+    setReset(preferences.reset);
+    setAutoTicket(preferences.autoTicket);
+    setTicketEvery(preferences.ticketEvery);
+    setTicketMaxSpikes(preferences.ticketMaxSpikes);
+    setPreferencesReady(true);
+  }, []);
+
+  // A running stream is authoritative. A stopped stream must not overwrite saved edits.
+  useEffect(() => {
+    if (!s || !preferencesReady) return;
+    if (s.running && !wasRunning.current) {
       setBatchSize(s.batch_size);
       setIntervalSec(s.interval_seconds);
       setLoop(s.loop);
@@ -105,11 +125,11 @@ export default function LiveStreamPanel() {
       setTicketMaxSpikes(s.ticket_max_spikes);
     }
     if (s.last_result?.complete && !s.running) setReset(true);
-    hydratedFromServer.current = true;
-  }, [s]);
+    wasRunning.current = s.running;
+  }, [preferencesReady, s]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !preferencesReady) return;
     const preferences: LiveStreamPreferences = {
       batchSize,
       interval,
@@ -120,7 +140,16 @@ export default function LiveStreamPanel() {
       ticketMaxSpikes,
     };
     window.localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
-  }, [autoTicket, batchSize, interval, loop, reset, ticketEvery, ticketMaxSpikes]);
+  }, [
+    autoTicket,
+    batchSize,
+    interval,
+    loop,
+    preferencesReady,
+    reset,
+    ticketEvery,
+    ticketMaxSpikes,
+  ]);
 
   useEffect(() => {
     if (s?.last_result?.complete && !isRunning) setReset(true);
@@ -172,7 +201,8 @@ export default function LiveStreamPanel() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Không thể tắt live stream"),
   });
 
-  const isBusy = statusQuery.isFetching || startMutation.isPending || stopMutation.isPending;
+  const isBusy =
+    !preferencesReady || statusQuery.isLoading || startMutation.isPending || stopMutation.isPending;
 
   return (
     <div className="space-y-5">
@@ -192,11 +222,16 @@ export default function LiveStreamPanel() {
         {s && (
           <>
             <span className="text-xs text-muted-foreground">
-              Batch {s.batches_ingested} · offset {s.offset}
+              {s.batch_running
+                ? `Đang xử lý batch ${s.batches_ingested + 1}`
+                : `Đã xong ${s.batches_ingested} batch`}{" "}
+              · offset {s.offset}
             </span>
             {s.last_result && (
               <span className="text-xs text-muted-foreground">
-                Batch cuối: +{s.last_result.inserted} inserted, {s.last_result.skipped} skipped
+                Batch cuối: +{s.last_result.inserted} inserted,{" "}
+                {s.last_result.failed ?? s.last_result.skipped ?? 0} lỗi
+                {s.last_result.duration_seconds != null && ` · ${s.last_result.duration_seconds}s`}
                 {s.last_result.complete && " · Hết data"}
               </span>
             )}

@@ -53,12 +53,19 @@ def build_feedback_payload(row: dict, user_id: str) -> dict | None:
     }
     return payload
 
-def _process_and_insert_batch(db: Client, payload_batch: list[dict]):
+def _process_and_insert_batch(
+    db: Client,
+    payload_batch: list[dict],
+    *,
+    defer_llm_scoring: bool = False,
+):
     if not payload_batch:
         return
         
     # 1. Lọc ra các feedback Negative cần gọi LLM
-    negative_payloads = [p for p in payload_batch if p["sentiment"] == "negative"]
+    negative_payloads = [] if defer_llm_scoring else [
+        p for p in payload_batch if p["sentiment"] == "negative"
+    ]
     
     # 2. Xử lý Caching (Tầng 3)
     to_score_llm = []
@@ -112,7 +119,14 @@ def _process_and_insert_batch(db: Client, payload_batch: list[dict]):
     db.table("feedback").insert(payload_batch).execute()
 
 
-def ingest_dataset(json_path: str, limit: int | None = None, batch_size: int = 150, offset: int = 0):
+def ingest_dataset(
+    json_path: str,
+    limit: int | None = None,
+    batch_size: int = 150,
+    offset: int = 0,
+    *,
+    defer_llm_scoring: bool = False,
+):
     if not has_supabase_admin_key():
         return {
             "success": False,
@@ -154,7 +168,11 @@ def ingest_dataset(json_path: str, limit: int | None = None, batch_size: int = 1
                 continue
             payload_batch.append(payload)
             if len(payload_batch) >= batch_size:
-                _process_and_insert_batch(db, payload_batch)
+                _process_and_insert_batch(
+                    db,
+                    payload_batch,
+                    defer_llm_scoring=defer_llm_scoring,
+                )
                 inserted_count += len(payload_batch)
                 batch_count += 1
                 payload_batch = []
@@ -164,7 +182,11 @@ def ingest_dataset(json_path: str, limit: int | None = None, batch_size: int = 1
 
     if payload_batch:
         try:
-            _process_and_insert_batch(db, payload_batch)
+            _process_and_insert_batch(
+                db,
+                payload_batch,
+                defer_llm_scoring=defer_llm_scoring,
+            )
             inserted_count += len(payload_batch)
             batch_count += 1
         except Exception as e:
@@ -188,6 +210,7 @@ def ingest_dataset(json_path: str, limit: int | None = None, batch_size: int = 1
         "next_offset": offset + len(records_to_process),
         "total_rows": len(data),
         "complete": offset + len(records_to_process) >= len(data),
+        "llm_scoring_deferred": defer_llm_scoring,
     }
 
 if __name__ == "__main__":

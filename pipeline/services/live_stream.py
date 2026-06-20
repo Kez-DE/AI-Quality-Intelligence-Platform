@@ -15,7 +15,7 @@ live_stream_state: dict[str, Any] = {
     "running": False,
     "offset": 0,
     "batch_size": int(os.getenv("LIVE_STREAM_BATCH_SIZE", "150")),
-    "interval_seconds": int(os.getenv("LIVE_STREAM_INTERVAL_SECONDS", "10")),
+    "interval_seconds": int(os.getenv("LIVE_STREAM_INTERVAL_SECONDS", "5")),
     "loop": os.getenv("LIVE_STREAM_LOOP", "false").lower() == "true",
     "auto_ticket": os.getenv("AUTO_TICKET_ENABLED", "true").lower() == "true",
     "ticket_every_batches": int(os.getenv("AUTO_TICKET_EVERY_BATCHES", "2")),
@@ -23,6 +23,9 @@ live_stream_state: dict[str, Any] = {
     "ticket_max_spikes": int(os.getenv("AUTO_TICKET_MAX_SPIKES", "6")),
     "ticket_running": False,
     "batches_ingested": 0,
+    "batch_running": False,
+    "last_batch_started_at": None,
+    "last_batch_completed_at": None,
     "last_ticket_result": None,
     "last_ticket_error": None,
     "last_ticket_at": None,
@@ -119,6 +122,8 @@ def _live_stream_tick():
             return
         offset = int(live_stream_state["offset"])
         batch_size = int(live_stream_state["batch_size"])
+        live_stream_state["batch_running"] = True
+        live_stream_state["last_batch_started_at"] = datetime.now(timezone.utc).isoformat()
 
     try:
         result = ingest_dataset(
@@ -126,10 +131,13 @@ def _live_stream_tick():
             limit=batch_size,
             batch_size=batch_size,
             offset=offset,
+            defer_llm_scoring=True,
         )
         with live_stream_lock:
             live_stream_state["last_result"] = result
             live_stream_state["last_error"] = None
+            live_stream_state["batch_running"] = False
+            live_stream_state["last_batch_completed_at"] = datetime.now(timezone.utc).isoformat()
             if result.get("success"):
                 live_stream_state["batches_ingested"] += 1
                 periodic_detection = (
@@ -163,6 +171,8 @@ def _live_stream_tick():
         with live_stream_lock:
             live_stream_state["last_error"] = str(exc)
             live_stream_state["running"] = False
+            live_stream_state["batch_running"] = False
+            live_stream_state["last_batch_completed_at"] = datetime.now(timezone.utc).isoformat()
         if scheduler and scheduler.get_job("live_feedback_stream"):
             scheduler.remove_job("live_feedback_stream")
 
@@ -190,6 +200,8 @@ def start_live_stream(
             live_stream_state["last_ticket_at"] = None
             live_stream_state["last_ticket_batch"] = None
             live_stream_state["final_detection_requested"] = False
+            live_stream_state["last_batch_started_at"] = None
+            live_stream_state["last_batch_completed_at"] = None
         live_stream_state["batch_size"] = batch_size
         live_stream_state["interval_seconds"] = interval_seconds
         live_stream_state["loop"] = loop
@@ -197,6 +209,7 @@ def start_live_stream(
         live_stream_state["ticket_every_batches"] = ticket_every_batches
         live_stream_state["ticket_max_spikes"] = ticket_max_spikes
         live_stream_state["running"] = True
+        live_stream_state["batch_running"] = False
         live_stream_state["ticket_running"] = False
         live_stream_state["last_error"] = None
 

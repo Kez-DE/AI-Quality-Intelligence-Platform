@@ -93,6 +93,49 @@ def test_completed_stream_schedules_final_ticket_detection():
         live_stream.set_scheduler(old_scheduler)
 
 
+def test_live_stream_ticks_defer_llm_scoring_and_advance_consecutively():
+    old_scheduler = live_stream.scheduler
+    old_state = dict(live_stream.live_stream_state)
+    fake_scheduler = FakeScheduler()
+
+    try:
+        live_stream.set_scheduler(fake_scheduler)
+        live_stream.live_stream_state.update({
+            "running": True,
+            "offset": 0,
+            "batch_size": 100,
+            "loop": False,
+            "auto_ticket": False,
+            "ticket_every_batches": 2,
+            "ticket_running": False,
+            "batches_ingested": 0,
+            "batch_running": False,
+        })
+
+        results = [
+            {"success": True, "complete": False, "next_offset": offset, "inserted": 100}
+            for offset in (100, 200, 300)
+        ]
+        with patch.object(live_stream, "ingest_dataset", side_effect=results) as ingest_mock:
+            for _ in results:
+                live_stream._live_stream_tick()
+
+        assert [call.kwargs["offset"] for call in ingest_mock.call_args_list] == [0, 100, 200]
+        assert all(
+            call.kwargs["defer_llm_scoring"] is True
+            for call in ingest_mock.call_args_list
+        )
+        assert live_stream.live_stream_state["batches_ingested"] == 3
+        assert live_stream.live_stream_state["offset"] == 300
+        assert live_stream.live_stream_state["batch_running"] is False
+        assert live_stream.live_stream_state["last_batch_started_at"] is not None
+        assert live_stream.live_stream_state["last_batch_completed_at"] is not None
+    finally:
+        live_stream.live_stream_state.clear()
+        live_stream.live_stream_state.update(old_state)
+        live_stream.set_scheduler(old_scheduler)
+
+
 def test_manual_stop_schedules_detection_for_unprocessed_batches():
     old_scheduler = live_stream.scheduler
     old_state = dict(live_stream.live_stream_state)

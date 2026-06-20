@@ -112,7 +112,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     live_stream_enabled: bool = Field(default=False, alias="LIVE_STREAM_ENABLED")
     live_stream_batch_size: int = Field(default=150, alias="LIVE_STREAM_BATCH_SIZE")
-    live_stream_interval_seconds: int = Field(default=10, alias="LIVE_STREAM_INTERVAL_SECONDS")
+    live_stream_interval_seconds: int = Field(default=5, alias="LIVE_STREAM_INTERVAL_SECONDS")
     live_stream_loop: bool = Field(default=False, alias="LIVE_STREAM_LOOP")
     live_stream_reset_on_start: bool = Field(default=False, alias="LIVE_STREAM_RESET_ON_START")
     auto_ticket_enabled: bool = Field(default=True, alias="AUTO_TICKET_ENABLED")
