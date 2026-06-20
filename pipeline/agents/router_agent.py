@@ -6,24 +6,25 @@ Khác bản origin:
 """
 
 import json
-from pathlib import Path
 from typing import Any, Dict
 import time
 
 from agents.common import log_agent_run
 from agents.schemas import RouterOutput
+from core.paths import TAXONOMY_DIR
 from departments import normalize_department
 
-# pipeline/agents/router_agent.py -> repo root = parent x3
-TAXONOMY_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "taxonomy"
 ROUTING_TABLE_PATH = TAXONOMY_DIR / "routing_table.json"
 
 
 def load_routing_table() -> Dict[str, Any]:
     if not ROUTING_TABLE_PATH.exists():
-        return {"routes": [], "default_team": "CSKH", "severity_overrides": []}
+        raise FileNotFoundError(f"Routing taxonomy not found: {ROUTING_TABLE_PATH}")
     with open(ROUTING_TABLE_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
+        config = json.load(f)
+    if not config.get("routes"):
+        raise ValueError(f"Routing taxonomy has no routes: {ROUTING_TABLE_PATH}")
+    return config
 
 
 def route_ticket(

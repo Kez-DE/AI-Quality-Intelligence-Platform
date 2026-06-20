@@ -11,3 +11,5 @@ async def test_health_endpoint():
         assert data["status"] == "ok"
         assert "version" in data
         assert "uptime_seconds" in data
+        assert data["routing_taxonomy_loaded"] is True
+        assert data["routing_routes"] == 7

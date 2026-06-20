@@ -1,4 +1,9 @@
-from agents.router_agent import route_ticket
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+
+from agents.router_agent import load_routing_table, route_ticket
 
 
 def _team(topic: str, severity: str, sentiment: str = "negative") -> str:
@@ -26,3 +31,9 @@ def test_valid_input_severity_becomes_ticket_priority():
 
 def test_unknown_topic_uses_cskh_default():
     assert _team("Unknown", "P2", "neutral") == "CSKH"
+
+
+def test_missing_routing_taxonomy_fails_instead_of_defaulting_everything_to_cskh():
+    with patch("agents.router_agent.ROUTING_TABLE_PATH", Path("/missing/routing_table.json")):
+        with pytest.raises(FileNotFoundError):
+            load_routing_table()

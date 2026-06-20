@@ -2,15 +2,13 @@
 
 import json
 from datetime import datetime, timedelta
-from pathlib import Path
 import time
 from typing import Any, Dict, List
 
 from agents.common import get_db, log_agent_run
 from agents.schemas import AlertOutput
+from core.paths import TAXONOMY_DIR
 
-# Taxonomy sống trong data/taxonomy/ ở repo root (layout phẳng: pipeline/agents -> ../../data)
-TAXONOMY_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "taxonomy"
 SEVERITY_RULES_PATH = TAXONOMY_DIR / "severity_rules.json"
 
 _DEFAULT_RULES = {

@@ -153,14 +153,21 @@ def read_root():
 @app.get("/health")
 def health_check():
     from core.paths import DEFAULT_DATA_FILE
+    from agents.router_agent import load_routing_table
     from pathlib import Path
     agent_info = get_agent_status()
+    try:
+        routing_routes = len(load_routing_table().get("routes", []))
+    except (FileNotFoundError, ValueError):
+        routing_routes = 0
     return {
         "status": "ok",
         "message": "Backend service is running",
         "version": "1.0.0",
         "uptime_seconds": int(time.time() - START_TIME),
         "data_file_exists": Path(DEFAULT_DATA_FILE).exists(),
+        "routing_taxonomy_loaded": routing_routes > 0,
+        "routing_routes": routing_routes,
         "llm_provider": agent_info.get("provider"),
         "llm_has_key": agent_info.get("has_key"),
     }
