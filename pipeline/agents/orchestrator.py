@@ -203,13 +203,6 @@ def run_full_cycle(hours: int = 24, max_feedback: int = 1000, max_spikes: int = 
     """
     pipeline_result = run_agent_pipeline(hours=hours)
 
-    # Thêm spike detection nếu cần
-    try:
-        from spike_detector import detect_spikes
-        spike_result = detect_spikes(max_feedback=max_feedback, max_spikes=max_spikes)
-        pipeline_result["spike_detection"] = spike_result
-    except Exception as exc:
-        pipeline_result["spike_detection"] = {"error": str(exc)[:200]}
 
     return pipeline_result
 

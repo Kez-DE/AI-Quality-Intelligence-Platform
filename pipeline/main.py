@@ -21,6 +21,7 @@ from clean import mask_pii
 from env_config import get_settings
 from core.paths import DEFAULT_DATA_FILE
 from departments import alert_department
+from agents.router_agent import route_ticket
 from services.agent_context import AGENT_SYSTEM_PROMPT, GUEST_SYSTEM_PROMPT, build_agent_data_context, build_agent_system_prompt
 from services.live_stream import get_live_stream_status, set_scheduler, start_live_stream, stop_live_stream
 from services.ticket_workflow import ticket_workflow_state
@@ -62,6 +63,23 @@ def _parse_timestamp(value: str | None) -> datetime | None:
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+def _feedback_team(feedback: dict) -> str:
+    """Resolve feedback ownership with the same rules used to create tickets."""
+    severity = feedback.get("severity", "P3")
+    try:
+        overall_risk = int(feedback.get("overall_risk"))
+        if 1 <= overall_risk <= 5:
+            severity = f"P{overall_risk}"
+    except (TypeError, ValueError):
+        pass
+    return route_ticket(
+        str(feedback.get("topic") or "Other"),
+        severity,
+        str(feedback.get("sentiment") or "neutral"),
+        log_run=False,
+    )["team"]
 
 
 @asynccontextmanager
@@ -157,20 +175,30 @@ def recent_feedback(
     """Đọc feedback gần nhất.
 
     - Guest: chỉ xem feedback của chính mình.
-    - Staff/Manager/Admin: xem toàn bộ + filter review queue.
+    - Staff/Manager: chỉ xem feedback được định tuyến về phòng của mình.
+    - Admin: xem toàn bộ feedback.
     """
     try:
         db = get_supabase()
         q = db.table("feedback").select("*")
+        feedback_team = None
+        fetch_limit = limit
         if user.role == "guest":
             # Guest chỉ xem feedback do chính mình gửi
             q = q.eq("user_id", user.id)
         else:
+            if user.role in ("staff", "manager"):
+                feedback_team = scoped_team(user, None)
+                fetch_limit = 500
             if needs_review is not None:
                 q = q.eq("needs_review", needs_review)
             if reviewed is not None:
                 q = q.eq("reviewed", reviewed)
-        data = q.order("created_at", desc=True).limit(limit).execute().data or []
+        data = q.order("created_at", desc=True).limit(fetch_limit).execute().data or []
+        if feedback_team:
+            data = [row for row in data if _feedback_team(row) == feedback_team][:limit]
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot read feedback: {str(exc)[:300]}") from exc
     return {"status": "success", "data": data}

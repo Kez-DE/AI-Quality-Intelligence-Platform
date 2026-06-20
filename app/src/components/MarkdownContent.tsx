@@ -1,22 +1,19 @@
-import type { ComponentType } from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-type MarkdownComponents = Record<string, ComponentType<any>>;
-
-const defaultComponents: MarkdownComponents = {
-  table: ({ children }: any) => (
+const defaultComponents: Components = {
+  table: ({ children }) => (
     <div className="my-3 overflow-x-auto rounded-lg border border-border bg-white shadow-sm">
       <table className="min-w-full border-collapse text-left text-sm">{children}</table>
     </div>
   ),
-  thead: ({ children }: any) => <thead className="bg-muted/70">{children}</thead>,
-  tbody: ({ children }: any) => <tbody className="divide-y divide-border">{children}</tbody>,
-  tr: ({ children }: any) => <tr className="divide-x divide-border align-top">{children}</tr>,
-  th: ({ children }: any) => (
+  thead: ({ children }) => <thead className="bg-muted/70">{children}</thead>,
+  tbody: ({ children }) => <tbody className="divide-y divide-border">{children}</tbody>,
+  tr: ({ children }) => <tr className="divide-x divide-border align-top">{children}</tr>,
+  th: ({ children }) => (
     <th className="whitespace-nowrap px-3 py-2 font-semibold text-xanh-deep">{children}</th>
   ),
-  td: ({ children }: any) => <td className="min-w-32 px-3 py-2 text-foreground/90">{children}</td>,
+  td: ({ children }) => <td className="min-w-32 px-3 py-2 text-foreground/90">{children}</td>,
 };
 
 function stripListPrefix(line: string): string {
@@ -121,15 +118,16 @@ export function MarkdownContent({
 }: {
   children?: string | null;
   className?: string;
-  components?: MarkdownComponents;
+  components?: Components;
 }) {
   return (
-    <ReactMarkdown
-      className={className}
-      remarkPlugins={[remarkGfm]}
-      components={{ ...defaultComponents, ...components }}
-    >
-      {normalizeMarkdownForRendering(children ?? "")}
-    </ReactMarkdown>
+    <div className={className}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{ ...defaultComponents, ...components }}
+      >
+        {normalizeMarkdownForRendering(children ?? "")}
+      </ReactMarkdown>
+    </div>
   );
 }

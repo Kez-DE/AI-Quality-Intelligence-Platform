@@ -45,10 +45,15 @@ def route_ticket(
     routing_config = load_routing_table()
 
     # 1. Severity override trước (Safety-first)
-    str_sev = str(severity).upper()
+    str_sev = str(severity).strip().upper()
+    formatted_sev = f"P{str_sev}" if str_sev.isdigit() else str_sev
+    if formatted_sev not in {"P1", "P2", "P3", "P4", "P5"}:
+        formatted_sev = None
+    input_hash = f"{topic}_{severity}"
+
     for override in routing_config.get("severity_overrides", []):
         ov_sev = str(override.get("severity", "")).upper()
-        if ov_sev == str_sev or (str_sev in {"5", "P5"} and ov_sev == "P5"):
+        if formatted_sev == ov_sev:
             output = RouterOutput(
                 team=normalize_department(override.get("team"), "Safety"),
                 sla_hours=override.get("sla_hours", 1),
@@ -59,12 +64,12 @@ def route_ticket(
             )
             if log_run:
                 log_agent_run(
-                    run_id=f"router_{int(time.time())}",
+                    run_id=f"route_{int(time.time())}",
                     agent_name="router_agent",
                     status="success",
                     latency_ms=int((time.time() - start_time) * 1000),
-                    output_summary=f"Routed to {output.team} (Override)",
-                    input_hash=f"{topic}_{severity}"
+                    output_summary=f"{output.team} (Sev Override)",
+                    input_hash=input_hash,
                 )
             return output.model_dump()
 
@@ -100,7 +105,7 @@ def route_ticket(
                 sla_hours=route.get("sla_hours", 24),
                 routed_by="router_agent (Topic Match)",
                 is_override=False,
-                priority=route.get("priority_default"),
+                priority=formatted_sev or route.get("priority_default"),
                 description=route.get("description"),
             )
             if log_run:
@@ -118,6 +123,7 @@ def route_ticket(
     output = RouterOutput(
         team=normalize_department(routing_config.get("default_team"), "CSKH"),
         sla_hours=24,
+        priority=formatted_sev or "P4",
         routed_by="router_agent (Default)",
         is_override=False,
     )

@@ -28,12 +28,17 @@ def get_supabase() -> Client:
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
-def _severity_number(value: object) -> int:
+def _severity_number(row: dict) -> int:
     try:
-        return int(str(value).upper().lstrip("P"))
+        overall_risk = int(row.get("overall_risk"))
+        if 1 <= overall_risk <= 5:
+            return overall_risk
+    except (TypeError, ValueError):
+        pass
+    try:
+        return int(str(row.get("severity", "0")).upper().lstrip("P"))
     except (TypeError, ValueError):
         return 0
-
 
 def _group_threshold(group: dict) -> int | None:
     max_severity = group["max_severity"]
@@ -119,7 +124,7 @@ def detect_spikes(
 
     response = (
         db.table("feedback")
-        .select("id,text,area,severity,topic,sentiment")
+        .select("id,text,area,severity,overall_risk,topic,sentiment")
         .gte("created_at", since)
         .order("created_at", desc=True)
         .limit(max_feedback)
@@ -134,8 +139,9 @@ def detect_spikes(
         area = str(row.get("area") or "Unknown")
         topic = str(row.get("topic") or "Other")
         sentiment = str(row.get("sentiment") or "neutral").lower()
-        severity = _severity_number(row.get("severity"))
-        route = route_ticket(topic, row.get("severity", "P3"), sentiment, log_run=False)
+        severity = _severity_number(row)
+        effective_severity = f"P{severity}" if severity else row.get("severity", "P3")
+        route = route_ticket(topic, effective_severity, sentiment, log_run=False)
         team = route["team"]
         ticket_type = "opportunity" if team == "Marketing" and sentiment == "positive" else "incident"
         key = (area, topic, team, ticket_type)
@@ -201,8 +207,8 @@ def detect_spikes(
             analysis.get("description", "Không có mô tả chi tiết")
             + f"\n\n**Action Plan:** {analysis.get('action', '')}"
             + f"\n**Assigned Team:** {route['team']}"
-            + f"\n**Priority:** {route.get('priority') or ''}"
-            + f"\n**Routing Note:** {route.get('description') or ''}"
+            + f"\n**Priority:** {route.get('priority') or 'P3'}"
+            + f"\n**Routing Note:** {route.get('description') or 'Không có ghi chú'}"
         )
         severity = f"P{max(1, group['max_severity'])}"
         result = create_or_update_ticket(

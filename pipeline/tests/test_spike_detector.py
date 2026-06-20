@@ -42,6 +42,34 @@ class TestSpikeDetector(unittest.TestCase):
 
         self.assertEqual([group["team"] for group in selected], ["Safety", "IT", "Marketing"])
 
+    @patch("spike_detector.create_or_update_ticket")
+    @patch("spike_detector.analyze_spike")
+    @patch("spike_detector.get_supabase")
+    @patch("spike_detector.has_supabase_admin_key", return_value=True)
+    def test_overall_risk_drives_safety_override(
+        self,
+        _mock_has_key,
+        mock_get_supabase,
+        mock_analyze_spike,
+        mock_create_ticket,
+    ):
+        mock_get_supabase.return_value = _database([{
+            "id": "1",
+            "text": "Rủi ro nghiêm trọng",
+            "area": "HCM-Q1",
+            "severity": "P2",
+            "overall_risk": 5,
+            "topic": "Pricing",
+            "sentiment": "negative",
+        }])
+        mock_analyze_spike.return_value = {"title": "Rủi ro", "description": "Chi tiết", "action": "Xử lý"}
+        mock_create_ticket.return_value = {"action": "created"}
+
+        detect_spikes(max_spikes=1)
+
+        self.assertEqual(mock_create_ticket.call_args.kwargs["team"], "Safety")
+        self.assertEqual(mock_create_ticket.call_args.kwargs["severity"], "P5")
+
     @patch("spike_detector.get_supabase")
     @patch("spike_detector.has_supabase_admin_key", return_value=True)
     def test_no_spike_when_low_risk_counts_are_low(self, _mock_has_key, mock_get_supabase):

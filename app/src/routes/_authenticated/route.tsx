@@ -40,6 +40,11 @@ export const Route = createFileRoute("/_authenticated")({
       throw redirect({ to: "/dashboard" });
     }
 
+    // Route Guard for Staff/Manager
+    if ((role === "staff" || role === "manager") && location.pathname.startsWith("/admin")) {
+      throw redirect({ to: "/dashboard" });
+    }
+
     return { user: data.user, role };
   },
   component: () => (
