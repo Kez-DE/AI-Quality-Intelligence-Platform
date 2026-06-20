@@ -10,6 +10,7 @@ import os
 import signal
 import sys
 import time
+from datetime import datetime, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -32,7 +33,7 @@ def run_pipeline():
         print(f"[agent-worker] Pipeline error: {exc}", file=sys.stderr, flush=True)
 
 
-def main():
+def build_scheduler() -> BackgroundScheduler:
     scheduler = BackgroundScheduler()
     scheduler.add_job(
         run_pipeline,
@@ -41,7 +42,13 @@ def main():
         id="agent_pipeline",
         max_instances=1,
         coalesce=True,
+        next_run_time=datetime.now(timezone.utc),
     )
+    return scheduler
+
+
+def main():
+    scheduler = build_scheduler()
     scheduler.start()
 
     should_stop = False
