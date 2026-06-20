@@ -60,6 +60,41 @@ def _is_duplicate(recent_alerts: list[dict], *, area: str, team: str, topic: str
     return False
 
 
+def _select_candidates(candidates: list[dict], recent_alerts: list[dict], limit: int) -> list[dict]:
+    """Select the highest-risk group per department before filling remaining slots."""
+    viable = [
+        group
+        for group in candidates
+        if not _is_duplicate(
+            recent_alerts,
+            area=group["area"],
+            team=group["team"],
+            topic=group["topic"],
+        )
+    ]
+    selected: list[dict] = []
+    selected_ids: set[int] = set()
+    selected_teams: set[str] = set()
+
+    # candidates đã sort theo severity/volume, nên item đầu mỗi team là ưu tiên nhất.
+    for group in viable:
+        if group["team"] in selected_teams:
+            continue
+        selected.append(group)
+        selected_ids.add(id(group))
+        selected_teams.add(group["team"])
+        if len(selected) >= limit:
+            return selected
+
+    for group in viable:
+        if id(group) in selected_ids:
+            continue
+        selected.append(group)
+        if len(selected) >= limit:
+            break
+    return selected
+
+
 def detect_spikes(
     hours: int = 1,
     max_feedback: int = 1000,
@@ -147,18 +182,7 @@ def detect_spikes(
     except Exception:
         recent_alerts = []
 
-    selected = []
-    for group in candidates:
-        if _is_duplicate(
-            recent_alerts,
-            area=group["area"],
-            team=group["team"],
-            topic=group["topic"],
-        ):
-            continue
-        selected.append(group)
-        if len(selected) >= max_spikes:
-            break
+    selected = _select_candidates(candidates, recent_alerts, max_spikes)
 
     profiles_res = db.table("profiles").select("id").limit(1).execute()
     user_id = profiles_res.data[0]["id"] if profiles_res.data else None
@@ -207,6 +231,8 @@ def detect_spikes(
     return {
         "spikes_detected": len(selected),
         "candidate_spikes": len(candidates),
+        "candidate_teams": dict(Counter(group["team"] for group in candidates)),
+        "selected_teams": dict(Counter(group["team"] for group in selected)),
         "alerts_created": alerts_created,
         "records_scanned": len(data),
         "groups_scanned": len(groups),

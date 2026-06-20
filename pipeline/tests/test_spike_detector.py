@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from spike_detector import detect_spikes
+from spike_detector import _select_candidates, detect_spikes
 
 
 def _query(data):
@@ -30,6 +30,18 @@ def _database(feedback, alerts=None):
 
 
 class TestSpikeDetector(unittest.TestCase):
+    def test_candidate_selection_prioritizes_department_coverage(self):
+        candidates = [
+            {"area": "A", "topic": "Safety", "team": "Safety"},
+            {"area": "B", "topic": "Safety", "team": "Safety"},
+            {"area": "C", "topic": "App Issue", "team": "IT"},
+            {"area": "D", "topic": "Other", "team": "Marketing"},
+        ]
+
+        selected = _select_candidates(candidates, recent_alerts=[], limit=3)
+
+        self.assertEqual([group["team"] for group in selected], ["Safety", "IT", "Marketing"])
+
     @patch("spike_detector.get_supabase")
     @patch("spike_detector.has_supabase_admin_key", return_value=True)
     def test_no_spike_when_low_risk_counts_are_low(self, _mock_has_key, mock_get_supabase):
