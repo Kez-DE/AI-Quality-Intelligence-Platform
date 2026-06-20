@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity, AlertTriangle, Loader2, Play, RefreshCw, RotateCcw, Square } from "lucide-react";
 import { toast } from "sonner";
@@ -22,15 +22,62 @@ export type LiveStreamStatus = {
   last_ticket_error: string | null;
 };
 
+type LiveStreamPreferences = {
+  batchSize: number;
+  interval: number;
+  loop: boolean;
+  reset: boolean;
+  autoTicket: boolean;
+  ticketEvery: number;
+  ticketMaxSpikes: number;
+};
+
+const PREFERENCES_KEY = "live-stream-preferences-v1";
+const DEFAULT_PREFERENCES: LiveStreamPreferences = {
+  batchSize: 150,
+  interval: 10,
+  loop: false,
+  reset: false,
+  autoTicket: true,
+  ticketEvery: 2,
+  ticketMaxSpikes: 6,
+};
+
+function loadPreferences(): LiveStreamPreferences {
+  if (typeof window === "undefined") return DEFAULT_PREFERENCES;
+  try {
+    const stored = JSON.parse(
+      window.localStorage.getItem(PREFERENCES_KEY) ?? "{}",
+    ) as Partial<LiveStreamPreferences>;
+    return {
+      batchSize: clamp(Number(stored.batchSize ?? DEFAULT_PREFERENCES.batchSize), 1, 500),
+      interval: clamp(Number(stored.interval ?? DEFAULT_PREFERENCES.interval), 1, 3600),
+      loop: stored.loop ?? DEFAULT_PREFERENCES.loop,
+      reset: stored.reset ?? DEFAULT_PREFERENCES.reset,
+      autoTicket: stored.autoTicket ?? DEFAULT_PREFERENCES.autoTicket,
+      ticketEvery: clamp(Number(stored.ticketEvery ?? DEFAULT_PREFERENCES.ticketEvery), 1, 100),
+      ticketMaxSpikes: clamp(
+        Number(stored.ticketMaxSpikes ?? DEFAULT_PREFERENCES.ticketMaxSpikes),
+        1,
+        10,
+      ),
+    };
+  } catch {
+    return DEFAULT_PREFERENCES;
+  }
+}
+
 export default function LiveStreamPanel() {
   const qc = useQueryClient();
-  const [batchSize, setBatchSize] = useState(150);
-  const [interval, setIntervalSec] = useState(10);
-  const [loop, setLoop] = useState(false);
-  const [reset, setReset] = useState(true);
-  const [autoTicket, setAutoTicket] = useState(true);
-  const [ticketEvery, setTicketEvery] = useState(2);
-  const [ticketMaxSpikes, setTicketMaxSpikes] = useState(6);
+  const [initialPreferences] = useState(loadPreferences);
+  const [batchSize, setBatchSize] = useState(initialPreferences.batchSize);
+  const [interval, setIntervalSec] = useState(initialPreferences.interval);
+  const [loop, setLoop] = useState(initialPreferences.loop);
+  const [reset, setReset] = useState(initialPreferences.reset);
+  const [autoTicket, setAutoTicket] = useState(initialPreferences.autoTicket);
+  const [ticketEvery, setTicketEvery] = useState(initialPreferences.ticketEvery);
+  const [ticketMaxSpikes, setTicketMaxSpikes] = useState(initialPreferences.ticketMaxSpikes);
+  const hydratedFromServer = useRef(false);
 
   const statusQuery = useQuery({
     queryKey: ["live-stream-status"],
@@ -44,6 +91,36 @@ export default function LiveStreamPanel() {
   const s = statusQuery.data;
   const isRunning = s?.running ?? false;
   const isComplete = Boolean(s?.last_result?.complete && !isRunning);
+
+  // Hydrate once per mount. Refetch polling must not overwrite edits made before Start.
+  useEffect(() => {
+    if (!s || hydratedFromServer.current) return;
+    const serverHasSession = s.running || s.batches_ingested > 0 || Boolean(s.last_result);
+    if (serverHasSession) {
+      setBatchSize(s.batch_size);
+      setIntervalSec(s.interval_seconds);
+      setLoop(s.loop);
+      setAutoTicket(s.auto_ticket);
+      setTicketEvery(s.ticket_every_batches);
+      setTicketMaxSpikes(s.ticket_max_spikes);
+    }
+    if (s.last_result?.complete && !s.running) setReset(true);
+    hydratedFromServer.current = true;
+  }, [s]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const preferences: LiveStreamPreferences = {
+      batchSize,
+      interval,
+      loop,
+      reset,
+      autoTicket,
+      ticketEvery,
+      ticketMaxSpikes,
+    };
+    window.localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
+  }, [autoTicket, batchSize, interval, loop, reset, ticketEvery, ticketMaxSpikes]);
 
   useEffect(() => {
     if (s?.last_result?.complete && !isRunning) setReset(true);
@@ -67,6 +144,13 @@ export default function LiveStreamPanel() {
     },
     onSuccess: (data) => {
       qc.setQueryData(["live-stream-status"], data);
+      setBatchSize(data.batch_size);
+      setIntervalSec(data.interval_seconds);
+      setLoop(data.loop);
+      setAutoTicket(data.auto_ticket);
+      setTicketEvery(data.ticket_every_batches);
+      setTicketMaxSpikes(data.ticket_max_spikes);
+      setReset(false);
       toast.success("Live stream đã bật");
       qc.invalidateQueries({ queryKey: ["live-stream-status"] });
     },
