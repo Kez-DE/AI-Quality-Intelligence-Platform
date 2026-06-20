@@ -1058,14 +1058,21 @@ def run_multi_agent_pipeline(
 @app.post("/api/agent/generate-report")
 def trigger_daily_report(
     team: str,
-    _: AuthUser = Depends(require_admin),
+    user: AuthUser = Depends(require_ops_staff),
 ):
-    """Kích hoạt sinh báo cáo tự động cho 1 phòng ban (admin only)."""
+    """Generate the latest report; managers are restricted to their department."""
+    if user.role not in {"admin", "manager"}:
+        raise HTTPException(status_code=403, detail="Chỉ Manager hoặc Admin được tạo báo cáo.")
+    effective_team = scoped_team(user, team)
+    if not effective_team:
+        raise HTTPException(status_code=400, detail="Vui lòng chọn phòng ban cần tạo báo cáo.")
     from agents.task_agent import generate_daily_report
     try:
-        result = generate_daily_report(team)
+        result = generate_daily_report(effective_team)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Report generation error: {str(exc)[:300]}") from exc
+    if result.get("status") == "error":
+        raise HTTPException(status_code=502, detail=result.get("error", "Report generation failed"))
     return {"status": "success", "data": result}
 
 @app.get("/api/health/services")

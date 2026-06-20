@@ -1,6 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, FileText, Calendar, Building2, CheckCircle2, ClipboardCopy } from "lucide-react";
+import {
+  Loader2,
+  FileText,
+  Calendar,
+  Building2,
+  CheckCircle2,
+  ClipboardCopy,
+  Sparkles,
+} from "lucide-react";
 import { toast } from "sonner";
 import { ALL_TEAMS, useMe, apiFetch, isUnassignedOps } from "@/lib/api";
 import { NoDepartmentNotice } from "@/components/NoDepartmentNotice";
@@ -24,6 +32,7 @@ type Report = {
 function ReportsPage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<string>("All");
   const { data: me } = useMe();
   const isManager = me?.role === "admin" || me?.role === "manager";
@@ -103,6 +112,32 @@ function ReportsPage() {
     }
   }
 
+  async function handleGenerateReport() {
+    const team = isAdmin ? selectedTeam : me?.department;
+    if (!team || team === "All") {
+      toast.error("Vui lòng chọn một phòng ban cụ thể.");
+      return;
+    }
+    setGenerating(true);
+    try {
+      const json = await apiFetch<{
+        data: { status: string; stored?: boolean; reason?: string };
+      }>(`/api/agent/generate-report?team=${encodeURIComponent(team)}`, { method: "POST" });
+      if (json.data.reason === "approved_report_locked") {
+        toast.error("Báo cáo hôm nay đã được duyệt nên không thể ghi đè.");
+      } else if (json.data.status === "skipped") {
+        toast.error("Phòng ban chưa có feedback để tạo báo cáo.");
+      } else {
+        toast.success("Đã tạo báo cáo mới nhất.");
+      }
+      await loadData(selectedTeam);
+    } catch {
+      toast.error("Không thể tạo báo cáo mới.");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   const teams = ["All", ...ALL_TEAMS];
   return (
     <div className="mx-auto max-w-6xl space-y-6 animate-in fade-in slide-in-from-bottom-2">
@@ -117,29 +152,49 @@ function ReportsPage() {
           </p>
         </div>
 
-        {isAdmin ? (
-          <div className="flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-            <select
-              className="border-border bg-white text-sm rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-xanh-green/50"
-              value={selectedTeam}
-              onChange={(e) => setSelectedTeam(e.target.value)}
-            >
-              {teams.map((t) => (
-                <option key={t} value={t}>
-                  {t === "All" ? "Tất cả phòng ban" : `Phòng ${t}`}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : (
-          me?.department && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Building2 className="h-4 w-4" />
-              Phòng {me.department}
+        <div className="flex flex-wrap items-center gap-2">
+          {isAdmin ? (
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+              <select
+                className="border-border bg-white text-sm rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-xanh-green/50"
+                value={selectedTeam}
+                onChange={(e) => setSelectedTeam(e.target.value)}
+              >
+                {teams.map((t) => (
+                  <option key={t} value={t}>
+                    {t === "All" ? "Tất cả phòng ban" : `Phòng ${t}`}
+                  </option>
+                ))}
+              </select>
             </div>
-          )
-        )}
+          ) : (
+            me?.department && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Building2 className="h-4 w-4" />
+                Phòng {me.department}
+              </div>
+            )
+          )}
+          <button
+            type="button"
+            onClick={handleGenerateReport}
+            disabled={generating || (isAdmin && selectedTeam === "All")}
+            title={
+              isAdmin && selectedTeam === "All"
+                ? "Chọn một phòng ban để tạo báo cáo"
+                : "Tạo báo cáo mới nhất"
+            }
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-xanh-deep px-4 text-sm font-semibold text-white transition-colors hover:bg-xanh-deep/90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {generating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4" />
+            )}
+            Tạo báo cáo mới
+          </button>
+        </div>
       </div>
 
       {loading ? (
