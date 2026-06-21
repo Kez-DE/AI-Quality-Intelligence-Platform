@@ -18,12 +18,15 @@ def calculate_overall_risk(
     """Thuật toán Max-Pooling Rule-based Waterfall (Thác rơi ưu tiên rủi ro cao nhất).
     Quy đổi 5 vector rủi ro (thang 0-10) ra điểm cảnh báo chung (Thang 1-5).
     """
-    # BẬC 5: KHẨN CẤP (🚨)
-    if risk_safety >= 8 or risk_fraud >= 8: 
+    # BẬC 5: KHẨN CẤP (🚨) — CHỈ rủi ro AN TOÀN tính mạng mới lên P5.
+    # Bất biến hệ thống: P5 ⟹ routing ép về team Safety (Safety-first). Vì vậy
+    # gian lận (fraud) — tuy nghiêm trọng nhưng là vấn đề tài chính — KHÔNG lên P5,
+    # nếu không ticket Payment sẽ bị định tuyến nhầm sang Safety. Fraud nặng -> P4.
+    if risk_safety >= 8:
         return 5
 
-    # BẬC 4: NGUY HIỂM (🔴)
-    if risk_safety >= 5 or risk_fraud >= 5 or risk_attitude >= 8: 
+    # BẬC 4: NGUY HIỂM (🔴) — gian lận nặng, an toàn mức vừa, thái độ rất nặng.
+    if risk_fraud >= 8 or risk_safety >= 5 or risk_fraud >= 5 or risk_attitude >= 8:
         return 4
 
     # BẬC 3: RỦI RO TRUNG BÌNH (🟠)
