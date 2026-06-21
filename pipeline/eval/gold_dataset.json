@@ -1,66 +1,242 @@
 [
     {
+        "id": "safety-001",
         "text": "Tài xế đi ẩu vượt đèn đỏ suýt đâm người ở Cầu Giấy, thái độ lại còn lồi lõm khi bị nhắc",
-        "expected": {
-            "topic": "Safety",
-            "sentiment": "negative",
-            "severity": "P5"
-        }
+        "expected": { "topic": "Safety", "sentiment": "negative", "severity": "P5" },
+        "note": "Lái nguy hiểm 'vượt đèn đỏ'/'suýt đâm' KHÔNG có trong SAFETY_KEYWORDS -> hiện bị rớt sang Driver Behavior. Ca lỗi điển hình."
     },
     {
-        "text": "App lag quá, cứ ấn xác nhận cuốc là bị văng ra ngoài, mãi không đặt được xe",
-        "expected": {
-            "topic": "App Issue",
-            "sentiment": "negative",
-            "severity": "P3"
-        }
+        "id": "safety-002",
+        "text": "Tài xế phóng như bay, lạng lách đánh võng giữa đường, mình sợ phát khóc",
+        "expected": { "topic": "Safety", "sentiment": "negative", "severity": "P5" },
+        "note": "'lạng lách'/'đánh võng' chỉ có trong safety_keywords.json (ML) chứ không có trong rules.py -> bị nhầm Driver Behavior."
     },
     {
+        "id": "safety-003",
+        "text": "Bác tài vừa lái vừa bấm điện thoại nhắn tin trên cao tốc, rất nguy hiểm",
+        "expected": { "topic": "Safety", "sentiment": "negative", "severity": "P5" },
+        "note": "'nguy hiểm' có trong rule -> ca này nên ĐÚNG. Dùng làm mốc đối chứng (control)."
+    },
+    {
+        "id": "safety-004",
+        "text": "Tài xế đi ngược chiều trên đường một chiều cho nhanh, hú hồn cả xe",
+        "expected": { "topic": "Safety", "sentiment": "negative", "severity": "P5" },
+        "note": "'ngược chiều' thiếu trong rules.py -> dễ rớt xuống Other/Driver."
+    },
+    {
+        "id": "safety-005",
+        "text": "Xe chạy quá tốc độ, kim đồng hồ lên hơn 100 trong phố, tôi xin giảm mà tài xế không nghe",
+        "expected": { "topic": "Safety", "sentiment": "negative", "severity": "P5" },
+        "note": "'quá tốc độ' thiếu trong rules.py."
+    },
+    {
+        "id": "safety-006",
+        "text": "Tài xế nồng nặc mùi rượu bia, nói lè nhè, tôi phải xuống xe giữa đường",
+        "expected": { "topic": "Safety", "sentiment": "negative", "severity": "P5" },
+        "note": "rules.py có 'say rượu'/'say xỉn' nhưng KHÔNG có 'rượu bia' -> miss."
+    },
+    {
+        "id": "safety-007",
+        "text": "Hai xe va chạm ở ngã tư, tôi bị xây xát nhẹ, cần hỗ trợ gấp",
+        "expected": { "topic": "Safety", "sentiment": "negative", "severity": "P5" },
+        "note": "rules có 'tai nạn'/'đụng xe'/'tông' nhưng KHÔNG có 'va chạm' -> miss."
+    },
+    {
+        "id": "safety-008",
+        "text": "Tài xế phanh gấp liên tục làm tôi đập đầu vào ghế trước, choáng váng",
+        "expected": { "topic": "Safety", "sentiment": "negative", "severity": "P5" },
+        "note": "'phanh gấp' thiếu trong rules.py -> rớt sang Other."
+    },
+    {
+        "id": "safety-009",
+        "text": "Tài xế vừa lái vừa ngủ gật, xe đảo hẳn sang làn bên cạnh mấy lần",
+        "expected": { "topic": "Safety", "sentiment": "negative", "severity": "P5" },
+        "note": "Lái nguy hiểm mô tả gián tiếp, không có keyword cứng -> ML phải gánh, dễ sai."
+    },
+    {
+        "id": "safety-010",
+        "text": "Kết thúc chuyến tài xế nhắn tin làm quen rồi gửi ảnh phản cảm, quấy rối tôi suốt tối",
+        "expected": { "topic": "Safety", "sentiment": "negative", "severity": "P5" },
+        "note": "'quấy rối' có trong rule -> control case (nên đúng)."
+    },
+    {
+        "id": "safety-011",
+        "text": "Tài xế cố tình sờ soạng, đụng chạm khi tôi vừa lên xe",
+        "expected": { "topic": "Safety", "sentiment": "negative", "severity": "P5" },
+        "note": "'sờ soạng' có trong rule -> control case."
+    },
+    {
+        "id": "safety-012",
+        "text": "Tài xế đe doạ hành hung tôi khi tôi phàn nàn về quãng đường vòng vèo",
+        "expected": { "topic": "Safety", "sentiment": "negative", "severity": "P5" },
+        "note": "'đe doạ'/'hành hung' có trong rule -> control case."
+    },
+    {
+        "id": "safety-013",
+        "text": "Nửa đêm tài xế dừng xe chỗ vắng đòi thêm tiền, doạ bỏ tôi xuống nếu không đưa",
+        "expected": { "topic": "Safety", "sentiment": "negative", "severity": "P5" },
+        "note": "Đe doạ an toàn cá nhân + cưỡng ép. Ranh giới Safety vs Payment -> ưu tiên tính mạng = Safety."
+    },
+    {
+        "id": "safety-014",
+        "text": "Tài xế không cho tôi thắt dây an toàn vì bảo dây ngắn, lại còn chạy rất nhanh",
+        "expected": { "topic": "Safety", "sentiment": "negative", "severity": "P5" },
+        "note": "'không thắt dây' thiếu trong rules.py."
+    },
+    {
+        "id": "safety-neg-015",
+        "text": "Chuyến đi rất an toàn, tài xế chạy cẩn thận, không có gì nguy hiểm cả",
+        "expected": { "topic": "Driver Behavior", "sentiment": "positive", "severity": "P1" },
+        "note": "FALSE POSITIVE test: 'nguy hiểm' bị phủ định bởi 'không'. Safety rule không có negation guard -> hiện bắt nhầm thành Safety P5."
+    },
+    {
+        "id": "safety-neg-016",
+        "text": "May mà không xảy ra tai nạn gì, tài xế xử lý tình huống rất tốt",
+        "expected": { "topic": "Driver Behavior", "sentiment": "positive", "severity": "P1" },
+        "note": "FALSE POSITIVE test: 'tai nạn' bị phủ định -> không phải Safety."
+    },
+    {
+        "id": "driver-017",
+        "text": "Tài xế thái độ cộc cằn, quát mắng khi tôi hỏi sao đi đường này",
+        "expected": { "topic": "Driver Behavior", "sentiment": "negative", "severity": "P4" },
+        "note": "Thái độ xấu nhưng KHÔNG nguy hiểm -> phải là Driver Behavior, không phải Safety. Ranh giới quan trọng."
+    },
+    {
+        "id": "driver-018",
+        "text": "Bác tài nghe điện thoại nói chuyện riêng oang oang suốt chuyến, mặc kệ khách",
+        "expected": { "topic": "Driver Behavior", "sentiment": "negative", "severity": "P4" },
+        "note": "Thái độ/tác phong, không phải an toàn."
+    },
+    {
+        "id": "driver-019",
+        "text": "Tài xế không thân thiện chút nào, mặt lạnh tanh không chào hỏi",
+        "expected": { "topic": "Driver Behavior", "sentiment": "negative", "severity": "P4" },
+        "note": "Negation test: 'thân thiện' bị phủ định -> phải ra negative, không được ăn DRIVER_POSITIVE."
+    },
+    {
+        "id": "driver-020",
         "text": "Chuyến đi tuyệt vời, bác tài DRV-123 thân thiện, xe rất sạch sẽ thơm tho",
-        "expected": {
-            "topic": "Driver Behavior",
-            "sentiment": "positive",
-            "severity": "P1"
-        }
+        "expected": { "topic": "Driver Behavior", "sentiment": "positive", "severity": "P1" },
+        "note": "Khen tài xế -> positive P1."
     },
     {
-        "text": "Tại sao hôm nay giá xe lại cao thế? Bình thường đi từ đây lên sân bay mất có 250k mà nay báo 400k",
-        "expected": {
-            "topic": "Pricing",
-            "sentiment": "negative",
-            "severity": "P3"
-        }
-    },
-    {
-        "text": "Mình để quên túi đồ trên xe, gọi tổng đài nhờ hỗ trợ mà chờ mãi không ai nhấc máy",
-        "expected": {
-            "topic": "Delay",
-            "sentiment": "negative",
-            "severity": "P3"
-        }
-    },
-    {
+        "id": "driver-021",
         "text": "Xe điện đi rất êm, tài xế lái cẩn thận. Rất ưng ý với dịch vụ của Xanh",
-        "expected": {
-            "topic": "Driver Behavior",
-            "sentiment": "positive",
-            "severity": "P1"
-        }
+        "expected": { "topic": "Driver Behavior", "sentiment": "positive", "severity": "P1" },
+        "note": "Khen tài xế/dịch vụ -> positive P1."
     },
     {
+        "id": "app-022",
+        "text": "App lag quá, cứ ấn xác nhận cuốc là bị văng ra ngoài, mãi không đặt được xe",
+        "expected": { "topic": "App Issue", "sentiment": "negative", "severity": "P3" },
+        "note": "Lỗi app -> 'lag'/'văng ra' có trong APP_KEYWORDS."
+    },
+    {
+        "id": "app-023",
+        "text": "Mở app lên toàn màn hình trắng, không bấm được gì, phải gỡ cài lại",
+        "expected": { "topic": "App Issue", "sentiment": "negative", "severity": "P3" },
+        "note": "Lỗi app mô tả gián tiếp, ít keyword cứng."
+    },
+    {
+        "id": "app-024",
+        "text": "Bản đồ định vị sai vị trí đón, tài xế chạy lòng vòng tìm tôi mãi",
+        "expected": { "topic": "App Issue", "sentiment": "negative", "severity": "P3" },
+        "note": "Map/navigation gộp vào App Issue (không có topic Map riêng)."
+    },
+    {
+        "id": "app-025",
+        "text": "App dùng ổn, đặt xe nhanh gọn, không có gì để chê",
+        "expected": { "topic": "App Issue", "sentiment": "positive", "severity": "P1" },
+        "note": "Khen app -> positive. Negation 'không có gì để chê' không được lật thành negative."
+    },
+    {
+        "id": "payment-026",
         "text": "Hôm nay mình đặt xe thanh toán thẻ tín dụng nhưng app báo lỗi rồi lại trừ tiền 2 lần",
-        "expected": {
-            "topic": "Payment",
-            "sentiment": "negative",
-            "severity": "P4"
-        }
+        "expected": { "topic": "Payment", "sentiment": "negative", "severity": "P4" },
+        "note": "Thanh toán tiêu cực -> P4 theo severity_scale (nhóm Thanh toán)."
     },
     {
+        "id": "payment-027",
+        "text": "Bị trừ tiền dù tôi đã huỷ chuyến từ trước khi tài xế nhận cuốc",
+        "expected": { "topic": "Payment", "sentiment": "negative", "severity": "P4" },
+        "note": "Mất tiền -> Payment P4."
+    },
+    {
+        "id": "payment-028",
+        "text": "Tài xế tự ý bấm kết thúc chuyến sớm rồi thu thêm tiền mặt ngoài app",
+        "expected": { "topic": "Payment", "sentiment": "negative", "severity": "P4" },
+        "note": "Gian lận -> 'thu thêm' có trong PAYMENT_FRAUD_KEYWORDS, severity ép >=4."
+    },
+    {
+        "id": "payment-029",
+        "text": "Cho hỏi xe có nhận thanh toán bằng Momo không ạ?",
+        "expected": { "topic": "Payment", "sentiment": "neutral", "severity": "P2" },
+        "note": "Câu hỏi trung tính -> neutral P2. Test severity P2 và sentiment neutral."
+    },
+    {
+        "id": "pricing-030",
+        "text": "Tại sao hôm nay giá xe lại cao thế? Bình thường đi lên sân bay mất 250k mà nay báo 400k",
+        "expected": { "topic": "Pricing", "sentiment": "negative", "severity": "P3" },
+        "note": "Phản ánh giá -> Pricing P3."
+    },
+    {
+        "id": "pricing-031",
+        "text": "Giá giờ cao điểm tăng gấp đôi mà không hề báo trước, đắt vô lý",
+        "expected": { "topic": "Pricing", "sentiment": "negative", "severity": "P3" },
+        "note": "'tăng giá'/'đắt' -> Pricing."
+    },
+    {
+        "id": "delay-032",
+        "text": "Đợi xe hơn 30 phút mà tài xế vẫn chưa tới, gọi điện thì không nghe máy",
+        "expected": { "topic": "Delay", "sentiment": "negative", "severity": "P3" },
+        "note": "Chờ lâu -> Delay P3."
+    },
+    {
+        "id": "delay-033",
+        "text": "Ghép tài xế chậm kinh khủng, đứng giữa trưa nắng đợi mãi mới có xe nhận",
+        "expected": { "topic": "Delay", "sentiment": "negative", "severity": "P3" },
+        "note": "Trễ chuyến/ghép chậm -> Delay."
+    },
+    {
+        "id": "other-034",
+        "text": "Mình để quên túi đồ trên xe, gọi tổng đài nhờ hỗ trợ mà chờ mãi không ai nhấc máy",
+        "expected": { "topic": "Other", "sentiment": "negative", "severity": "P3" },
+        "note": "Để quên đồ + CSKH -> Other (không phải Delay). Sửa nhãn so với bản cũ."
+    },
+    {
+        "id": "other-035",
         "text": "Điều hoà trên xe hôm nay bị hỏng hay sao mà nóng phát ngất",
-        "expected": {
-            "topic": "Other",
-            "sentiment": "negative",
-            "severity": "P3"
-        }
+        "expected": { "topic": "Other", "sentiment": "negative", "severity": "P3" },
+        "note": "Không thuộc nhóm nào rõ -> Other."
+    },
+    {
+        "id": "other-036",
+        "text": "Tài xế giao đồ ăn để sai địa chỉ, đồ bị nguội hết khi tôi nhận",
+        "expected": { "topic": "Other", "sentiment": "negative", "severity": "P3" },
+        "note": "Giao hàng -> Other theo taxonomy."
+    },
+    {
+        "id": "neutral-037",
+        "text": "Cho hỏi tên tài xế chuyến vừa rồi để tôi xác nhận lại với ạ",
+        "expected": { "topic": "Other", "sentiment": "neutral", "severity": "P2" },
+        "note": "Hỏi thông tin -> neutral P2."
+    },
+    {
+        "id": "neg-negation-038",
+        "text": "App không tệ như tôi nghĩ, dùng cũng tạm ổn",
+        "expected": { "topic": "App Issue", "sentiment": "neutral", "severity": "P2" },
+        "note": "Negation 'không tệ' -> không được gán negative. Sentiment trung tính."
+    },
+    {
+        "id": "safety-driver-039",
+        "text": "Tài xế chạy ẩu vượt ẩu liên tục, tôi sợ tai nạn xảy ra mất",
+        "expected": { "topic": "Safety", "sentiment": "negative", "severity": "P5" },
+        "note": "Có 'tai nạn' -> nên ra Safety. Test ưu tiên Safety > Driver khi cùng xuất hiện."
+    },
+    {
+        "id": "safety-040",
+        "text": "Tài xế chở con tôi mà không có ghế trẻ em, còn ôm cua gấp mấy lần",
+        "expected": { "topic": "Safety", "sentiment": "negative", "severity": "P5" },
+        "note": "An toàn trẻ em + lái ẩu, không keyword cứng -> ca khó cho ML."
     }
 ]
