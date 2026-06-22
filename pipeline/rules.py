@@ -23,6 +23,17 @@ NEGATIONS = ["không", "ko", "k ", "chẳng", "chưa", "đừng", "chả"]
 
 # --- Nhóm keyword theo topic. Thứ tự ưu tiên: Safety > Payment > App > Supply > Driver > Pricing > Delay ---
 
+# Keyword thiết bị an toàn: với nhóm này, sự xuất hiện của PHỦ ĐỊNH lại nghĩa là
+# NGUY HIỂM HƠN ('không thắt dây', 'không cho đội mũ', 'không có ghế trẻ em'),
+# nên KHÔNG áp negation guard — luôn ép Safety + để human review (Safety-first).
+# Định nghĩa Ở ĐÂY (nguồn duy nhất) rồi nối vào SAFETY_KEYWORDS bên dưới để tránh
+# lặp danh sách và lệch nhau khi chỉnh sửa về sau.
+SAFETY_EQUIPMENT_KEYWORDS = [
+    "thắt dây", "that day", "dây an toàn", "day an toan", "ghế trẻ em",
+    "ghe tre em", "ghế an toàn", "ghe an toan", "không đội mũ", "khong doi mu",
+    "mũ bảo hiểm", "mu bao hiem",
+]
+
 SAFETY_KEYWORDS = [
     # Tai nạn / va chạm
     "tai nạn", "tai nan", "va chạm", "va cham", "xe tông", "xe tong", "tông",
@@ -33,10 +44,8 @@ SAFETY_KEYWORDS = [
     "vuot toc do", "tốc độ cao", "phóng nhanh", "phong nhanh", "phóng như bay",
     "phóng bạt mạng", "phanh gấp", "phanh gap", "thắng gấp", "thang gap",
     "ngủ gật", "ngu gat", "leo lề", "leo le", "lên vỉa hè", "ôm cua gấp",
-    # Thiết bị an toàn
-    "thắt dây", "that day", "dây an toàn", "day an toan", "ghế trẻ em",
-    "ghe tre em", "ghế an toàn", "ghe an toan", "không đội mũ", "khong doi mu",
-    "mũ bảo hiểm", "mu bao hiem",
+    # Thiết bị an toàn (nối từ SAFETY_EQUIPMENT_KEYWORDS — nguồn duy nhất)
+    *SAFETY_EQUIPMENT_KEYWORDS,
     # Chất kích thích
     "say xỉn", "say xin", "say rượu", "rượu bia", "ruou bia", "ma tuý", "ma tuy",
     # Quấy rối / bạo lực / đe doạ
@@ -45,15 +54,6 @@ SAFETY_KEYWORDS = [
     "đe doạ", "đe dọa", "de doa", "hăm doạ", "ham doa", "bạo lực", "bao luc",
     "doạ bỏ", "doa bo", "bỏ chạy", "bo chay", "bỏ giữa đường", "đuổi xuống xe",
     "nguy hiểm", "nguy hiem",
-]
-
-# Keyword thiết bị an toàn: với nhóm này, sự xuất hiện của PHỦ ĐỊNH lại nghĩa là
-# NGUY HIỂM HƠN ('không thắt dây', 'không cho đội mũ', 'không có ghế trẻ em'),
-# nên KHÔNG áp negation guard — luôn ép Safety + để human review (Safety-first).
-SAFETY_EQUIPMENT_KEYWORDS = [
-    "thắt dây", "that day", "dây an toàn", "day an toan", "ghế trẻ em",
-    "ghe tre em", "ghế an toàn", "ghe an toan", "không đội mũ", "khong doi mu",
-    "mũ bảo hiểm", "mu bao hiem",
 ]
 
 # Gian lận / mất tiền -> Payment, nghiêm trọng (có thể cần duyệt).
@@ -104,7 +104,9 @@ DRIVER_NEGATIVE_KEYWORDS = [
     "tài xế thái độ", "thái độ tài xế", "tài xế hỗn", "tài xế cộc", "tài xế chửi",
     "tài xế quát", "tài xế khó chịu", "lái ẩu", "lai au", "chạy ẩu", "chay au",
     "tài xế trễ", "tài xế đến muộn", "huỷ chuyến", "hủy chuyến", "huy chuyen",
-    "tài xế hủy", "tài xế từ chối", "phóng nhanh", "vượt ẩu", "vuot au",
+    "tài xế hủy", "tài xế từ chối", "vượt ẩu", "vuot au",
+    # 'phóng nhanh' cố ý CHỈ nằm ở SAFETY_KEYWORDS (lái nhanh = rủi ro an toàn) —
+    # không lặp ở đây để tránh dead code (Safety chạy trước nên không bao giờ tới đây).
     # Phủ định của cụm tích cực -> thái độ tiêu cực ('không thân thiện', 'ko lịch sự').
     "không thân thiện", "ko thân thiện", "khong than thien", "không lịch sự",
     "không nhiệt tình", "không chào hỏi", "mặt lạnh tanh", "thái độ kém",
