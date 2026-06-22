@@ -10,7 +10,7 @@ class CohereEmbeddingService:
             self.client = None
         else:
             self.client = cohere.Client(api_key=api_key)
-        self.model = "embed-multilingual-v3.0"
+        self.model = os.environ.get("COHERE_MODEL", "embed-multilingual-v3.0")
         
     def embed_texts(self, texts: List[str], input_type: str = "search_document") -> List[List[float]]:
         if self.client is None:
