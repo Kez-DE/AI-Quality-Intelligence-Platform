@@ -14,6 +14,7 @@ from typing import Optional
 from ingest import ingest_dataset
 from ingest import get_supabase
 from agent import chat_completion, get_agent_status, run_chat_agent
+from agent.rag_engine import rag_chat
 from auth_guard import AuthUser, can_view_team, get_current_user, require_admin, require_ops_staff, scoped_team
 from users_admin import router as users_router, audit_router
 from rate_limiter import RateLimiter, check_rate_limit
@@ -31,7 +32,7 @@ START_TIME = time.time()
 
 class ChatMessageReq(BaseModel):
     role: str
-    content: str = Field(..., max_length=2000)
+    content: str = Field(..., max_length=15000)
 
 
 class ChatReq(BaseModel):
@@ -663,17 +664,18 @@ def _append_safe_client_history(normalized: list[dict], messages: list[ChatMessa
 def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
     if user.role == "guest":
         check_rate_limit(chat_rate_limit, user.id)
-        # Guests get a restricted customer-support-only chatbot
         if not payload.messages:
             raise HTTPException(status_code=400, detail="messages must be a non-empty list")
+
+        # --- Import guest tool support ---
+        from agent.chat_tools import GUEST_TOOLS_DEFINITIONS, execute_guest_tool
+
         # RAG công khai: lấy câu hỏi cuối của khách -> tra public KB (chính sách/FAQ).
         last_user_q = next(
             (m.content for m in reversed(payload.messages) if m.role == "user" and m.content.strip()),
             "",
         )
-        normalized = [
-            {"role": "system", "content": GUEST_SYSTEM_PROMPT},
-        ]
+        normalized = [{"role": "system", "content": GUEST_SYSTEM_PROMPT}]
         if last_user_q:
             try:
                 from agent.public_kb import search_public_knowledge, format_public_for_prompt
@@ -684,11 +686,17 @@ def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
         _append_safe_client_history(normalized, payload.messages)
         _t0 = time.time()
         try:
-            result = chat_completion(normalized, temperature=0.4)
+            # Chạy ReAct agent nhưng CHỈ với GUEST_TOOLS (submit_feedback).
+            # Truyền tools_override và execute_fn để agent không có quyền gọi OPS tools.
+            result = run_chat_agent(
+                normalized,
+                temperature=0.4,
+                tools_override=GUEST_TOOLS_DEFINITIONS,
+                execute_fn=lambda name, args: execute_guest_tool(name, args, user_id=user.id),
+            )
         except Exception as exc:
             _log_chat_event("guest", "error", int((time.time() - _t0) * 1000), error=str(exc)[:200])
             raise HTTPException(status_code=502, detail=f"Agent model error: {str(exc)[:300]}") from exc
-        # OWASP LLM: mask PII from LLM output before returning to client
         if isinstance(result.get("content"), str):
             result["content"] = mask_pii(result["content"])
         _log_chat_event("guest", "success", int((time.time() - _t0) * 1000),
@@ -720,6 +728,30 @@ def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
     # OWASP LLM: mask PII from LLM output before returning to client
     if isinstance(result.get("content"), str):
         result["content"] = mask_pii(result["content"])
+    _log_chat_event(log_team, "success", int((time.time() - _t0) * 1000),
+                    provider=result.get("provider", ""), model=result.get("model", ""))
+    return {"status": "success", "data": result}
+
+
+@app.post("/api/agent/rag-chat")
+def agent_rag_chat(payload: ChatReq, user: AuthUser = Depends(require_ops_staff)):
+    check_rate_limit(chat_rate_limit_staff, user.id)
+
+    if not payload.messages:
+        raise HTTPException(status_code=400, detail="messages must be a non-empty list")
+    
+    scope_team = user.department if (user.role != "admin" and user.department) else None
+    log_team = scope_team or ("admin" if user.role == "admin" else "unassigned")
+    
+    msg_dicts = [{"role": m.role, "content": m.content.strip()} for m in payload.messages[-CHAT_HISTORY_LIMIT:]]
+    
+    _t0 = time.time()
+    try:
+        result = rag_chat(msg_dicts, scope_team=scope_team)
+    except Exception as exc:
+        _log_chat_event(log_team, "error", int((time.time() - _t0) * 1000), error=str(exc)[:200])
+        raise HTTPException(status_code=502, detail=f"RAG engine error: {str(exc)[:300]}") from exc
+    
     _log_chat_event(log_team, "success", int((time.time() - _t0) * 1000),
                     provider=result.get("provider", ""), model=result.get("model", ""))
     return {"status": "success", "data": result}

@@ -27,7 +27,7 @@ Mục tiêu: giúp đội ngũ vận hành nắm bắt nhanh vấn đề chất 
 | 5 | Multi-Agent | 8 agent nghiệp vụ + Orchestrator |
 | 6 | Phân tích phòng ban | Insights 6 phòng ban với phân tích sâu bằng LLM |
 | 7 | Human-in-the-Loop | Hàng đợi duyệt nhãn — nhân viên sửa nhãn AI, ghi correction log |
-| 8 | AI Chat | Hỏi đáp trực tiếp về dữ liệu phản hồi |
+| 8 | AI Chat & RAG (Tiered) | Hỏi đáp tích hợp Hybrid Search KB, tự động phân quyền truy cập (Guest: Public FAQ / Staff: Internal Ops Tools) |
 | 9 | Streaming Realtime | Ingest phản hồi theo luồng thời gian thực |
 | 10 | RBAC 4 vai trò | Phân quyền admin, manager, staff, guest |
 

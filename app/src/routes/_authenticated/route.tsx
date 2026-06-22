@@ -32,8 +32,6 @@ export const Route = createFileRoute("/_authenticated")({
       "/tasks",
       "/reports",
       "/support",
-      "/health",
-      "/agent-control",
       "/live-stream",
     ];
     if (role === "guest" && restrictedForGuests.some((p) => location.pathname.startsWith(p))) {

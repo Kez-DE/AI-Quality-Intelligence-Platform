@@ -13,17 +13,14 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/tasks'
-import { Route as AuthenticatedSystemHealthRouteImport } from './routes/_authenticated/system-health'
 import { Route as AuthenticatedSupportRouteImport } from './routes/_authenticated/support'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedLiveStreamRouteImport } from './routes/_authenticated/live-stream'
 import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
-import { Route as AuthenticatedHealthRouteImport } from './routes/_authenticated/health'
 import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticated/feedback'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedAlertsRouteImport } from './routes/_authenticated/alerts'
-import { Route as AuthenticatedAgentControlRouteImport } from './routes/_authenticated/agent-control'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedFeedbackUploadRouteImport } from './routes/_authenticated/feedback_.upload'
 
@@ -46,12 +43,6 @@ const AuthenticatedTasksRoute = AuthenticatedTasksRouteImport.update({
   path: '/tasks',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedSystemHealthRoute =
-  AuthenticatedSystemHealthRouteImport.update({
-    id: '/system-health',
-    path: '/system-health',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedSupportRoute = AuthenticatedSupportRouteImport.update({
   id: '/support',
   path: '/support',
@@ -70,11 +61,6 @@ const AuthenticatedLiveStreamRoute = AuthenticatedLiveStreamRouteImport.update({
 const AuthenticatedInsightsRoute = AuthenticatedInsightsRouteImport.update({
   id: '/insights',
   path: '/insights',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedHealthRoute = AuthenticatedHealthRouteImport.update({
-  id: '/health',
-  path: '/health',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedFeedbackRoute = AuthenticatedFeedbackRouteImport.update({
@@ -97,12 +83,6 @@ const AuthenticatedAlertsRoute = AuthenticatedAlertsRouteImport.update({
   path: '/alerts',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedAgentControlRoute =
-  AuthenticatedAgentControlRouteImport.update({
-    id: '/agent-control',
-    path: '/agent-control',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -119,17 +99,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/admin': typeof AuthenticatedAdminRoute
-  '/agent-control': typeof AuthenticatedAgentControlRoute
   '/alerts': typeof AuthenticatedAlertsRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
-  '/health': typeof AuthenticatedHealthRoute
   '/insights': typeof AuthenticatedInsightsRoute
   '/live-stream': typeof AuthenticatedLiveStreamRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/support': typeof AuthenticatedSupportRoute
-  '/system-health': typeof AuthenticatedSystemHealthRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/feedback/upload': typeof AuthenticatedFeedbackUploadRoute
 }
@@ -137,17 +114,14 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/admin': typeof AuthenticatedAdminRoute
-  '/agent-control': typeof AuthenticatedAgentControlRoute
   '/alerts': typeof AuthenticatedAlertsRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
-  '/health': typeof AuthenticatedHealthRoute
   '/insights': typeof AuthenticatedInsightsRoute
   '/live-stream': typeof AuthenticatedLiveStreamRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/support': typeof AuthenticatedSupportRoute
-  '/system-health': typeof AuthenticatedSystemHealthRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/feedback/upload': typeof AuthenticatedFeedbackUploadRoute
 }
@@ -157,17 +131,14 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
-  '/_authenticated/agent-control': typeof AuthenticatedAgentControlRoute
   '/_authenticated/alerts': typeof AuthenticatedAlertsRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/feedback': typeof AuthenticatedFeedbackRoute
-  '/_authenticated/health': typeof AuthenticatedHealthRoute
   '/_authenticated/insights': typeof AuthenticatedInsightsRoute
   '/_authenticated/live-stream': typeof AuthenticatedLiveStreamRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/support': typeof AuthenticatedSupportRoute
-  '/_authenticated/system-health': typeof AuthenticatedSystemHealthRoute
   '/_authenticated/tasks': typeof AuthenticatedTasksRoute
   '/_authenticated/feedback_/upload': typeof AuthenticatedFeedbackUploadRoute
 }
@@ -177,17 +148,14 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/admin'
-    | '/agent-control'
     | '/alerts'
     | '/chat'
     | '/dashboard'
     | '/feedback'
-    | '/health'
     | '/insights'
     | '/live-stream'
     | '/reports'
     | '/support'
-    | '/system-health'
     | '/tasks'
     | '/feedback/upload'
   fileRoutesByTo: FileRoutesByTo
@@ -195,17 +163,14 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/admin'
-    | '/agent-control'
     | '/alerts'
     | '/chat'
     | '/dashboard'
     | '/feedback'
-    | '/health'
     | '/insights'
     | '/live-stream'
     | '/reports'
     | '/support'
-    | '/system-health'
     | '/tasks'
     | '/feedback/upload'
   id:
@@ -214,17 +179,14 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/admin'
-    | '/_authenticated/agent-control'
     | '/_authenticated/alerts'
     | '/_authenticated/chat'
     | '/_authenticated/dashboard'
     | '/_authenticated/feedback'
-    | '/_authenticated/health'
     | '/_authenticated/insights'
     | '/_authenticated/live-stream'
     | '/_authenticated/reports'
     | '/_authenticated/support'
-    | '/_authenticated/system-health'
     | '/_authenticated/tasks'
     | '/_authenticated/feedback_/upload'
   fileRoutesById: FileRoutesById
@@ -265,13 +227,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTasksRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/system-health': {
-      id: '/_authenticated/system-health'
-      path: '/system-health'
-      fullPath: '/system-health'
-      preLoaderRoute: typeof AuthenticatedSystemHealthRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/support': {
       id: '/_authenticated/support'
       path: '/support'
@@ -298,13 +253,6 @@ declare module '@tanstack/react-router' {
       path: '/insights'
       fullPath: '/insights'
       preLoaderRoute: typeof AuthenticatedInsightsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/health': {
-      id: '/_authenticated/health'
-      path: '/health'
-      fullPath: '/health'
-      preLoaderRoute: typeof AuthenticatedHealthRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/feedback': {
@@ -335,13 +283,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAlertsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/agent-control': {
-      id: '/_authenticated/agent-control'
-      path: '/agent-control'
-      fullPath: '/agent-control'
-      preLoaderRoute: typeof AuthenticatedAgentControlRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/admin': {
       id: '/_authenticated/admin'
       path: '/admin'
@@ -361,34 +302,28 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
-  AuthenticatedAgentControlRoute: typeof AuthenticatedAgentControlRoute
   AuthenticatedAlertsRoute: typeof AuthenticatedAlertsRoute
   AuthenticatedChatRoute: typeof AuthenticatedChatRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFeedbackRoute: typeof AuthenticatedFeedbackRoute
-  AuthenticatedHealthRoute: typeof AuthenticatedHealthRoute
   AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
   AuthenticatedLiveStreamRoute: typeof AuthenticatedLiveStreamRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedSupportRoute: typeof AuthenticatedSupportRoute
-  AuthenticatedSystemHealthRoute: typeof AuthenticatedSystemHealthRoute
   AuthenticatedTasksRoute: typeof AuthenticatedTasksRoute
   AuthenticatedFeedbackUploadRoute: typeof AuthenticatedFeedbackUploadRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
-  AuthenticatedAgentControlRoute: AuthenticatedAgentControlRoute,
   AuthenticatedAlertsRoute: AuthenticatedAlertsRoute,
   AuthenticatedChatRoute: AuthenticatedChatRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFeedbackRoute: AuthenticatedFeedbackRoute,
-  AuthenticatedHealthRoute: AuthenticatedHealthRoute,
   AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
   AuthenticatedLiveStreamRoute: AuthenticatedLiveStreamRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedSupportRoute: AuthenticatedSupportRoute,
-  AuthenticatedSystemHealthRoute: AuthenticatedSystemHealthRoute,
   AuthenticatedTasksRoute: AuthenticatedTasksRoute,
   AuthenticatedFeedbackUploadRoute: AuthenticatedFeedbackUploadRoute,
 }

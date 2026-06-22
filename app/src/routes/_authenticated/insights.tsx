@@ -4,6 +4,7 @@ import { Loader2, Building2, AlertCircle, Sparkles, RefreshCw, BarChart3, Messag
 import { toast } from "sonner";
 import { apiFetch, useMe, visibleTeams, isUnassignedOps } from "@/lib/api";
 import { NoDepartmentNotice } from "@/components/NoDepartmentNotice";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { topicLabel } from "@/lib/labels";
 import { regionLabel } from "@/lib/regions";
 
@@ -68,6 +69,16 @@ type Department = {
 
 type ApiResponse<T> = { status: string; data: T };
 
+function severityNum(s: string | null) {
+  if (!s) return 0;
+  if (s.includes("P5")) return 5;
+  if (s.includes("P4")) return 4;
+  if (s.includes("P3")) return 3;
+  if (s.includes("P2")) return 2;
+  if (s.includes("P1")) return 1;
+  return 0;
+}
+
 function InsightsPage() {
   const { data: me, isLoading: meLoading } = useMe();
   const teams = visibleTeams(me);
@@ -75,6 +86,7 @@ function InsightsPage() {
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [analyzingTeam, setAnalyzingTeam] = useState<string | null>(null);
   const [lastLoadedAt, setLastLoadedAt] = useState<string | null>(null);
+  const [showCriticalModal, setShowCriticalModal] = useState(false);
 
   async function loadMetrics() {
     if (teams.length === 0) return;
@@ -178,8 +190,19 @@ function InsightsPage() {
       <div className="grid sm:grid-cols-3 gap-3">
         <SummaryCard label="Tổng phản hồi" value={totalFeedback} icon={MessageSquare} />
         <SummaryCard label="Phòng ban có dữ liệu" value={`${teamsWithData}/${teams.length}`} icon={Building2} />
-        <SummaryCard label="Ca nghiêm trọng" value={criticalCount} icon={ShieldCheck} tone="coral" />
+        <SummaryCard 
+          label="Ca nghiêm trọng" 
+          value={criticalCount} 
+          icon={ShieldCheck} 
+          tone="coral" 
+          onClick={() => setShowCriticalModal(true)} 
+        />
       </div>
+
+      <CriticalCasesModal 
+        open={showCriticalModal} 
+        onOpenChange={setShowCriticalModal} 
+      />
 
       <div className="rounded-2xl border border-border bg-white p-4 text-sm text-muted-foreground">
         <div className="font-semibold text-foreground mb-1">Cách hoạt động</div>
@@ -218,14 +241,19 @@ function SummaryCard({
   value,
   icon: Icon,
   tone = "green",
+  onClick,
 }: {
   label: string;
   value: number | string;
   icon: React.ComponentType<{ className?: string }>;
   tone?: "green" | "coral";
+  onClick?: () => void;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-white p-4 shadow-[var(--shadow-card)] flex items-center gap-3">
+    <div 
+      onClick={onClick}
+      className={`rounded-2xl border border-border bg-white p-4 shadow-[var(--shadow-card)] flex items-center gap-3 ${onClick ? 'cursor-pointer hover:border-xanh-coral/50 transition-colors' : ''}`}
+    >
       <div className={`h-10 w-10 rounded-xl grid place-items-center ${tone === "coral" ? "bg-xanh-coral/10 text-xanh-coral" : "bg-xanh-mint text-xanh-deep"}`}>
         <Icon className="h-5 w-5" />
       </div>
@@ -234,6 +262,59 @@ function SummaryCard({
         <div className="font-display text-2xl font-bold">{value}</div>
       </div>
     </div>
+  );
+}
+
+function CriticalCasesModal({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const [cases, setCases] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setLoading(true);
+      apiFetch<{ status: string; data: any[] }>("/api/feedback/recent?limit=500")
+        .then((res) => {
+          const critical = res.data.filter((f) => severityNum(f.severity) >= 4);
+          setCases(critical);
+        })
+        .finally(() => setLoading(false));
+    }
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Các ca nghiêm trọng (P4 / P5)</DialogTitle>
+        </DialogHeader>
+        {loading ? (
+          <div className="p-10 flex justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-xanh-green" />
+          </div>
+        ) : cases.length === 0 ? (
+          <div className="p-10 text-center text-muted-foreground">Không tìm thấy ca nghiêm trọng nào gần đây.</div>
+        ) : (
+          <div className="space-y-3 mt-4">
+            {cases.map((f) => (
+              <div key={f.id} className="rounded-xl border border-xanh-coral/30 bg-xanh-coral/5 p-4">
+                <div className="flex justify-between items-start mb-2 gap-4">
+                  <div className="font-semibold text-xanh-coral leading-tight">{f.topic || "Không rõ chủ đề"}</div>
+                  <div className="text-xs text-muted-foreground whitespace-nowrap">
+                    {new Date(f.created_at).toLocaleString("vi-VN")}
+                  </div>
+                </div>
+                <p className="text-sm text-foreground/90 leading-relaxed">{f.text}</p>
+                <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-mono">
+                  <span className="bg-white/80 px-2 py-1 rounded border">Team: {f.team || "Chưa phân"}</span>
+                  <span className="bg-white/80 px-2 py-1 rounded border">Mức độ: {f.severity}</span>
+                  {f.area && <span className="bg-white/80 px-2 py-1 rounded border">Khu vực: {regionLabel(f.area)}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 

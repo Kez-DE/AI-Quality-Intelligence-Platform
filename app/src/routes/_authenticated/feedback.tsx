@@ -8,6 +8,11 @@ import { apiFetch, useMe } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/feedback")({
   component: FeedbackPage,
+  validateSearch: (search: Record<string, unknown>) => {
+    return {
+      filter: search.filter as string | undefined,
+    };
+  },
 });
 
 type Feedback = {
@@ -40,6 +45,8 @@ function severityNum(sev: string | null): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+type FilterType = "all" | "needs_review" | "critical" | "low_conf";
+
 function FeedbackPage() {
   const [list, setList] = useState<Feedback[]>([]);
   const [queue, setQueue] = useState<Feedback[]>([]);
@@ -51,6 +58,13 @@ function FeedbackPage() {
 
   const { data: me } = useMe();
   const isGuest = me?.role === "guest";
+
+  const search = Route.useSearch();
+  const [activeFilter, setActiveFilter] = useState<FilterType>(
+    ["all", "needs_review", "critical", "low_conf"].includes(search.filter as string) 
+      ? (search.filter as FilterType) 
+      : "all"
+  );
 
   const [form, setForm] = useState({
     text: "",
@@ -173,11 +187,27 @@ function FeedbackPage() {
     }
   }
 
-  // Review Queue lấy đúng từ server (?needs_review=true) — không sót ca cũ.
   // Stream = danh sách chung, loại các id đang nằm trong Queue.
-  const reviewQueue = queue;
   const queueIds = new Set(queue.map((f) => f.id));
-  const stream = list.filter((f) => !queueIds.has(f.id));
+  let stream = list.filter((f) => !queueIds.has(f.id));
+  let reviewQueue = queue;
+
+  if (activeFilter === "critical") {
+    stream = stream.filter(f => severityNum(f.severity) >= 4);
+    reviewQueue = reviewQueue.filter(f => severityNum(f.severity) >= 4);
+  } else if (activeFilter === "low_conf") {
+    stream = stream.filter(f => f.confidence != null && f.confidence < 0.55);
+    reviewQueue = reviewQueue.filter(f => f.confidence != null && f.confidence < 0.55);
+  } else if (activeFilter === "needs_review") {
+    stream = [];
+  }
+
+  const filterLabel = {
+    all: "",
+    critical: "Nghiêm trọng (P4/P5)",
+    low_conf: "Confidence thấp (<55%)",
+    needs_review: "Cần duyệt",
+  }[activeFilter];
 
   const stats = {
     total: list.length,
@@ -245,10 +275,38 @@ function FeedbackPage() {
       {/* 2. Stat cards */}
       {!isGuest && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard label="Tổng phản hồi" value={stats.total} icon={Inbox} tone="deep" />
-          <StatCard label="Cần duyệt" value={stats.review} icon={ShieldAlert} tone="coral" />
-          <StatCard label="P4 / P5" value={stats.critical} icon={AlertCircle} tone="amber" />
-          <StatCard label="Confidence thấp" value={stats.lowConf} icon={AlertCircle} tone="mint" />
+          <StatCard 
+            label="Tổng phản hồi" 
+            value={stats.total} 
+            icon={Inbox} 
+            tone="deep" 
+            onClick={() => setActiveFilter("all")}
+            isActive={activeFilter === "all"}
+          />
+          <StatCard 
+            label="Cần duyệt" 
+            value={stats.review} 
+            icon={ShieldAlert} 
+            tone="coral" 
+            onClick={() => setActiveFilter("needs_review")}
+            isActive={activeFilter === "needs_review"}
+          />
+          <StatCard 
+            label="P4 / P5" 
+            value={stats.critical} 
+            icon={AlertCircle} 
+            tone="amber" 
+            onClick={() => setActiveFilter("critical")}
+            isActive={activeFilter === "critical"}
+          />
+          <StatCard 
+            label="Confidence thấp" 
+            value={stats.lowConf} 
+            icon={AlertCircle} 
+            tone="mint" 
+            onClick={() => setActiveFilter("low_conf")}
+            isActive={activeFilter === "low_conf"}
+          />
         </div>
       )}
 
@@ -263,6 +321,14 @@ function FeedbackPage() {
               <h2 className="font-display font-semibold">
                 Luồng phản hồi <span className="text-muted-foreground font-mono text-xs">({stream.length})</span>
               </h2>
+              {activeFilter !== "all" && (
+                <button 
+                  onClick={() => setActiveFilter("all")}
+                  className="ml-2 text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full hover:bg-amber-200"
+                >
+                  Đang lọc: {filterLabel} ✕
+                </button>
+              )}
             </div>
             <button onClick={load} className="text-xs font-mono text-xanh-deep hover:underline">
               ↻ refresh
@@ -298,11 +364,21 @@ function FeedbackPage() {
 
         {/* Cột phải: Cần duyệt / Review Queue */}
         <section className="rounded-2xl border border-amber-300 bg-amber-50/40 shadow-[var(--shadow-card)]">
-          <div className="p-5 border-b border-amber-200 flex items-center gap-2">
-            <ShieldAlert className="h-5 w-5 text-amber-600" />
-            <h2 className="font-display font-semibold text-amber-900">
-              Cần duyệt / Review Queue <span className="font-mono text-xs">({reviewQueue.length})</span>
-            </h2>
+          <div className="p-5 border-b border-amber-200 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-amber-600" />
+              <h2 className="font-display font-semibold text-amber-900">
+                Cần duyệt / Review Queue <span className="font-mono text-xs">({reviewQueue.length})</span>
+              </h2>
+              {activeFilter !== "all" && (
+                <button 
+                  onClick={() => setActiveFilter("all")}
+                  className="ml-2 text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full hover:bg-amber-200"
+                >
+                  Đang lọc: {filterLabel} ✕
+                </button>
+              )}
+            </div>
           </div>
           {reviewQueue.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">
@@ -434,11 +510,15 @@ function StatCard({
   value,
   icon: Icon,
   tone,
+  onClick,
+  isActive,
 }: {
   label: string;
   value: number;
   icon: React.ComponentType<{ className?: string }>;
   tone: "deep" | "coral" | "amber" | "mint";
+  onClick?: () => void;
+  isActive?: boolean;
 }) {
   const toneMap: Record<string, string> = {
     deep: "text-xanh-deep",
@@ -447,7 +527,10 @@ function StatCard({
     mint: "text-xanh-green",
   };
   return (
-    <div className="rounded-xl border border-border bg-white p-4 shadow-[var(--shadow-card)]">
+    <div 
+      onClick={onClick}
+      className={`rounded-xl border bg-white p-4 shadow-[var(--shadow-card)] ${onClick ? 'cursor-pointer transition-all hover:shadow-md' : ''} ${isActive ? 'border-xanh-green ring-2 ring-xanh-green/20' : 'border-border'}`}
+    >
       <div className="flex items-center justify-between">
         <div className="text-[11px] text-muted-foreground">{label}</div>
         <Icon className={`h-4 w-4 ${toneMap[tone]}`} />

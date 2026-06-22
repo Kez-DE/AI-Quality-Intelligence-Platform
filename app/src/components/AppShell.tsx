@@ -45,7 +45,6 @@ const NAV: NavItem[] = [
   { to: "/support", label: "CSKH Support", icon: Headphones, roles: AUTHENTICATED_ROLES },
   { to: "/reports", label: "Báo cáo AI", icon: FileText, roles: ["admin", "manager"] },
   { to: "/insights", label: "Phân tích phòng ban", icon: Building2, roles: AUTHENTICATED_ROLES },
-  { to: "/agent-control", label: "Điều khiển Agent", icon: Bot, roles: ["admin"] },
   { to: "/chat", label: "AI Chat", icon: Sparkles, roles: ALL_ROLES },
 ];
 
@@ -53,7 +52,6 @@ const NAV: NavItem[] = [
 const ADMIN_NAV: NavItem[] = [
   { to: "/live-stream", label: "Live Stream", icon: Radio, roles: ["admin"] },
   { to: "/admin", label: "Quản lý người dùng", icon: Shield, roles: ["admin"] },
-  { to: "/health", label: "System Health", icon: Activity, roles: ["admin"] },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {

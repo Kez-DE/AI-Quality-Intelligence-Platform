@@ -11,12 +11,32 @@ from clean import mask_pii
 from .model_router import chat_completion, ChatMessage
 from .chat_tools import TOOLS_DEFINITIONS, execute_tool
 
-def run_chat_agent(messages: list[ChatMessage], temperature: float = 0.3, max_loops: int = 5, scope_team: str | None = None) -> dict:
+def run_chat_agent(
+    messages: list[ChatMessage],
+    temperature: float = 0.3,
+    max_loops: int = 5,
+    scope_team: str | None = None,
+    tools_override: list | None = None,
+    execute_fn=None,
+) -> dict:
     """Chạy vòng lặp ReAct agent để LLM tự gọi công cụ (nếu cần) trước khi trả lời.
 
     scope_team: phòng ban của ops user. Nếu set, mọi tool bị ép lọc về đúng phòng
     này (chống rò rỉ dữ liệu chéo phòng). None = admin/toàn hệ thống.
+
+    tools_override: thay thế TOOLS_DEFINITIONS mặc định bằng danh sách tool tuỳ chỉnh
+    (dùng cho guest tier: chỉ truyền GUEST_TOOLS_DEFINITIONS).
+
+    execute_fn: hàm thực thi tool (name, args) -> str tuỳ chỉnh. Nếu không truyền,
+    dùng execute_tool mặc định (dành cho ops/admin).
     """
+    active_tools = tools_override if tools_override is not None else TOOLS_DEFINITIONS
+
+    def _execute(name: str, args: dict) -> str:
+        if execute_fn is not None:
+            return execute_fn(name, args)
+        return execute_tool(name, args, scope_team=scope_team)
+
     # Lọc PII từ input messages
     current_messages = []
     for m in messages:
@@ -31,7 +51,7 @@ def run_chat_agent(messages: list[ChatMessage], temperature: float = 0.3, max_lo
             result = chat_completion(
                 current_messages,
                 temperature=temperature,
-                tools=TOOLS_DEFINITIONS
+                tools=active_tools
             )
         except ValueError as e:
             # Fallback nếu provider (vd: Gemini) không hỗ trợ tools
@@ -69,10 +89,10 @@ def run_chat_agent(messages: list[ChatMessage], temperature: float = 0.3, max_lo
             except Exception:
                 args = {}
                 
-            # Thực thi hàm truy vấn dữ liệu thực tế (ép scope theo phòng ban của ops)
-            tool_result = execute_tool(name, args, scope_team=scope_team)
+            # Thực thi tool (ops dùng execute_tool, guest dùng execute_fn)
+            tool_result = _execute(name, args)
             
-            # Lọc PII từ tool context (nếu có user feedback raw) để tránh leak lên prompt lần 2
+            # Lọc PII từ tool context
             safe_tool_result = mask_pii(str(tool_result))
             
             # Gắn kết quả của hàm vào context để gửi lên LLM ở vòng lặp tiếp theo
@@ -90,3 +110,4 @@ def run_chat_agent(messages: list[ChatMessage], temperature: float = 0.3, max_lo
         "provider": "system",
         "model": "agent_loop"
     }
+

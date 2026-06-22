@@ -213,3 +213,18 @@ Chưa phân công. TODO: ai làm module nào, deadline nội bộ.
 ### Scope feedback theo phòng ban
 - Staff/Manager chỉ xem feedback được `route_ticket` gán về phòng của mình; Admin vẫn xem toàn hệ thống.
 - Bộ lọc dùng đủ topic, sentiment và severity/overall_risk, tránh ánh xạ topic tĩnh làm sai Marketing và Safety.
+
+## 2026-06-22
+
+### Nâng cấp Agent & RAG (Tiered AI Chatbot)
+- **Vấn đề**: Chatbot (Agent) trước đây chỉ áp dụng cho nội bộ, Guest và Staff dùng chung khiến Guest có nguy cơ gọi nhầm Tool nội bộ hoặc truy xuất dữ liệu Knowledge Base mật của công ty.
+- **Giải pháp**:
+  1. Xây dựng **Hybrid Search RAG** (Vector + BM25 kết hợp giải thuật RRF) giúp tìm kiếm tài liệu chuẩn xác hơn.
+  2. Phân tách **Knowledge Base**: `knowledge_base` (nội bộ, scope theo phòng ban) và `public_kb` (công khai cho Guest).
+  3. Áp dụng kiến trúc **Tiered Agent**:
+     - **Guest Tier**: Agent bị tắt quyền gọi Ops Tools, chỉ được phép gọi tool `submit_feedback` và tự động đính kèm ngữ cảnh từ Public KB. Ẩn thông tin metadata (Model/Provider/Latency) trên UI để tối ưu trải nghiệm.
+     - **Staff/Admin Tier**: Agent sở hữu đầy đủ bộ công cụ nghiệp vụ (`get_team_priority_tasks`, `get_hot_areas`, `get_feedback_summary`, `search_knowledge_base`) nhưng bị giới hạn không gian dữ liệu chặt chẽ theo Phòng ban (Department Scoping) của tài khoản đang đăng nhập.
+
+### Bug Fix — Agent Crash (502 & 422)
+- **Lỗi 502 Bad Gateway (Staff Chat)**: Fix lỗi `UnboundLocalError` do import hàm `run_chat_agent` bên trong scope của khối lệnh `if user.role == "guest":`. Đã di chuyển import ra file-level scope để nhánh code của Staff chạy ổn định.
+- **Lỗi 422 Unprocessable Content (Validation)**: Fix lỗi API từ chối request gửi lên từ Frontend khi lịch sử chat kèm phản hồi dài của AI bị quá giới hạn. Tăng `max_length` của trường `content` trong schema `ChatMessageReq` từ 2000 lên 15000 ký tự.

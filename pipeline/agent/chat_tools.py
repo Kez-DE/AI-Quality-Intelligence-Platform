@@ -1,9 +1,13 @@
+import uuid
 from datetime import datetime, timezone, timedelta
 from collections import Counter
 from agents.common import get_db
 from agents.router_agent import route_ticket
 from departments import alert_department
+from ingest import get_supabase
+from clean import mask_pii
 from .knowledge_base import search_knowledge, format_for_prompt
+from .rag_engine import _vector_search, _hybrid_merge, embedder
 
 
 def get_hot_areas(hours: int = 24, limit: int = 5, scope_team: str | None = None) -> str:
@@ -94,17 +98,144 @@ def get_team_priority_tasks(team_name: str) -> str:
         return f"Lỗi truy xuất dữ liệu: {str(e)}"
 
 
+def submit_feedback(content: str, topic: str = "Other", sentiment: str = "negative", user_id: str | None = None) -> str:
+    """Gửi phản hồi/khiếu nại của khách hàng vào hệ thống Supabase."""
+    try:
+        db = get_supabase()
+        safe_content = mask_pii(content[:2000])
+        row = {
+            "id": str(uuid.uuid4()),
+            "raw_text": safe_content,
+            "cleaned_text": safe_content,
+            "topic": topic,
+            "sentiment": sentiment,
+            "severity": "P3",  # default severity cho feedback từ chat
+            "source": "chat",
+            "needs_review": True,
+            "reviewed": False,
+        }
+        if user_id:
+            row["user_id"] = user_id
+        db.table("feedback").insert(row).execute()
+        return f"✅ Phản hồi của bạn đã được ghi nhận thành công! Chúng tôi sẽ xem xét và phản hồi sớm nhất có thể."
+    except Exception as e:
+        return f"Lỗi khi gửi phản hồi: {str(e)[:200]}"
+
+
 def search_knowledge_base(query: str, scope_team: str | None = None) -> str:
-    """Tra cứu SOP/SLA/quy trình nội bộ (RAG) để trả lời có trích dẫn, không bịa.
+    """Tra cứu SOP/SLA/quy trình nội bộ bằng Hybrid Search (Vector + BM25 + RRF).
 
     scope_team != None (ops): chỉ tìm trong tài liệu của phòng đó (khớp RBAC)."""
     try:
-        results = search_knowledge(query, department=scope_team, top_k=3)
-        return format_for_prompt(results)
-    except Exception as e:
-        return f"Lỗi tra cứu knowledge base: {str(e)}"
+        query_emb = embedder.embed_query(query)
+        vector_results = _vector_search(query_emb, scope_team, top_k=6)
+        keyword_results = search_knowledge(query, department=scope_team, top_k=6)
+        merged = _hybrid_merge(vector_results, keyword_results, top_k=3)
 
+        if not merged:
+            return "Không tìm thấy tài liệu nội bộ nào liên quan đến câu hỏi này."
+
+        blocks = ["Tài liệu nội bộ liên quan (trích dẫn nguồn khi trả lời):"]
+        for i, r in enumerate(merged, 1):
+            dept = r.get("department") or "chung"
+            blocks.append(
+                f"\n[Nguồn {i}] {r['document_title']} › {r['heading']} (phòng: {dept})\n{r['content']}"
+            )
+        return "\n".join(blocks)
+    except Exception as e:
+        # Fallback về BM25 nếu Hybrid lỗi (vd: Cohere API down)
+        try:
+            results = search_knowledge(query, department=scope_team, top_k=3)
+            return format_for_prompt(results)
+        except Exception:
+            return f"Lỗi tra cứu knowledge base: {str(e)[:200]}"
+
+
+def get_feedback_summary(days: int = 7, scope_team: str | None = None) -> str:
+    """Tổng hợp feedback theo topic/severity/area trong N ngày gần nhất dưới dạng bảng Markdown."""
+    try:
+        db = get_db()
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        feedback = (
+            db.table("feedback")
+            .select("topic,severity,sentiment,area,created_at")
+            .gte("created_at", cutoff)
+            .execute()
+            .data or []
+        )
+
+        if scope_team:
+            feedback = [
+                f for f in feedback
+                if route_ticket(
+                    f.get("topic", ""), f.get("severity", 3), f.get("sentiment"), log_run=False
+                )["team"] == scope_team
+            ]
+
+        if not feedback:
+            scope_txt = f" của phòng {scope_team}" if scope_team else ""
+            return f"Không có feedback nào{scope_txt} trong {days} ngày qua."
+
+        topic_counts = Counter(f.get("topic") or "Unknown" for f in feedback)
+        severity_counts = Counter(f.get("severity") or "Unknown" for f in feedback)
+        sentiment_counts = Counter(f.get("sentiment") or "Unknown" for f in feedback)
+        area_counts = Counter(f.get("area") or "Unknown" for f in feedback)
+
+        scope_txt = f" (Phòng {scope_team})" if scope_team else " (Toàn hệ thống)"
+        lines = [
+            f"## Tổng hợp Feedback {days} ngày qua{scope_txt}",
+            f"**Tổng số:** {len(feedback)} feedback\n",
+            "### Theo Chủ đề (Topic)",
+            "| Chủ đề | Số lượng |",
+            "|---|---|",
+        ]
+        for topic, cnt in topic_counts.most_common(8):
+            lines.append(f"| {topic} | {cnt} |")
+
+        lines += [
+            "\n### Theo Mức độ (Severity)",
+            "| Severity | Số lượng |",
+            "|---|---|",
+        ]
+        for sev in ["P5", "P4", "P3", "P2", "P1"]:
+            cnt = severity_counts.get(sev, 0)
+            if cnt:
+                lines.append(f"| {sev} | {cnt} |")
+
+        lines += [
+            "\n### Cảm xúc (Sentiment)",
+            f"- 😡 Tiêu cực: {sentiment_counts.get('negative', 0)}",
+            f"- 😐 Trung tính: {sentiment_counts.get('neutral', 0)}",
+            f"- 😊 Tích cực: {sentiment_counts.get('positive', 0)}",
+            "\n### Top 5 Khu vực nóng",
+            "| Khu vực | Số feedback |",
+            "|---|---|",
+        ]
+        for area, cnt in area_counts.most_common(5):
+            lines.append(f"| {area} | {cnt} |")
+
+        return "\n".join(lines)
+    except Exception as e:
+        return f"Lỗi khi tổng hợp feedback: {str(e)[:200]}"
+
+# ── Tool definitions cho OPS / ADMIN ──────────────────────────────────────────
 TOOLS_DEFINITIONS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_feedback_summary",
+            "description": "Tổng hợp feedback theo topic/severity/area trong N ngày qua — dùng khi user hỏi 'tổng hợp vấn đề nổi cộm', 'xu hướng tuần này', 'các vấn đề chính trong N ngày qua'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "days": {
+                        "type": "integer",
+                        "description": "Số ngày gần nhất để tổng hợp (mặc định 7)"
+                    }
+                }
+            }
+        }
+    },
     {
         "type": "function",
         "function": {
@@ -157,7 +288,7 @@ TOOLS_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "search_knowledge_base",
-            "description": "Tra cứu quy trình/SOP/SLA nội bộ (tai nạn, gian lận cước, thái độ tài xế, lỗi thanh toán, bồi thường...) để trả lời ĐÚNG theo tài liệu và TRÍCH DẪN nguồn, thay vì tự suy diễn. Dùng khi user hỏi 'xử lý thế nào', 'quy trình', 'chính sách', 'SLA bao lâu'.",
+            "description": "Tra cứu quy trình/SOP/SLA nội bộ (tai nạn, gian lận cước, thái độ tài xế, lỗi thanh toán, bồi thường...) để trả lời ĐÚNG theo tài liệu và TRÍCH DẪN nguồn. Dùng khi user hỏi 'xử lý thế nào', 'quy trình', 'chính sách', 'SLA bao lâu'.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -172,10 +303,41 @@ TOOLS_DEFINITIONS = [
     }
 ]
 
+# ── Tool definitions cho GUEST (giới hạn, chỉ 1 tool) ─────────────────────────
+GUEST_TOOLS_DEFINITIONS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "submit_feedback",
+            "description": "Gửi phản hồi hoặc khiếu nại của khách hàng vào hệ thống. Dùng khi khách hàng nói muốn 'gửi phản hồi', 'khiếu nại', 'báo cáo sự cố', 'phàn nàn', hoặc yêu cầu ghi nhận ý kiến.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "description": "Nội dung phản hồi/khiếu nại của khách hàng"
+                    },
+                    "topic": {
+                        "type": "string",
+                        "description": "Chủ đề vấn đề. Chọn một trong: Driver Behavior, Safety, Payment, App Issue, Other"
+                    },
+                    "sentiment": {
+                        "type": "string",
+                        "enum": ["negative", "neutral", "positive"],
+                        "description": "Cảm xúc của phản hồi"
+                    }
+                },
+                "required": ["content"]
+            }
+        }
+    }
+]
+
 def execute_tool(name: str, args: dict, scope_team: str | None = None) -> str:
-    """Thực thi tool. scope_team != None (ops đã gán phòng) -> ép mọi truy vấn
-    về đúng phòng đó, bỏ qua tham số team LLM tự sinh (chống rò rỉ chéo phòng)."""
-    if name == "get_hot_areas":
+    """Thực thi tool OPS/ADMIN. scope_team != None → ép mọi truy vấn về đúng phòng đó."""
+    if name == "get_feedback_summary":
+        return get_feedback_summary(days=args.get("days", 7), scope_team=scope_team)
+    elif name == "get_hot_areas":
         return get_hot_areas(hours=args.get("hours", 24), limit=args.get("limit", 5), scope_team=scope_team)
     elif name == "get_sla_tickets":
         return get_sla_tickets(scope_team=scope_team)
@@ -185,4 +347,16 @@ def execute_tool(name: str, args: dict, scope_team: str | None = None) -> str:
         return get_team_priority_tasks(team_name=team)
     elif name == "search_knowledge_base":
         return search_knowledge_base(query=args.get("query", ""), scope_team=scope_team)
-    return f"Error: Tool {name} not found"
+    return f"Error: Tool '{name}' not found"
+
+
+def execute_guest_tool(name: str, args: dict, user_id: str | None = None) -> str:
+    """Thực thi tool dành riêng cho GUEST (submit_feedback)."""
+    if name == "submit_feedback":
+        return submit_feedback(
+            content=args.get("content", ""),
+            topic=args.get("topic", "Other"),
+            sentiment=args.get("sentiment", "negative"),
+            user_id=user_id,
+        )
+    return f"Error: Guest tool '{name}' not found"

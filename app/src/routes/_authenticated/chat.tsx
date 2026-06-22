@@ -12,6 +12,7 @@ import {
   Copy,
   Check,
   AlertCircle,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { MarkdownContent } from "@/components/MarkdownContent";
@@ -27,11 +28,12 @@ type AgentMeta = {
   latency_ms?: number;
 };
 
-type Msg = { id?: string; role: "user" | "assistant"; content: string; meta?: AgentMeta };
+type Msg = { id?: string; role: "user" | "assistant"; content: string; meta?: AgentMeta; sources?: any[] };
 
 type AgentChatResponse = {
   data?: AgentMeta & {
     content?: string;
+    sources?: any[];
   };
 };
 
@@ -332,7 +334,8 @@ function ChatPage() {
     await supabase.from("chat_messages").insert({ user_id: u.user.id, role: "user", content });
 
     try {
-      const reply = await apiFetch<AgentChatResponse>("/api/agent/chat", {
+      const endpoint = "/api/agent/chat"; // backend tự phân tầng: guest→RAG công khai, ops/admin→ReAct Agent
+      const reply = await apiFetch<AgentChatResponse>(endpoint, {
         method: "POST",
         body: JSON.stringify({
           messages: next
@@ -351,6 +354,7 @@ function ChatPage() {
           model: reply.data?.model,
           latency_ms: reply.data?.latency_ms,
         },
+        sources: reply.data?.sources,
       };
       setMessages((m) => [...m, aMsg]);
       await supabase
@@ -406,7 +410,8 @@ function ChatPage() {
         </button>
       </div>
 
-      <div className="flex-1 rounded-2xl border border-border bg-white shadow-[var(--shadow-card)] overflow-hidden flex flex-col">
+      <div className="flex-1 flex gap-4 overflow-hidden">
+        <div className="flex-[6] rounded-2xl border border-border bg-white shadow-[var(--shadow-card)] overflow-hidden flex flex-col">
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {messages.length === 0 && (
             <div className="text-center py-10">
@@ -484,6 +489,33 @@ function ChatPage() {
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </button>
         </form>
+        </div>
+        {(role !== "guest" && (messages.some(m => m.sources?.length) || loading)) && (
+          <div className="flex-[4] rounded-2xl border border-border bg-white shadow-[var(--shadow-card)] overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-border bg-muted/30">
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <FileText className="h-4 w-4 text-xanh-green" />
+                Nguồn tài liệu tham khảo
+              </h3>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {loading ? (
+                <div className="text-center text-sm text-muted-foreground mt-10">
+                  <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-xanh-green" />
+                  Đang tra cứu tài liệu SOP/SLA...
+                </div>
+              ) : (
+                messages[messages.length - 1]?.sources?.map((s: any, idx: number) => (
+                  <div key={idx} className="rounded-xl border border-border p-3 text-sm hover:border-xanh-green/50 transition-colors bg-white">
+                    <div className="font-semibold text-xanh-deep mb-1 line-clamp-1">{s.document_title} - {s.heading}</div>
+                    <div className="text-xs text-muted-foreground mb-2">Độ tương đồng: {Math.round(s.similarity * 100)}%</div>
+                    <p className="text-muted-foreground line-clamp-4 text-xs">{s.content}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -621,9 +653,7 @@ function AssistantResponse({
         </div>
       )}
 
-      {visibleCount >= blocks.length && metaText && (
-        <div className="px-1 text-[11px] text-muted-foreground">{metaText}</div>
-      )}
+
 
       {onCopy && visibleCount >= blocks.length && (
         <button
