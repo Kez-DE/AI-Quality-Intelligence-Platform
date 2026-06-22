@@ -6,12 +6,16 @@ class CohereEmbeddingService:
     def __init__(self):
         api_key = os.environ.get("COHERE_API_KEY")
         if not api_key:
-            raise ValueError("COHERE_API_KEY is not set in the environment variables.")
-        # Khởi tạo Cohere Client
-        self.client = cohere.Client(api_key=api_key)
+            print("WARNING: COHERE_API_KEY is not set. RAG Embedding will not work.")
+            self.client = None
+        else:
+            self.client = cohere.Client(api_key=api_key)
         self.model = "embed-multilingual-v3.0"
         
     def embed_texts(self, texts: List[str], input_type: str = "search_document") -> List[List[float]]:
+        if self.client is None:
+            print("WARNING: Cannot embed texts because COHERE_API_KEY is missing.")
+            return [[0.0] * 1024 for _ in texts]
         """
         Nhúng danh sách văn bản thành vector.
         input_type có thể là "search_document" (dùng khi lưu data vào DB) 
