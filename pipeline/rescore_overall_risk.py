@@ -45,40 +45,66 @@ def _fetch_all(db, table: str, columns: str, build_query):
     return rows
 
 
+def _effective_severity(row: dict) -> int:
+    """Mức severity mà spike_detector THỰC SỰ đọc: overall_risk trước, fallback severity."""
+    ov = row.get("overall_risk")
+    try:
+        ov_int = int(ov)
+        if 1 <= ov_int <= 5:
+            return ov_int
+    except (TypeError, ValueError):
+        pass
+    try:
+        return int(str(row.get("severity") or "P3").upper().lstrip("P"))
+    except (TypeError, ValueError):
+        return 0
+
+
 def rescore_feedback(db, apply: bool) -> dict:
-    """Phase A: tính lại overall_risk cho feedback đã chấm, từ điểm rủi ro đã lưu."""
-    cols = "id,overall_risk," + ",".join(RISK_FIELDS)
+    """Phase A: tính lại risk cho MỌI feedback negative ĐÃ CHẤM, từ risk_* đã lưu.
+
+    Ghi lại CẢ overall_risk LẪN severity, vì hai đường nhập lưu khác nhau:
+    - ingest.py (seed/bulk): severity='P{overall_risk}' rồi POP overall_risk
+      => overall_risk NULL, severity='P5'; spike_detector fallback đúng vào severity.
+    - app trực tiếp (main.py): severity=classifier, overall_risk do ml-worker set.
+    Nếu chỉ sửa overall_risk (như bản cũ) sẽ BỎ SÓT đám seed severity='P5'.
+    """
+    cols = "id,sentiment,severity,overall_risk," + ",".join(RISK_FIELDS)
     rows = _fetch_all(
         db, "feedback", cols,
-        lambda q: q.not_.is_("overall_risk", "null"),
+        lambda q: q.eq("sentiment", "negative"),
     )
 
     changed = []
     for r in rows:
-        new_risk = calculate_overall_risk(
-            int(r.get("risk_safety") or 0),
-            int(r.get("risk_fraud") or 0),
-            int(r.get("risk_attitude") or 0),
-            int(r.get("risk_vehicle") or 0),
-            int(r.get("risk_compliance") or 0),
-        )
-        old_risk = int(r.get("overall_risk") or 0)
-        if new_risk != old_risk:
-            changed.append((r["id"], old_risk, new_risk))
+        dims = [int(r.get(f) or 0) for f in RISK_FIELDS]
+        # Chỉ đụng row ĐÃ chấm (có overall_risk hoặc ít nhất 1 điểm risk > 0) —
+        # tránh ép feedback negative chưa chấm về P1.
+        scored = r.get("overall_risk") is not None or any(d > 0 for d in dims)
+        if not scored:
+            continue
+        new_risk = calculate_overall_risk(*dims)
+        new_sev = f"P{new_risk}"
+        cur_eff = _effective_severity(r)
+        cur_sev = str(r.get("severity") or "")
+        if new_risk != cur_eff or cur_sev != new_sev:
+            changed.append((r["id"], cur_eff, new_risk))
 
-    print(f"\n=== Phase A — feedback ===")
-    print(f"Đã chấm: {len(rows)} | cần đổi overall_risk: {len(changed)}")
+    print("\n=== Phase A — feedback ===")
+    print(f"Negative đã chấm: ~{len(rows)} | cần sửa: {len(changed)}")
     demoted_p5 = sum(1 for _, o, n in changed if o == 5 and n < 5)
     print(f"  trong đó P5 -> thấp hơn (chủ yếu fraud): {demoted_p5}")
     for fid, o, n in changed[:10]:
-        print(f"    feedback {fid}: P{o} -> P{n}")
+        print(f"    feedback {fid}: P{o} -> P{n} (ghi cả overall_risk + severity)")
     if len(changed) > 10:
         print(f"    ... và {len(changed) - 10} row khác")
 
     if apply and changed:
         for fid, _o, n in changed:
-            db.table("feedback").update({"overall_risk": n}).eq("id", fid).execute()
-        print(f"  [APPLIED] cập nhật {len(changed)} feedback.")
+            db.table("feedback").update(
+                {"overall_risk": n, "severity": f"P{n}"}
+            ).eq("id", fid).execute()
+        print(f"  [APPLIED] cập nhật {len(changed)} feedback (overall_risk + severity).")
     elif changed:
         print("  [DRY-RUN] chưa ghi. Thêm --apply để cập nhật.")
 

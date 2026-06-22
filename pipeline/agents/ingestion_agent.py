@@ -66,11 +66,13 @@ def _compute_hash(text: str) -> str:
 
 def _fallback_classify(text: str) -> Dict[str, Any]:
     """Fallback heuristic khi model ML không load được."""
-    # Safety keywords check
+    # Safety keywords check — CHỈ rủi ro an toàn tính mạng. KHÔNG gồm "gian lận"/
+    # "lừa đảo": chúng là rủi ro tài chính (fraud) -> không được ép Safety/P5, nếu không
+    # feedback thanh toán sẽ bị định tuyến nhầm sang Safety khi model ML lỗi phải fallback.
     safety_keywords = [
         "tai nạn", "say xỉn", "say rượu", "cướp", "hành hung",
         "sàm sỡ", "đe dọa", "tông", "bỏ chạy", "nguy hiểm",
-        "chết", "thương", "đâm", "gian lận", "lừa đảo",
+        "chết", "thương", "đâm",
     ]
     text_lower = text.lower()
     is_safety = any(kw in text_lower for kw in safety_keywords)
