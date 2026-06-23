@@ -21,6 +21,29 @@ def test_router_topic_routing_per_department():
     assert _team("Other", "P1", "positive") == "Marketing"
 
 
+def test_positive_sentiment_only_routes_marketing_for_other_topic():
+    # Positive CHUNG (topic Other) -> Marketing để khai thác truyền thông.
+    assert _team("Other", "P3", "positive") == "Marketing"
+    # Positive gắn chủ đề chuyên môn KHÔNG còn bị ép về Marketing — route theo topic.
+    assert _team("App Issue", "P3", "positive") == "IT"
+    assert _team("Payment", "P3", "positive") == "CSKH"
+    assert _team("Driver Behavior", "P3", "positive") == "Vận hành"
+    assert _team("Pricing", "P3", "positive") == "CSKH"
+
+
+def test_sentiment_override_without_topics_is_ignored():
+    # Override thiếu "topics" KHÔNG được ép về Marketing (chống tái sinh bug cũ);
+    # ticket rơi xuống topic match như bình thường.
+    config = {
+        "default_team": "CSKH",
+        "routes": [{"topic": "App Issue", "team": "IT", "sla_hours": 12, "priority_default": "P3"}],
+        "severity_overrides": [],
+        "sentiment_overrides": [{"sentiment": "positive", "team": "Marketing", "sla_hours": 48}],
+    }
+    with patch("agents.router_agent.load_routing_table", return_value=config):
+        assert _team("App Issue", "P3", "positive") == "IT"
+
+
 def test_p5_override_routes_to_van_hanh_and_wins_over_positive_sentiment():
     assert _team("Other", "P5", "positive") == "Vận hành"
     assert _team("App Issue", "5", "negative") == "Vận hành"

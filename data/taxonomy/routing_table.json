@@ -13,6 +13,6 @@
     { "severity": "P5", "team": "Vận hành", "sla_hours": 1, "priority_default": "P5", "description": "Mọi ticket mức P5 ép về Vận hành (đội phản ứng nhanh) bất kể chủ đề — ưu tiên xử lý khẩn cấp." }
   ],
   "sentiment_overrides": [
-    { "sentiment": "positive", "team": "Marketing", "sla_hours": 48, "priority_default": "P4", "description": "Phản hồi tích cực phản ánh cảm nhận thương hiệu — chuyển Marketing theo dõi & khai thác truyền thông." }
+    { "sentiment": "positive", "topics": ["Other"], "team": "Marketing", "sla_hours": 48, "priority_default": "P4", "description": "Phản hồi tích cực chung (chưa gắn chủ đề chuyên môn) phản ánh cảm nhận thương hiệu — chuyển Marketing theo dõi & khai thác truyền thông. Positive về app/tài xế/thanh toán vẫn route theo topic về đúng phòng chuyên môn." }
   ]
 }

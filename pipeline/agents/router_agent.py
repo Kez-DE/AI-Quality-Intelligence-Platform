@@ -38,7 +38,9 @@ def route_ticket(
 
     Thứ tự ưu tiên:
       1. Severity override — P5 ép về Vận hành (đội phản ứng nhanh), thắng tất cả.
-      2. Sentiment override — feedback positive về Marketing (cảm nhận thương hiệu).
+      2. Sentiment override — feedback positive về Marketing, NHƯNG chỉ với các topic
+         được liệt kê trong override["topics"] (vd "Other"). Positive về app/tài xế/
+         thanh toán không khớp danh sách này nên rơi xuống topic match (đúng phòng chuyên môn).
       3. Topic match — theo bảng routes.
       4. Default team.
     """
@@ -74,29 +76,35 @@ def route_ticket(
                 )
             return output.model_dump()
 
-    # 2. Sentiment override (positive -> Marketing)
+    # 2. Sentiment override (positive -> Marketing), chỉ áp cho các topic trong override["topics"].
+    #    BẮT BUỘC khai báo "topics" rõ ràng: override thiếu/rỗng "topics" bị bỏ qua,
+    #    để tránh tái sinh bug cũ (positive ép MỌI topic về Marketing).
     if sentiment:
         str_sentiment = str(sentiment).strip().lower()
         for override in routing_config.get("sentiment_overrides", []):
-            if str(override.get("sentiment", "")).strip().lower() == str_sentiment:
-                output = RouterOutput(
-                    team=normalize_department(override.get("team"), "Marketing"),
-                    sla_hours=override.get("sla_hours", 48),
-                    routed_by=f"router_agent ({str_sentiment} Sentiment)",
-                    is_override=True,
-                    priority=override.get("priority_default"),
-                    description=override.get("description"),
+            if str(override.get("sentiment", "")).strip().lower() != str_sentiment:
+                continue
+            allowed_topics = override.get("topics")
+            if not allowed_topics or topic not in allowed_topics:
+                continue
+            output = RouterOutput(
+                team=normalize_department(override.get("team"), "Marketing"),
+                sla_hours=override.get("sla_hours", 48),
+                routed_by=f"router_agent ({str_sentiment} Sentiment)",
+                is_override=True,
+                priority=override.get("priority_default"),
+                description=override.get("description"),
+            )
+            if log_run:
+                log_agent_run(
+                    run_id=f"router_{int(time.time())}",
+                    agent_name="router_agent",
+                    status="success",
+                    latency_ms=int((time.time() - start_time) * 1000),
+                    output_summary=f"Routed to {output.team} (Sentiment)",
+                    input_hash=f"{topic}_{severity}_{str_sentiment}"
                 )
-                if log_run:
-                    log_agent_run(
-                        run_id=f"router_{int(time.time())}",
-                        agent_name="router_agent",
-                        status="success",
-                        latency_ms=int((time.time() - start_time) * 1000),
-                        output_summary=f"Routed to {output.team} (Sentiment)",
-                        input_hash=f"{topic}_{severity}_{str_sentiment}"
-                    )
-                return output.model_dump()
+            return output.model_dump()
 
     # 3. Routing theo topic
     for route in routing_config.get("routes", []):
