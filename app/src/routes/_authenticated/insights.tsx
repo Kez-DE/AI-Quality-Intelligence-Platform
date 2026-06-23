@@ -14,19 +14,15 @@ export const Route = createFileRoute("/_authenticated/insights")({
 
 const TEAM_LABEL: Record<string, string> = {
   IT: "Kỹ thuật / IT",
-  Safety: "An toàn",
   CSKH: "Chăm sóc khách hàng",
   "Vận hành": "Vận hành",
-  Pricing: "Giá cước",
   Marketing: "Marketing",
 };
 
 const TEAM_HINT: Record<string, string> = {
   IT: "Lỗi ứng dụng, bản đồ, thanh toán trong app",
-  Safety: "Tai nạn, đe doạ, hành hung, rủi ro an toàn",
-  CSKH: "Khiếu nại chung, trải nghiệm dịch vụ, cần phản hồi khách",
-  "Vận hành": "Tài xế, thiếu cuốc, chậm trễ, khu vực nóng",
-  Pricing: "Giá cước, mã giảm giá, cảm nhận chi phí",
+  CSKH: "Khiếu nại chung, trải nghiệm dịch vụ, giá cước, voucher, cần phản hồi khách",
+  "Vận hành": "Tài xế, thiếu cuốc, chậm trễ, khu vực nóng, sự cố an toàn hiện trường",
   Marketing: "Nhận diện thương hiệu, cảm nhận tích cực/tiêu cực thị trường",
 };
 
@@ -208,7 +204,7 @@ function InsightsPage() {
         <div className="font-semibold text-foreground mb-1">Cách hoạt động</div>
         <ol className="list-decimal ml-5 space-y-1">
           <li>Feedback đã được classifier + rule engine gán topic/sentiment/severity.</li>
-          <li>Router Agent route từng feedback về đúng phòng ban theo topic + P5 Safety override.</li>
+          <li>Router Agent route từng feedback về đúng phòng ban theo topic + P5 override (về Vận hành).</li>
           <li>Insight Agent tổng hợp số lượng, mức độ, top chủ đề, ví dụ phản hồi.</li>
           <li>Bấm “Phân tích sâu bằng AI” để Analyst Agent gọi LLM cho riêng phòng ban đó.</li>
         </ol>

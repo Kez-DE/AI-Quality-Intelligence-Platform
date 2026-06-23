@@ -2,8 +2,8 @@ from departments import DEPARTMENTS, alert_department, normalize_department
 
 
 def test_departments_are_distinct_and_canonical():
-    assert DEPARTMENTS == ("IT", "Safety", "CSKH", "Vận hành", "Pricing", "Marketing")
-    assert len(set(DEPARTMENTS)) == 6
+    assert DEPARTMENTS == ("IT", "CSKH", "Vận hành", "Marketing")
+    assert len(set(DEPARTMENTS)) == 4
 
 
 def test_normalize_legacy_department_aliases():
@@ -17,4 +17,4 @@ def test_alert_department_prefers_structured_field_and_supports_legacy():
         "assigned_team": "Marketing",
         "description": "**Assigned Team:** CSKH",
     }) == "Marketing"
-    assert alert_department({"description": "x\n**Assigned Team:** Pricing\n"}) == "Pricing"
+    assert alert_department({"description": "x\n**Assigned Team:** CSKH\n"}) == "CSKH"

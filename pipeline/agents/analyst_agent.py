@@ -14,27 +14,6 @@ from agents.schemas import AnalystOutput, AnalystAnalysis, ActionItem
 # action-item dự phòng (fallback_actions) đúng nghiệp vụ khi LLM lỗi.
 # Phòng không có trong bảng (vd team lạ) -> dùng prompt + action generic.
 DEPARTMENT_PERSONAS: Dict[str, Dict[str, Any]] = {
-    "Safety": {
-        "persona": "Bạn là chuyên gia an toàn vận hành. Tính mạng và sự an toàn của "
-                   "khách hàng, tài xế là ưu tiên TUYỆT ĐỐI.",
-        "priorities": "Luôn giả định tình huống xấu nhất. Nâng mức rủi ro lên 1 cấp khi "
-                      "có dấu hiệu đe doạ an toàn. Đề xuất escalate sớm, không chờ đủ dữ liệu.",
-        "fallback_actions": [
-            ("Escalate ngay các ca nghi mất an toàn lên trực lãnh đạo", "1h"),
-            ("Liên hệ trực tiếp khách hàng/tài xế bị ảnh hưởng để xác minh", "6h"),
-            ("Rà soát quy trình an toàn liên quan và cập nhật cảnh báo", "24h"),
-        ],
-    },
-    "Pricing": {
-        "persona": "Bạn là chuyên gia phân tích giá cước & doanh thu.",
-        "priorities": "Nhìn vấn đề dưới góc doanh thu, độ co giãn giá và rò rỉ doanh thu. "
-                      "Ước lượng tác động tiền bạc và mức độ ảnh hưởng tới chuyển đổi.",
-        "fallback_actions": [
-            ("Rà soát cấu hình giá/khuyến mãi tại khu vực bị phản ánh", "24h"),
-            ("Phân tích tác động doanh thu của vấn đề giá đang gặp", "48h"),
-            ("Đề xuất điều chỉnh chính sách giá/mã giảm giá", "1w"),
-        ],
-    },
     "IT": {
         "persona": "Bạn là kỹ sư phần mềm phân tích sự cố kỹ thuật.",
         "priorities": "Tập trung tìm lỗi kỹ thuật, xác định severity hệ thống và các bước "
