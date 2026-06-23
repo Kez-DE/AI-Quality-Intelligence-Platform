@@ -228,3 +228,16 @@ Chưa phân công. TODO: ai làm module nào, deadline nội bộ.
 ### Bug Fix — Agent Crash (502 & 422)
 - **Lỗi 502 Bad Gateway (Staff Chat)**: Fix lỗi `UnboundLocalError` do import hàm `run_chat_agent` bên trong scope của khối lệnh `if user.role == "guest":`. Đã di chuyển import ra file-level scope để nhánh code của Staff chạy ổn định.
 - **Lỗi 422 Unprocessable Content (Validation)**: Fix lỗi API từ chối request gửi lên từ Frontend khi lịch sử chat kèm phản hồi dài của AI bị quá giới hạn. Tăng `max_length` của trường `content` trong schema `ChatMessageReq` từ 2000 lên 15000 ký tự.
+
+## 2026-06-23
+
+### Đổi mapping định tuyến topic → phòng ban (router_agent / routing_table)
+- **Vấn đề / Yêu cầu**: Bố cục phòng ban thay đổi — topic Safety và Pricing không còn do đội riêng xử lý.
+- **Thay đổi mapping** (`data/taxonomy/routing_table.json`):
+  - **Safety** → chuyển từ đội `Safety` sang **`Vận hành`** (đội phản ứng nhanh tại hiện trường). Giữ SLA 1h / P5.
+  - **Pricing** → chuyển từ đội `Pricing` sang **`CSKH`** (front-line nhận khiếu nại voucher/khuyến mãi/trừ tiền không rõ lý do), **phối hợp IT** kiểm tra lỗi kỹ thuật. SLA 24h→12h, priority P4→P3.
+- **Sửa override P5 (QUAN TRỌNG)**: `severity_overrides` P5 trước đây ép về `Safety` (Safety-first) → đổi đích sang **`Vận hành`**. Bắt buộc phải sửa để tránh mâu thuẫn với việc topic Safety đã chuyển sang Vận hành. **Quyết định này thay thế (supersede) chính sách "Chuẩn hóa định tuyến P5 theo Safety-first" ghi ngày 2026-06-20.**
+- **Quyết định — Pricing đa-phòng (IT + CSKH)**: `route_ticket()` chỉ trả về MỘT team. Chọn **hướng (a)**: 1 team chính = `CSKH`, ghi chú phối hợp IT trong `description`/Routing Note — thay vì (b) mở rộng schema/router/DB/UI cho nhiều team. Lý do: nhiều call site lọc bằng so sánh chuỗi `route_ticket(...)["team"] == scope_team` (chat_tools, insight_agent, agent_context, spike_detector); chuyển multi-team sẽ vỡ các filter này + DB `assigned_team` + UI. Hướng (a) không đụng schema, an toàn.
+- **Cập nhật code phụ trợ**: `router_agent.py` đổi fallback default của P5 override `"Safety"`→`"Vận hành"`, sửa docstring/comment/demo `__main__`.
+- **Lưu ý**: Phòng `Safety` và `Pricing` VẪN giữ trong `departments.py` (RBAC + alias) — chỉ bỏ vai trò làm đích routing tự động, KHÔNG xóa khỏi phân quyền (sẽ là thay đổi riêng nếu cần).
+- **Test**: Cập nhật `tests/test_router_agent.py`, `tests/test_spike_detector.py`, `tests/test_feedback_scope.py` cho khớp hành vi mới. Chạy `python -m pytest tests/test_router_agent.py tests/test_spike_detector.py -q` → 10 passed. (`test_feedback_scope.py` không collect được do môi trường thiếu `apscheduler` khi import `main.py` — lỗi sẵn có, không liên quan thay đổi.)

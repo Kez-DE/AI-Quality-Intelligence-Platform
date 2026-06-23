@@ -46,7 +46,7 @@ class TestSpikeDetector(unittest.TestCase):
     @patch("spike_detector.analyze_spike")
     @patch("spike_detector.get_supabase")
     @patch("spike_detector.has_supabase_admin_key", return_value=True)
-    def test_overall_risk_drives_safety_override(
+    def test_overall_risk_drives_p5_override(
         self,
         _mock_has_key,
         mock_get_supabase,
@@ -67,7 +67,7 @@ class TestSpikeDetector(unittest.TestCase):
 
         detect_spikes(max_spikes=1)
 
-        self.assertEqual(mock_create_ticket.call_args.kwargs["team"], "Safety")
+        self.assertEqual(mock_create_ticket.call_args.kwargs["team"], "Vận hành")
         self.assertEqual(mock_create_ticket.call_args.kwargs["severity"], "P5")
 
     @patch("spike_detector.get_supabase")
@@ -101,7 +101,7 @@ class TestSpikeDetector(unittest.TestCase):
     @patch("spike_detector.analyze_spike")
     @patch("spike_detector.get_supabase")
     @patch("spike_detector.has_supabase_admin_key", return_value=True)
-    def test_p5_creates_immediate_safety_ticket(
+    def test_p5_creates_immediate_incident_ticket(
         self,
         _mock_has_key,
         mock_get_supabase,
@@ -129,7 +129,7 @@ class TestSpikeDetector(unittest.TestCase):
 
         self.assertEqual(result["alerts_created"], 1)
         kwargs = mock_create_ticket.call_args.kwargs
-        self.assertEqual(kwargs["team"], "Safety")
+        self.assertEqual(kwargs["team"], "Vận hành")
         self.assertEqual(kwargs["topic"], "Safety")
         self.assertEqual(kwargs["ticket_type"], "incident")
         outbound_text = mock_analyze_spike.call_args.args[1][0]

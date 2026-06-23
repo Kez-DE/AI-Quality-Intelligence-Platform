@@ -37,7 +37,7 @@ def route_ticket(
     """Định tuyến ticket về đúng phòng ban.
 
     Thứ tự ưu tiên:
-      1. Severity override — P5/P0 ép về Safety (Safety-first), thắng tất cả.
+      1. Severity override — P5 ép về Vận hành (đội phản ứng nhanh), thắng tất cả.
       2. Sentiment override — feedback positive về Marketing (cảm nhận thương hiệu).
       3. Topic match — theo bảng routes.
       4. Default team.
@@ -45,7 +45,7 @@ def route_ticket(
     start_time = time.time()
     routing_config = load_routing_table()
 
-    # 1. Severity override trước (Safety-first)
+    # 1. Severity override trước (P5 -> Vận hành, phản ứng nhanh)
     str_sev = str(severity).strip().upper()
     formatted_sev = f"P{str_sev}" if str_sev.isdigit() else str_sev
     if formatted_sev not in {"P1", "P2", "P3", "P4", "P5"}:
@@ -56,7 +56,7 @@ def route_ticket(
         ov_sev = str(override.get("severity", "")).upper()
         if formatted_sev == ov_sev:
             output = RouterOutput(
-                team=normalize_department(override.get("team"), "Safety"),
+                team=normalize_department(override.get("team"), "Vận hành"),
                 sla_hours=override.get("sla_hours", 1),
                 routed_by=f"router_agent ({ov_sev} Override)",
                 is_override=True,
@@ -142,5 +142,5 @@ def route_ticket(
 
 if __name__ == "__main__":
     print(route_ticket("App Issue", 3))
-    print(route_ticket("General Inquiry", 5))  # -> Safety override
+    print(route_ticket("General Inquiry", 5))  # -> Vận hành override
     print(route_ticket("Other", 2, sentiment="positive"))  # -> Marketing
