@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   AlertTriangle,
   CheckCircle2,
+  ChevronDown,
   Clock,
   Headphones,
   Loader2,
@@ -348,25 +349,31 @@ function AlertsPage() {
         </div>
 
         <div className="flex gap-2">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 min-h-[44px] rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-xanh-green/50"
-          >
-            <option value="all">Mọi trạng thái</option>
-            <option value="open">🔴 Chờ xử lý</option>
-            <option value="in_progress">🟡 Đang xử lý</option>
-            <option value="resolved">🟢 Đã xong</option>
-          </select>
-          <select
-            value={severityFilter}
-            onChange={(e) => setSeverityFilter(e.target.value)}
-            className="px-3 min-h-[44px] rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-xanh-green/50"
-          >
-            <option value="all">Mọi độ ưu tiên</option>
-            <option value="high">🔥 Cao (P5/P4)</option>
-            <option value="low">🧊 Thấp (P3-P1)</option>
-          </select>
+          <div className="relative">
+            <ChevronDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="appearance-none pl-9 pr-3 min-h-[44px] rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-xanh-green/50"
+            >
+              <option value="all">Mọi trạng thái</option>
+              <option value="open">🔴 Chờ xử lý</option>
+              <option value="in_progress">🟡 Đang xử lý</option>
+              <option value="resolved">🟢 Đã xong</option>
+            </select>
+          </div>
+          <div className="relative">
+            <ChevronDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <select
+              value={severityFilter}
+              onChange={(e) => setSeverityFilter(e.target.value)}
+              className="appearance-none pl-9 pr-3 min-h-[44px] rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-xanh-green/50"
+            >
+              <option value="all">Mọi độ ưu tiên</option>
+              <option value="high">🔥 Cao (P5/P4)</option>
+              <option value="low">🧊 Thấp (P3-P1)</option>
+            </select>
+          </div>
         </div>
       </div>
 
