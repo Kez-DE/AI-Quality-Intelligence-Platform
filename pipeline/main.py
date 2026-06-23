@@ -83,6 +83,20 @@ def _feedback_team(feedback: dict) -> str:
     )["team"]
 
 
+# Khung giờ dùng cho heatmap khu vực × giờ trên cockpit.
+COCKPIT_HOUR_BUCKETS = ["06", "09", "12", "15", "18", "21"]
+
+
+def _hour_bucket(dt: datetime) -> str:
+    """Gom giờ trong ngày về một trong các mốc COCKPIT_HOUR_BUCKETS (mốc <= giờ)."""
+    hour = dt.hour
+    chosen = 6
+    for bucket in (6, 9, 12, 15, 18, 21):
+        if hour >= bucket:
+            chosen = bucket
+    return f"{chosen:02d}"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global scheduler
@@ -1073,6 +1087,261 @@ def get_department_insights(
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Insight error: {str(exc)[:300]}") from exc
     return {"status": "success", "data": insights}
+
+@app.get("/api/cockpit/overview")
+def cockpit_overview(
+    days: int = Query(default=14, ge=1, le=90),
+    user: AuthUser = Depends(get_current_user),
+):
+    """Số liệu tổng hợp cho Quality Cockpit, scope theo RBAC phòng ban.
+
+    - admin: toàn bộ phòng.
+    - manager/staff đã gán phòng: chỉ phòng mình.
+    - manager/staff chưa gán phòng: trả unassigned=true (frontend hiện thông báo).
+    - guest: payload rút gọn (kpis cơ bản + trend + categories; không alerts/tickets/heatmap).
+
+    Mọi truy vấn bọc try/except — lỗi DB không làm vỡ trang (trả field rỗng + db_error).
+    """
+    role = user.role
+    now = datetime.now(timezone.utc)
+    window_start = now - timedelta(days=days)
+    empty_heatmap = {"areas": [], "hours": COCKPIT_HOUR_BUCKETS, "cells": []}
+
+    # ----- Scope theo RBAC -----
+    restricted = role == "guest"
+    if role == "admin":
+        team = None
+    elif role in ("manager", "staff"):
+        if not user.department:
+            # Khác /api/insights: cockpit không 403, trả cờ unassigned để frontend hiện thông báo.
+            return {"status": "success", "data": {
+                "scope": {"team": None, "role": role, "unassigned": True, "restricted": False},
+                "window_days": days,
+                "generated_at": now.isoformat(),
+                "kpis": {}, "trend": [], "trend_sentiment": [], "categories": [],
+                "heatmap": empty_heatmap, "risk_distribution": [],
+                "funnel": {}, "sankey_flows": [],
+                "db_error": None,
+            }}
+        team = user.department
+    else:  # guest
+        team = None
+
+    # ----- Lấy feedback trong cửa sổ (1 lượt), filter theo phòng nếu là ops -----
+    db_error = None
+    feedback_rows: list[dict] = []
+    try:
+        db = get_supabase()
+        rows = db.table("feedback") \
+            .select("id,topic,sentiment,severity,area,created_at,needs_review,overall_risk") \
+            .gte("created_at", window_start.isoformat()) \
+            .order("created_at", desc=True) \
+            .limit(5000) \
+            .execute().data or []
+        if team:
+            rows = [r for r in rows if _feedback_team(r) == team]
+        feedback_rows = rows
+    except Exception as exc:  # noqa: BLE001 - stats không được làm vỡ trang
+        db_error = str(exc)[:200]
+
+    # ----- Aggregate feedback -----
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    yesterday_start = today_start - timedelta(days=1)
+    feedback_today = feedback_yesterday = neg_today = needs_review = 0
+    total_window = neg_window = 0
+
+    trend_map: dict[str, dict] = {}
+    for i in range(days):
+        d = (today_start - timedelta(days=days - 1 - i)).date().isoformat()
+        trend_map[d] = {"date": d, "total": 0, "negative": 0}
+
+    # trend_sentiment: cùng cấu trúc trend_map nhưng tách theo sentiment
+    sentiment_map: dict[str, dict] = {}
+    for d in trend_map:
+        sentiment_map[d] = {"date": d, "positive": 0, "neutral": 0, "negative": 0}
+
+    cat_counts: dict[str, int] = {}
+    heat: dict[tuple, int] = {}
+    area_neg_total: dict[str, int] = {}
+    risk_counter: dict[int, int] = {}          # overall_risk 1-10
+    classified_count = 0                         # có topic != null
+    sankey_sent_sev: dict[tuple, int] = {}      # (sentiment, severity) → count
+
+    for r in feedback_rows:
+        dt = _parse_timestamp(r.get("created_at"))
+        if not dt:
+            continue
+        sent = r.get("sentiment") or "neutral"
+        is_neg = sent == "negative"
+        total_window += 1
+        if is_neg:
+            neg_window += 1
+        dkey = dt.date().isoformat()
+        if dkey in trend_map:
+            trend_map[dkey]["total"] += 1
+            if is_neg:
+                trend_map[dkey]["negative"] += 1
+        if dkey in sentiment_map:
+            key = sent if sent in ("positive", "neutral", "negative") else "neutral"
+            sentiment_map[dkey][key] += 1
+        if dt >= today_start:
+            feedback_today += 1
+            if is_neg:
+                neg_today += 1
+        elif dt >= yesterday_start:
+            feedback_yesterday += 1
+        if r.get("needs_review"):
+            needs_review += 1
+        topic = r.get("topic") or "Khác"
+        if r.get("topic"):
+            classified_count += 1
+        cat_counts[topic] = cat_counts.get(topic, 0) + 1
+        if is_neg:
+            area = r.get("area") or "Khác"
+            hb = _hour_bucket(dt)
+            heat[(area, hb)] = heat.get((area, hb), 0) + 1
+            area_neg_total[area] = area_neg_total.get(area, 0) + 1
+        # risk distribution
+        risk_raw = r.get("overall_risk")
+        if risk_raw is not None:
+            try:
+                score = max(1, min(10, int(risk_raw)))
+                risk_counter[score] = risk_counter.get(score, 0) + 1
+            except (ValueError, TypeError):
+                pass
+        # sankey layer1: sentiment × severity
+        sev = r.get("severity") or ""
+        if sent in ("positive", "neutral", "negative") and sev:
+            sankey_sent_sev[(sent, sev)] = sankey_sent_sev.get((sent, sev), 0) + 1
+
+    feedback_today_delta_pct = (
+        round((feedback_today - feedback_yesterday) / feedback_yesterday * 100, 1)
+        if feedback_yesterday else None
+    )
+    negative_rate = round(neg_window / total_window * 100, 1) if total_window else 0.0
+    negative_rate_today = round(neg_today / feedback_today * 100, 1) if feedback_today else 0.0
+
+    categories = [
+        {"topic": t, "count": c, "pct": round(c / total_window * 100, 1) if total_window else 0.0}
+        for t, c in sorted(cat_counts.items(), key=lambda kv: -kv[1])
+    ]
+
+    top_areas = [a for a, _ in sorted(area_neg_total.items(), key=lambda kv: -kv[1])[:7]]
+    cells = [
+        {"area": a, "hour": hb, "negative_count": c}
+        for (a, hb), c in heat.items() if a in top_areas
+    ]
+
+    kpis = {
+        "feedback_today": feedback_today,
+        "feedback_today_delta_pct": feedback_today_delta_pct,
+        "negative_rate": negative_rate,
+        "negative_rate_today": negative_rate_today,
+        "needs_review": needs_review,
+        "window_total": total_window,
+    }
+
+    # ----- KPI từ tasks/alerts/correction_logs (chỉ ops/admin) -----
+    if not restricted and db_error is None:
+        alerts_open = tickets_open = corrections_7d = 0
+        tickets_by_priority: dict[str, int] = {}
+        try:
+            db = get_supabase()
+            tq = db.table("tasks").select("status,priority,assigned_team").neq("status", "resolved").limit(2000)
+            if team:
+                tq = tq.eq("assigned_team", team)
+            for t in tq.execute().data or []:
+                tickets_open += 1
+                p = t.get("priority") or "P3"
+                tickets_by_priority[p] = tickets_by_priority.get(p, 0) + 1
+            arows = db.table("alerts").select("*").neq("status", "resolved") \
+                .order("created_at", desc=True).limit(2000).execute().data or []
+            if team:
+                arows = [a for a in arows if alert_department(a) == team]
+            alerts_open = len(arows)
+            corrections_7d = len(
+                db.table("correction_logs").select("id")
+                .gte("created_at", (now - timedelta(days=7)).isoformat())
+                .limit(5000).execute().data or []
+            )
+        except Exception as exc:  # noqa: BLE001
+            db_error = str(exc)[:200]
+        kpis.update({
+            "alerts_open": alerts_open,
+            "tickets_open": tickets_open,
+            "tickets_by_priority": tickets_by_priority,
+            "corrections_7d": corrections_7d,
+        })
+
+    # ----- Chart data: risk_distribution -----
+    risk_distribution = [
+        {"score": s, "count": risk_counter.get(s, 0)} for s in range(1, 11)
+    ]
+
+    # ----- Chart data: trend_sentiment -----
+    trend_sentiment = list(sentiment_map.values())
+
+    # ----- Chart data: funnel + sankey (chỉ ops/admin) -----
+    funnel: dict = {}
+    sankey_flows: list = []
+    if not restricted and db_error is None:
+        try:
+            db2 = get_supabase()
+            # Funnel: alerts + tasks trong cửa sổ
+            alerts_triggered = len(
+                db2.table("alerts").select("id")
+                .gte("created_at", window_start.isoformat())
+                .limit(5000).execute().data or []
+            )
+            all_tasks = db2.table("tasks").select("id,status,priority,assigned_team") \
+                .gte("created_at", window_start.isoformat()) \
+                .limit(5000).execute().data or []
+            if team:
+                all_tasks = [t for t in all_tasks if t.get("assigned_team") == team]
+            tickets_created = len(all_tasks)
+            resolved_count = sum(1 for t in all_tasks if t.get("status") == "resolved")
+            funnel = {
+                "total": total_window,
+                "classified": classified_count,
+                "needs_review": needs_review,
+                "alerts_triggered": alerts_triggered,
+                "tickets_created": tickets_created,
+                "resolved": resolved_count,
+            }
+            # Sankey layer 2: severity × status từ tasks
+            sankey_sev_status: dict[tuple, int] = {}
+            for t in all_tasks:
+                p = t.get("priority") or ""
+                s = t.get("status") or ""
+                if p and s:
+                    sankey_sev_status[(p, s)] = sankey_sev_status.get((p, s), 0) + 1
+            # Merge flows
+            for (sent, sev), v in sankey_sent_sev.items():
+                if v > 0:
+                    sankey_flows.append({"from": sent, "to": sev, "value": v})
+            for (sev, st), v in sankey_sev_status.items():
+                if v > 0:
+                    sankey_flows.append({"from": sev, "to": st, "value": v})
+        except Exception as exc:  # noqa: BLE001
+            db_error = str(exc)[:200]
+
+    return {"status": "success", "data": {
+        "scope": {"team": team, "role": role, "unassigned": False, "restricted": restricted},
+        "window_days": days,
+        "generated_at": now.isoformat(),
+        "kpis": kpis,
+        "trend": list(trend_map.values()),
+        "trend_sentiment": trend_sentiment,
+        "categories": categories,
+        "heatmap": empty_heatmap if restricted else {
+            "areas": top_areas, "hours": COCKPIT_HOUR_BUCKETS, "cells": cells,
+        },
+        "risk_distribution": risk_distribution,
+        "funnel": funnel,
+        "sankey_flows": sankey_flows,
+        "db_error": db_error,
+    }}
+
 
 @app.post("/api/agent/run")
 def run_multi_agent_pipeline(
