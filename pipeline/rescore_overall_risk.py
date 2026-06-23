@@ -7,9 +7,11 @@ cho DỮ LIỆU CŨ:
 
   Phase A — feedback: tính lại overall_risk TỪ 5 điểm rủi ro ĐÃ LƯU (không gọi
             LLM, hoàn toàn xác định). Cập nhật row nào lệch.
-  Phase B — alerts:  re-route các ticket đang mở bị đẩy nhầm sang team Safety
-            (assigned_team='Safety' nhưng topic KHÔNG phải Safety). Hạ severity
-            về P4 và định tuyến lại theo topic.
+  Phase B — alerts:  re-route MỌI ticket đang mở có assigned_team='Safety' sang
+            routing mới (không còn team Safety nhận routing tự động).
+            - topic != Safety: bị ép nhầm lên P5/Safety -> hạ P4, route theo topic.
+            - topic == Safety: sự cố an toàn thật -> giữ severity gốc, P5 override
+              chuyển sang team Vận hành (đội phản ứng nhanh).
 
 MẶC ĐỊNH chạy dry-run (chỉ in ra thay đổi). Thêm --apply để ghi vào DB.
 
@@ -112,25 +114,35 @@ def rescore_feedback(db, apply: bool) -> dict:
 
 
 def reroute_alerts(db, apply: bool) -> dict:
-    """Phase B: re-route alert đang mở bị ép nhầm về Safety (topic != Safety)."""
+    """Phase B: re-route MỌI alert đang mở có assigned_team='Safety' sang routing mới.
+
+    Chính sách mới: không còn team Safety nhận routing tự động.
+    - topic != 'Safety': bị ép nhầm lên P5/Safety trước đây -> hạ về P4 (để vượt
+      qua override P5) rồi định tuyến lại theo topic.
+    - topic == 'Safety': sự cố an toàn thật -> giữ severity gốc; override P5 đưa
+      sang team Vận hành (đội phản ứng nhanh).
+    """
     rows = _fetch_all(
         db, "alerts", "id,title,topic,assigned_team,severity,priority,area,status,ticket_type",
         lambda q: q.in_("status", ["open", "in_progress"]).eq("assigned_team", "Safety"),
     )
 
-    # Bị đẩy nhầm = team Safety nhưng topic không phải Safety (và có topic rõ).
-    mislabeled = [r for r in rows if (r.get("topic") or "").strip() not in ("", "Safety")]
-
     print(f"\n=== Phase B — alerts ===")
-    print(f"Alert team=Safety đang mở: {len(rows)} | bị đẩy nhầm (topic != Safety): {len(mislabeled)}")
+    print(f"Alert team=Safety đang mở: {len(rows)} (re-route toàn bộ theo routing mới)")
 
     changes = []
-    for r in mislabeled:
-        topic = r["topic"]
-        # Topic phi-an-toàn không thể là P5 theo luật mới -> hạ về P4, định tuyến lại theo topic.
-        route = route_ticket(topic, "P4", "negative", log_run=False)
+    for r in rows:
+        topic = (r.get("topic") or "").strip() or "Other"
+        if topic == "Safety":
+            # Sự cố an toàn thật: giữ severity gốc, để override quyết định team (-> Vận hành).
+            sev_in = r.get("severity") or "P5"
+            route = route_ticket(topic, sev_in, "negative", log_run=False)
+            new_prio = route.get("priority") or sev_in
+        else:
+            # Topic phi-an-toàn bị ép nhầm P5/Safety -> hạ về P4, định tuyến lại theo topic.
+            route = route_ticket(topic, "P4", "negative", log_run=False)
+            new_prio = route.get("priority") or "P4"
         new_team = route["team"]
-        new_prio = route.get("priority") or "P4"
         changes.append((r["id"], r.get("title", "")[:40], topic, r.get("assigned_team"),
                         new_team, r.get("severity"), new_prio))
 
