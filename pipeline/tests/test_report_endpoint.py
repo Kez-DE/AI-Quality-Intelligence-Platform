@@ -13,9 +13,9 @@ def _user(role: str, department=None) -> AuthUser:
 
 def test_manager_can_only_generate_own_department_report():
     with patch("agents.task_agent.generate_daily_report", return_value={"status": "success"}) as generate:
-        trigger_daily_report(team="IT", user=_user("manager", "Safety"))
+        trigger_daily_report(team="IT", user=_user("manager", "Vận hành"))
 
-    generate.assert_called_once_with("Safety")
+    generate.assert_called_once_with("Vận hành")
 
 
 def test_admin_can_generate_selected_department_report():

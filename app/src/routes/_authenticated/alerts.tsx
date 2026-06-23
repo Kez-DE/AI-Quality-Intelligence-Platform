@@ -3,14 +3,12 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   AlertTriangle,
-  BadgeDollarSign,
   CheckCircle2,
   Clock,
   Headphones,
   Loader2,
   MapPin,
   RefreshCw,
-  Shield,
   Siren,
   Megaphone,
   Wrench,
@@ -81,14 +79,7 @@ const TEAM_CONFIG: Record<
     color: "text-purple-700",
     bg: "bg-purple-50 border-purple-200",
   },
-  Safety: { label: "Safety", icon: Shield, color: "text-red-700", bg: "bg-red-50 border-red-200" },
   IT: { label: "IT", icon: Zap, color: "text-yellow-700", bg: "bg-yellow-50 border-yellow-200" },
-  Pricing: {
-    label: "Pricing",
-    icon: BadgeDollarSign,
-    color: "text-emerald-700",
-    bg: "bg-emerald-50 border-emerald-200",
-  },
   Marketing: {
     label: "Marketing",
     icon: Megaphone,

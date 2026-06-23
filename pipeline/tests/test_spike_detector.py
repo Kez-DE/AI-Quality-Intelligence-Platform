@@ -32,15 +32,15 @@ def _database(feedback, alerts=None):
 class TestSpikeDetector(unittest.TestCase):
     def test_candidate_selection_prioritizes_department_coverage(self):
         candidates = [
-            {"area": "A", "topic": "Safety", "team": "Safety"},
-            {"area": "B", "topic": "Safety", "team": "Safety"},
+            {"area": "A", "topic": "Safety", "team": "Vận hành"},
+            {"area": "B", "topic": "Safety", "team": "Vận hành"},
             {"area": "C", "topic": "App Issue", "team": "IT"},
             {"area": "D", "topic": "Other", "team": "Marketing"},
         ]
 
         selected = _select_candidates(candidates, recent_alerts=[], limit=3)
 
-        self.assertEqual([group["team"] for group in selected], ["Safety", "IT", "Marketing"])
+        self.assertEqual([group["team"] for group in selected], ["Vận hành", "IT", "Marketing"])
 
     @patch("spike_detector.create_or_update_ticket")
     @patch("spike_detector.analyze_spike")

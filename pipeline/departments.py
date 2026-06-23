@@ -3,17 +3,15 @@
 from typing import Optional
 
 
-DEPARTMENTS = ("IT", "Safety", "CSKH", "Vận hành", "Pricing", "Marketing")
+DEPARTMENTS = ("IT", "CSKH", "Vận hành", "Marketing")
 
 _DEPARTMENT_ALIASES = {
     "it": "IT",
-    "safety": "Safety",
     "cskh": "CSKH",
     "vận hành": "Vận hành",
     "vận hành & đào tạo": "Vận hành",
     "van hanh": "Vận hành",
     "driver mgmt": "Vận hành",
-    "pricing": "Pricing",
     "marketing": "Marketing",
 }
 
