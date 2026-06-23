@@ -103,8 +103,15 @@ jobs:
               frontend=true
             fi
 
+            # Loại các file KHÔNG ảnh hưởng runtime của worker: test + script chạy
+            # tay/offline (không được worker_*.py / main.py import). Sửa các file này
+            # KHÔNG cần redeploy backend/worker -> tránh deploy toàn bộ vô ích.
+            deploy_relevant="$(echo "$changed_files" | grep -vE '^pipeline/(tests/|eval/|scripts/|test_[^/]*\.py$|rescore_overall_risk\.py$|check_rag_data\.py$|seed_graph_kb\.py$)' || true)"
+            echo "Deploy-relevant changes:"
+            echo "$deploy_relevant"
+
             # Backend + all workers share the same source (pipeline/ + data/).
-            if echo "$changed_files" | grep -Eq '^(pipeline/|data/|railway\.json$|\.env\.example$|\.github/workflows/railway\.yml$)'; then
+            if echo "$deploy_relevant" | grep -Eq '^(pipeline/|data/|railway\.json$|\.env\.example$|\.github/workflows/railway\.yml$)'; then
               backend=true
               backend_worker=true
               ingest_worker=true
