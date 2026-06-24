@@ -15,7 +15,7 @@ export function AdvancedAnalytics() {
   if (isUnassigned) return null;
 
   return (
-    <div className="rounded-2xl border border-border bg-white/60 backdrop-blur overflow-hidden">
+    <div className="rounded-2xl border border-border bg-card/60 backdrop-blur overflow-hidden">
       {/* Header toggle */}
       <button
         onClick={() => setIsOpen((v) => !v)}

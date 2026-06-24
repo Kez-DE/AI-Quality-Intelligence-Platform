@@ -131,7 +131,7 @@ export function ValueView() {
           {PERSONAS.map((p) => {
             const Icon = p.icon;
             return (
-              <div key={p.t} className="rounded-xl border border-border bg-white p-4 hover:shadow-md hover:-translate-y-0.5 transition-all group">
+              <div key={p.t} className="rounded-xl border border-border bg-card p-4 hover:shadow-md hover:-translate-y-0.5 transition-all group">
                 <div className="flex items-start justify-between gap-2 mb-3">
                   <div className="h-9 w-9 rounded-lg bg-xanh-mint grid place-items-center">
                     <Icon className="h-5 w-5 text-xanh-deep" />
@@ -160,7 +160,7 @@ export function ValueView() {
             ].map((item) => {
               const Icon = item.icon;
               return (
-                <div key={item.t} className="rounded-xl border border-border bg-gradient-to-br from-white to-xanh-mint/20 p-4">
+                <div key={item.t} className="rounded-xl border border-border bg-gradient-to-br from-card to-xanh-mint/20 p-4">
                   <div className="h-8 w-8 rounded-lg grid place-items-center mb-3" style={{ background: `color-mix(in oklch, ${item.color} 15%, white)` }}>
                     <Icon className="h-4 w-4" style={{ color: item.color }} />
                   </div>

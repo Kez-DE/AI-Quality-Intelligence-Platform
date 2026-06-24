@@ -19,6 +19,7 @@ import { Route as AuthenticatedLiveStreamRouteImport } from './routes/_authentic
 import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
 import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticated/feedback'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedCompletionReportsRouteImport } from './routes/_authenticated/completion-reports'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedAlertsRouteImport } from './routes/_authenticated/alerts'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
@@ -73,6 +74,12 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedCompletionReportsRoute =
+  AuthenticatedCompletionReportsRouteImport.update({
+    id: '/completion-reports',
+    path: '/completion-reports',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedChatRoute = AuthenticatedChatRouteImport.update({
   id: '/chat',
   path: '/chat',
@@ -101,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRoute
   '/alerts': typeof AuthenticatedAlertsRoute
   '/chat': typeof AuthenticatedChatRoute
+  '/completion-reports': typeof AuthenticatedCompletionReportsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/insights': typeof AuthenticatedInsightsRoute
@@ -116,6 +124,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminRoute
   '/alerts': typeof AuthenticatedAlertsRoute
   '/chat': typeof AuthenticatedChatRoute
+  '/completion-reports': typeof AuthenticatedCompletionReportsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/insights': typeof AuthenticatedInsightsRoute
@@ -133,6 +142,7 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/alerts': typeof AuthenticatedAlertsRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
+  '/_authenticated/completion-reports': typeof AuthenticatedCompletionReportsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/feedback': typeof AuthenticatedFeedbackRoute
   '/_authenticated/insights': typeof AuthenticatedInsightsRoute
@@ -150,6 +160,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/alerts'
     | '/chat'
+    | '/completion-reports'
     | '/dashboard'
     | '/feedback'
     | '/insights'
@@ -165,6 +176,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/alerts'
     | '/chat'
+    | '/completion-reports'
     | '/dashboard'
     | '/feedback'
     | '/insights'
@@ -181,6 +193,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/alerts'
     | '/_authenticated/chat'
+    | '/_authenticated/completion-reports'
     | '/_authenticated/dashboard'
     | '/_authenticated/feedback'
     | '/_authenticated/insights'
@@ -269,6 +282,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/completion-reports': {
+      id: '/_authenticated/completion-reports'
+      path: '/completion-reports'
+      fullPath: '/completion-reports'
+      preLoaderRoute: typeof AuthenticatedCompletionReportsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/chat': {
       id: '/_authenticated/chat'
       path: '/chat'
@@ -304,6 +324,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAlertsRoute: typeof AuthenticatedAlertsRoute
   AuthenticatedChatRoute: typeof AuthenticatedChatRoute
+  AuthenticatedCompletionReportsRoute: typeof AuthenticatedCompletionReportsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFeedbackRoute: typeof AuthenticatedFeedbackRoute
   AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
@@ -318,6 +339,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAlertsRoute: AuthenticatedAlertsRoute,
   AuthenticatedChatRoute: AuthenticatedChatRoute,
+  AuthenticatedCompletionReportsRoute: AuthenticatedCompletionReportsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFeedbackRoute: AuthenticatedFeedbackRoute,
   AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,

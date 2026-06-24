@@ -100,6 +100,21 @@ function getTeamConfig(team: string) {
   return TEAM_CONFIG[normalizeTeam(team)] ?? TEAM_CONFIG.CSKH;
 }
 
+// Mức độ ưu tiên P1-P5 — màu + nhãn riêng cho từng cấp (P5 khẩn cấp nhất).
+const SEVERITY_META: Record<string, { label: string; short: string; dot: string; badge: string }> = {
+  P5: { label: "P5 · Khẩn cấp", short: "P5", dot: "bg-red-500", badge: "bg-red-50 border-red-200 text-red-700" },
+  P4: { label: "P4 · Rất cao", short: "P4", dot: "bg-orange-500", badge: "bg-orange-50 border-orange-200 text-orange-700" },
+  P3: { label: "P3 · Cao", short: "P3", dot: "bg-amber-500", badge: "bg-amber-50 border-amber-200 text-amber-800" },
+  P2: { label: "P2 · Trung bình", short: "P2", dot: "bg-blue-500", badge: "bg-blue-50 border-blue-200 text-blue-700" },
+  P1: { label: "P1 · Thấp", short: "P1", dot: "bg-slate-400", badge: "bg-slate-50 border-slate-200 text-slate-600" },
+};
+
+const SEVERITY_LEVELS = ["P5", "P4", "P3", "P2", "P1"] as const;
+
+function severityMeta(sev: string | null | undefined) {
+  return SEVERITY_META[String(sev || "").trim().toUpperCase()] ?? SEVERITY_META.P3;
+}
+
 const TABS = ["Tất cả", ...ALL_TEAMS] as const;
 
 type LiveStreamStatus = {
@@ -199,11 +214,9 @@ function AlertsPage() {
       const { assigned_team } = alertMetadata(a);
       if (assigned_team !== activeTab) return false;
     }
-    // 2. Lọc theo Severity
-    if (severityFilter === "high") {
-      if (a.severity !== "P5" && a.severity !== "P4") return false;
-    } else if (severityFilter === "low") {
-      if (a.severity === "P5" || a.severity === "P4") return false;
+    // 2. Lọc theo Mức độ ưu tiên (P1-P5)
+    if (severityFilter !== "all" && a.severity !== severityFilter) {
+      return false;
     }
     // 3. Lọc theo Status
     if (statusFilter !== "all" && a.status !== statusFilter) {
@@ -228,7 +241,7 @@ function AlertsPage() {
       <div className="space-y-6">
         <h1 className="font-display text-3xl font-bold flex items-center gap-2">
           <Siren className="h-7 w-7 text-xanh-coral" />
-          Ticket Triage
+          Phân loại Ticket
         </h1>
         <NoDepartmentNotice />
       </div>
@@ -242,7 +255,7 @@ function AlertsPage() {
         <div>
           <h1 className="font-display text-3xl font-bold flex items-center gap-2">
             <Siren className="h-7 w-7 text-xanh-coral" />
-            Ticket Triage
+            Phân loại Ticket
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Cảnh báo AI tự động phân loại và giao về đúng phòng ban.
@@ -250,7 +263,7 @@ function AlertsPage() {
         </div>
         <button
           onClick={() => fetchAlerts(true)}
-          className="flex items-center gap-2 px-4 min-h-[44px] rounded-xl border border-border bg-white text-sm hover:bg-muted/50 transition-colors"
+          className="flex items-center gap-2 px-4 min-h-[44px] rounded-xl border border-border bg-card text-sm hover:bg-muted/50 transition-colors"
         >
           <RefreshCw className="h-4 w-4" />
           Làm mới
@@ -273,7 +286,7 @@ function AlertsPage() {
         </div>
       </div>
 
-      <div className="border border-border bg-white px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+      <div className="border border-border bg-card px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
         <span className="inline-flex items-center gap-2 font-semibold">
           <span
             className={`h-2 w-2 rounded-full ${stream?.running ? "bg-xanh-green animate-pulse" : "bg-muted-foreground"}`}
@@ -330,7 +343,7 @@ function AlertsPage() {
                     className={`flex items-center justify-center gap-1.5 px-4 min-h-[44px] rounded-full text-sm font-medium border transition-all ${
                       activeTab === tab
                         ? "border-xanh-green bg-xanh-deep text-white shadow"
-                        : "border-border bg-white text-muted-foreground hover:border-xanh-green/40 hover:text-foreground"
+                        : "border-border bg-card text-muted-foreground hover:border-xanh-green/40 hover:text-foreground"
                     }`}
                   >
                     {Icon && <Icon className="h-4 w-4" />}
@@ -354,9 +367,9 @@ function AlertsPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="appearance-none pl-9 pr-3 min-h-[44px] rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-xanh-green/50"
+              className="appearance-none pl-9 pr-3 min-h-[44px] rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-xanh-green/50"
             >
-              <option value="all">Mọi trạng thái</option>
+              <option value="all">Tất cả trạng thái</option>
               <option value="open">🔴 Chờ xử lý</option>
               <option value="in_progress">🟡 Đang xử lý</option>
               <option value="resolved">🟢 Đã xong</option>
@@ -367,11 +380,14 @@ function AlertsPage() {
             <select
               value={severityFilter}
               onChange={(e) => setSeverityFilter(e.target.value)}
-              className="appearance-none pl-9 pr-3 min-h-[44px] rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-xanh-green/50"
+              className="appearance-none pl-9 pr-3 min-h-[44px] rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-xanh-green/50"
             >
-              <option value="all">Mọi độ ưu tiên</option>
-              <option value="high">🔥 Cao (P5/P4)</option>
-              <option value="low">🧊 Thấp (P3-P1)</option>
+              <option value="all">Tất cả mức độ ưu tiên</option>
+              <option value="P5">🔴 P5 · Khẩn cấp</option>
+              <option value="P4">🟠 P4 · Rất cao</option>
+              <option value="P3">🟡 P3 · Cao</option>
+              <option value="P2">🔵 P2 · Trung bình</option>
+              <option value="P1">⚪ P1 · Thấp</option>
             </select>
           </div>
         </div>
@@ -403,7 +419,7 @@ function AlertsPage() {
                 ? "border-green-300 bg-green-50"
                 : alert.status === "in_progress"
                   ? "border-yellow-300 bg-yellow-50"
-                  : "border-red-300 bg-white";
+                  : "border-red-300 bg-card";
 
             const statusBadge =
               alert.status === "resolved"
@@ -461,7 +477,7 @@ function AlertsPage() {
                           </span>
                         )}
                         {alert.topic && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs border bg-white border-border text-muted-foreground">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs border bg-card border-border text-muted-foreground">
                             {alert.topic}
                           </span>
                         )}
@@ -528,14 +544,14 @@ function AlertsPage() {
 
                 {/* Description & Action */}
                 <div className="mt-4 grid sm:grid-cols-2 gap-3">
-                  <div className="rounded-xl bg-white/70 border border-border/60 p-3">
+                  <div className="rounded-xl bg-card/70 border border-border/60 p-3">
                     <div className="text-[10px] font-mono text-muted-foreground mb-1 uppercase">
                       🔍 Nguyên nhân gốc rễ (AI phân tích)
                     </div>
                     <p className="text-sm text-foreground leading-relaxed">{description}</p>
                   </div>
                   {action && (
-                    <div className="rounded-xl bg-white/70 border border-border/60 p-3">
+                    <div className="rounded-xl bg-card/70 border border-border/60 p-3">
                       <div className="text-[10px] font-mono text-muted-foreground mb-1 uppercase">
                         ⚡ Hành động đề xuất
                       </div>
@@ -543,7 +559,7 @@ function AlertsPage() {
                     </div>
                   )}
                   {routing_note && (
-                    <div className="rounded-xl bg-white/70 border border-border/60 p-3">
+                    <div className="rounded-xl bg-card/70 border border-border/60 p-3">
                       <div className="text-[10px] font-mono text-muted-foreground mb-1 uppercase">
                         🧭 Lý do định tuyến
                       </div>

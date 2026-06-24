@@ -10,12 +10,14 @@ Tài liệu mô tả kiến trúc AI của dự án: các lớp AI, luồng dữ
 
 Hệ thống có **4 lớp AI** chạy trên dataset feedback gọi xe (lưu ở Supabase), vận hành bởi **1 web API + 4 background worker** (5 Railway service backend, cộng frontend là 6). Mọi lệnh gọi LLM đi qua **một cổng router duy nhất** có failover. Đổi provider/model chỉ cần sửa env var, không sửa code.
 
-| Lớp | Thành phần | Loại |
-|-----|-----------|------|
-| A. Chat LLM (real-time) | `agent/model_router.py`, `/api/agent/chat` | LLM |
-| B. Multi-agent pipeline (batch) | `agents/*` qua `orchestrator.py` | LLM + Rule + ML |
-| C. ML models | `classifier.py` (TF-IDF + LinearSVC) | ML (sklearn) |
-| D. Rule-based | `rules.py`, `spike_detector.py`, `ticket_workflow.py` | Rule |
+
+| Lớp                             | Thành phần                                            | Loại            |
+| ------------------------------- | ----------------------------------------------------- | --------------- |
+| A. Chat LLM (real-time)         | `agent/model_router.py`, `/api/agent/chat`            | LLM             |
+| B. Multi-agent pipeline (batch) | `agents/`* qua `orchestrator.py`                      | LLM + Rule + ML |
+| C. ML models                    | `classifier.py` (TF-IDF + LinearSVC)                  | ML (sklearn)    |
+| D. Rule-based                   | `rules.py`, `spike_detector.py`, `ticket_workflow.py` | Rule            |
+
 
 ---
 
@@ -39,10 +41,12 @@ LLM_PROVIDER=auto  →  thử lần lượt provider CÓ KEY theo thứ tự:
 
 Có **2 cơ chế**, chia theo `guest` vs non-guest:
 
-| Role | System prompt | Data context | Rate limit |
-|------|--------------|-------------|------------|
-| **guest** | `GUEST_SYSTEM_PROMPT` — chỉ hướng dẫn dùng app, KHÔNG lộ data nội bộ | ❌ | 20 req/giờ |
-| **staff / manager / admin** | `AGENT_SYSTEM_PROMPT` | ✅ `build_agent_data_context()` | 100 req/giờ |
+
+| Role                        | System prompt                                                        | Data context                   | Rate limit  |
+| --------------------------- | -------------------------------------------------------------------- | ------------------------------ | ----------- |
+| **guest**                   | `GUEST_SYSTEM_PROMPT` — chỉ hướng dẫn dùng app, KHÔNG lộ data nội bộ | không                              | 20 req/giờ  |
+| **staff / manager / admin** | `AGENT_SYSTEM_PROMPT`                                                | có `build_agent_data_context()` | 100 req/giờ |
+
 
 > Staff/manager/admin hiện dùng **chung một cơ chế chat** (cùng prompt, cùng data context, cùng rate limit). Backend chỉ phân biệt guest vs non-guest.
 
@@ -69,23 +73,25 @@ Step 6   for team in TEAMS: insight_agent.generate(...)      [RULE]  metric theo
 Step 7   analyst_agent.analyze_root_cause(team, insights)    [LLM]   → department_reports
 ```
 
-`TEAMS = [IT, Safety, CSKH, Vận hành, Pricing, Marketing]`
+`TEAMS = [IT, CSKH, Vận hành, Marketing]`
 
 ### Các agent
 
-| Agent | Loại | Vai trò | Input → Output |
-|-------|------|---------|----------------|
-| `ingestion_agent` | ML + Rule | clean PII → classify → gán nhãn (fallback heuristic khi ML lỗi) | text → topic/sentiment/severity/confidence/needs_review |
-| `alert_agent` | Rule | escalation WATCH≥3 / WARNING≥5 / CRITICAL≥10; P5→CRITICAL; dedup cooldown | (area, feedbacks) → create/skip + severity |
-| `router_agent` | Rule | route ticket theo `routing_table.json`; P5/P0 ép về Safety | (topic, severity) → team + SLA |
-| `ticket_agent` | DB | tạo/cập nhật ticket bảng `alerts`; quét overdue SLA | → ticket_id, action, status |
-| `task_agent` | Rule + LLM | gom cụm alert `(team, area)` → task (LLM đặt title/summary) | alerts → tasks_created |
-| `insight_agent` | Rule | tổng hợp metric feedback theo phòng | (team, hours) → severity dist + top topics |
-| `analyst_agent` | **LLM** | phân tích root-cause + 3 action item (fallback khi lỗi) | (team, insights) → summary + risk_level + actions |
-| `llm_agent` | **LLM** | phân tích spike đã che PII → nguyên nhân gốc + action | (area, texts) → title/desc/action |
-| `scoring_agent`* | LLM + Rule | chấm 5 chiều rủi ro (safety/fraud/attitude/vehicle/compliance 0-10) → waterfall max-pooling ra điểm 1-5 | feedback → overall_risk + 5 risk vector |
 
-\* `scoring_agent` chạy chính trong `ml-worker`, không nằm trong `run_agent_pipeline`.
+| Agent             | Loại       | Vai trò                                                                                                 | Input → Output                                          |
+| ----------------- | ---------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `ingestion_agent` | ML + Rule  | clean PII → classify → gán nhãn (fallback heuristic khi ML lỗi)                                         | text → topic/sentiment/severity/confidence/needs_review |
+| `alert_agent`     | Rule       | escalation WATCH≥3 / WARNING≥5 / CRITICAL≥10; P5→CRITICAL; dedup cooldown                               | (area, feedbacks) → create/skip + severity              |
+| `router_agent`    | Rule       | route ticket theo `routing_table.json`; P5 ép về Vận hành                                              | (topic, severity) → team + SLA                          |
+| `ticket_agent`    | DB         | tạo/cập nhật ticket bảng `alerts`; quét overdue SLA                                                     | → ticket_id, action, status                             |
+| `task_agent`      | Rule + LLM | gom cụm alert `(team, area)` → task (LLM đặt title/summary)                                             | alerts → tasks_created                                  |
+| `insight_agent`   | Rule       | tổng hợp metric feedback theo phòng                                                                     | (team, hours) → severity dist + top topics              |
+| `analyst_agent`   | **LLM**    | phân tích root-cause + 3 action item (fallback khi lỗi)                                                 | (team, insights) → summary + risk_level + actions       |
+| `llm_agent`       | **LLM**    | phân tích spike đã che PII → nguyên nhân gốc + action                                                   | (area, texts) → title/desc/action                       |
+| `scoring_agent`*  | LLM + Rule | chấm 5 chiều rủi ro (safety/fraud/attitude/vehicle/compliance 0-10) → waterfall max-pooling ra điểm 1-5 | feedback → overall_risk + 5 risk vector                 |
+
+
+ `scoring_agent` chạy chính trong `ml-worker`, không nằm trong `run_agent_pipeline`.
 
 ---
 
@@ -107,11 +113,11 @@ sklearn `Pipeline(TfidfVectorizer(ngram 1-2, max_features=30000, sublinear_tf) +
 
 ## D. Rule-based Components
 
-- **`rules.py`** — lớp rule chính sau ML. Ưu tiên Safety > PaymentFraud > App > Map > Payment > Supply > DriverNeg > Pricing > Delay > Positive. Có **negation guard tiếng Việt** (`không/ko/chẳng`), gibberish detector, set `needs_review` khi confidence < 0.55 hoặc P5 hoặc safety override.
-- **`spike_detector.py`** — gom theo `(area, topic, team)`: P5 tạo ngay, P4 cần cụm 3, P2/P3 tiêu cực cần volume 10, tích cực đủ 5 tạo Marketing opportunity. Router quyết định phòng; LLM không được tự gán team.
-- **`scoring_agent.calculate_overall_risk()`** — waterfall max-pooling 5 chiều → thang 1-5.
-- **`services/ticket_workflow.py`** — vòng đời ticket theo thời gian: open → in_progress (10s) → resolved (30s).
-- **`services/live_stream.py`** — scheduler nạp dataset theo batch, cứ N batch chạy auto spike detection.
+- `**rules.py**` — lớp rule chính sau ML. Ưu tiên Safety > PaymentFraud > App > Map > Payment > Supply > DriverNeg > Pricing > Delay > Positive. Có **negation guard tiếng Việt** (`không/ko/chẳng`), gibberish detector, set `needs_review` khi confidence < 0.55 hoặc P5 hoặc safety override.
+- `**spike_detector.py`** — gom theo `(area, topic, team)`: P5 tạo ngay, P4 cần cụm 3, P2/P3 tiêu cực cần volume 10, tích cực đủ 5 tạo Marketing opportunity. Router quyết định phòng; LLM không được tự gán team.
+- `**scoring_agent.calculate_overall_risk()**` — waterfall max-pooling 5 chiều → thang 1-5.
+- `**services/ticket_workflow.py**` — vòng đời ticket theo thời gian: open → in_progress (10s) → resolved (30s).
+- `**services/live_stream.py**` — scheduler nạp dataset theo batch, cứ N batch chạy auto spike detection.
 
 ---
 
@@ -119,13 +125,15 @@ sklearn `Pipeline(TfidfVectorizer(ngram 1-2, max_features=30000, sublinear_tf) +
 
 Tất cả dùng APScheduler + signal handling.
 
-| Worker file | Railway service | Chạy gì | Chu kỳ | Tốn LLM? |
-|-------------|-----------------|---------|--------|----------|
-| `worker_ingest.py` | `ingest-worker` | `start_live_stream` (nạp dataset batch + auto spike) | 10s/batch | gián tiếp |
-| `worker_ml.py` | `ml-worker` | quét feedback `overall_risk IS NULL & negative` → `score_feedback_batch` | 30-60s, batch 50 | ✅ LLM |
-| `worker_agent.py` | `agent-worker` | `run_agent_pipeline(24h)` — full multi-agent | 300s; tắt bằng `WORKER_AGENT_ENABLED=false` | ✅ LLM |
-| `worker_ticket.py` | `backend-worker` | `advance_ticket_workflow` | 5s | Rule |
-| `main.py` (backend) | `backend` | API + chat + scheduler on-demand | — | ✅ chat |
+
+| Worker file         | Railway service  | Chạy gì                                                                  | Chu kỳ                                      | Tốn LLM?  |
+| ------------------- | ---------------- | ------------------------------------------------------------------------ | ------------------------------------------- | --------- |
+| `worker_ingest.py`  | `ingest-worker`  | `start_live_stream` (nạp dataset batch + auto spike)                     | 10s/batch                                   | gián tiếp |
+| `worker_ml.py`      | `ml-worker`      | quét feedback `overall_risk IS NULL & negative` → `score_feedback_batch` | 30-60s, batch 50                            | có LLM     |
+| `worker_agent.py`   | `agent-worker`   | `run_agent_pipeline(24h)` — full multi-agent                             | 300s; tắt bằng `WORKER_AGENT_ENABLED=false` | có LLM     |
+| `worker_ticket.py`  | `backend-worker` | `advance_ticket_workflow`                                                | 5s                                          | Rule      |
+| `main.py` (backend) | `backend`        | API + chat + scheduler on-demand                                         | —                                           | có chat    |
+
 
 > Chỉ `agent-worker` và `ml-worker` tốn LLM cost — đều có cờ tắt / fallback mock.
 
@@ -166,3 +174,4 @@ CHAT (sync, /api/agent/chat):
 2. **ML chỉ ở `classifier.py`** — 2 model sklearn, luôn bị `rules.py` ghi đè khi keyword rõ.
 3. **Phân loại agent:** LLM = analyst, scoring (chấm), task (title), spike. Rule = alert, router, insight, ingestion-fallback, ticket-workflow, scoring-waterfall.
 4. **Chỉ `agent-worker` + `ml-worker` tốn LLM cost** — đều có cờ tắt / fallback mock.
+

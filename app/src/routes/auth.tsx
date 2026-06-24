@@ -266,7 +266,7 @@ function Field({
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`w-full h-11 pl-10 ${isPassword ? "pr-10" : "pr-3"} rounded-xl border border-border bg-white focus:outline-none focus:ring-2 focus:ring-xanh-green/40 focus:border-xanh-green/40 transition-all`}
+        className={`w-full h-11 pl-10 ${isPassword ? "pr-10" : "pr-3"} rounded-xl border border-border bg-card focus:outline-none focus:ring-2 focus:ring-xanh-green/40 focus:border-xanh-green/40 transition-all`}
       />
       {isPassword && (
         <button

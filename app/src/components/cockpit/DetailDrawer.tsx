@@ -53,7 +53,7 @@ export function DetailDrawer({ filter, onClose }: Props) {
             <p className="text-sm text-muted-foreground text-center py-8">Không có phản hồi phù hợp</p>
           ) : (
             data.map((f) => (
-              <div key={f.id} className="rounded-xl border border-border bg-white p-3 space-y-1.5">
+              <div key={f.id} className="rounded-xl border border-border bg-card p-3 space-y-1.5">
                 <p className="text-sm">{f.text}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {f.topic && <Pill tone="mint">{f.topic}</Pill>}

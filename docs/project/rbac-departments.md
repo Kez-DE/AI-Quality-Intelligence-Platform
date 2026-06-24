@@ -13,9 +13,9 @@ Hệ thống có hai trục phân quyền: **role** (cấp độ quyền) và **
 
 `VALID_ROLES = {admin, manager, staff, guest}`. `OPS_ROLES = {admin, manager, staff}` là nhóm nhân sự vận hành (phân biệt với guest).
 
-## 6 phòng ban
+## 4 phòng ban
 
-`IT`, `Safety`, `CSKH`, `Vận hành`, `Pricing`, `Marketing`. Định nghĩa ở `DEPARTMENT_PERSONAS` (`analyst_agent.py`) và `valid_departments` (`users_admin.py`). Một ops user có thể chưa được gán phòng (`department = null`), khi đó không xem được dữ liệu phòng nào cho tới khi admin gán.
+`IT`, `CSKH`, `Vận hành`, `Marketing`. Định nghĩa ở `DEPARTMENTS` (`departments.py`), `DEPARTMENT_PERSONAS` (`analyst_agent.py`) và `valid_departments` (`users_admin.py`). Một ops user có thể chưa được gán phòng (`department = null`), khi đó không xem được dữ liệu phòng nào cho tới khi admin gán.
 
 ---
 
@@ -73,7 +73,7 @@ Endpoint admin-only (qua `require_admin`): `GET /api/agent/stats`, `POST /api/in
 ## Quản lý user — `users_admin.py`
 
 - `PATCH /api/users/{id}/role` — đổi role; chặn admin tự đổi quyền chính mình; ghi `audit_logs` action `role_change`.
-- `PATCH /api/users/{id}/department` — gán phòng; `valid_departments = [null, IT, Safety, CSKH, Vận hành, Pricing, Marketing]`; ghi audit.
+- `PATCH /api/users/{id}/department` — gán phòng; `valid_departments = [null, IT, CSKH, Vận hành, Marketing]`; ghi audit.
 
 Bootstrap: user đăng ký **đầu tiên** thành admin (migration RBAC), các user sau mặc định guest.
 

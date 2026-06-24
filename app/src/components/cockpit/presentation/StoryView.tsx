@@ -66,7 +66,7 @@ export function StoryView() {
           {PAINS.map((p) => {
             const Icon = p.icon;
             return (
-              <div key={p.t} className="group rounded-xl border border-border bg-white p-4 hover:shadow-md transition-all hover:-translate-y-0.5">
+              <div key={p.t} className="group rounded-xl border border-border bg-card p-4 hover:shadow-md transition-all hover:-translate-y-0.5">
                 <div className="h-9 w-9 rounded-lg grid place-items-center mb-3" style={{ background: `color-mix(in oklch, ${p.color} 15%, white)` }}>
                   <Icon className="h-4.5 w-4.5" style={{ color: p.color }} />
                 </div>
@@ -116,7 +116,7 @@ export function StoryView() {
               const isLast = i === STEPS.length - 1;
               return (
                 <div key={s.t} className="relative">
-                  <div className="rounded-xl border border-border bg-white p-4 h-full">
+                  <div className="rounded-xl border border-border bg-card p-4 h-full">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="h-8 w-8 rounded-lg bg-xanh-mint grid place-items-center flex-shrink-0">
                         <Icon className="h-4 w-4 text-xanh-deep" />

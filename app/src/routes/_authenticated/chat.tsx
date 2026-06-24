@@ -115,7 +115,7 @@ const markdownComponents = {
   ),
   li: ({ children }: any) => <li className="pl-1">{children}</li>,
   table: ({ children }: any) => (
-    <div className="my-3 overflow-x-auto rounded-lg border border-xanh-green/20 bg-white shadow-sm">
+    <div className="my-3 overflow-x-auto rounded-lg border border-xanh-green/20 bg-card shadow-sm">
       <table className="min-w-full border-collapse text-left text-xs">{children}</table>
     </div>
   ),
@@ -130,7 +130,7 @@ const markdownComponents = {
     <strong className="font-semibold text-xanh-deep">{children}</strong>
   ),
   code: ({ children }: any) => (
-    <code className="rounded bg-white/70 px-1 py-0.5 font-mono text-[0.85em] text-xanh-deep">
+    <code className="rounded bg-card/70 px-1 py-0.5 font-mono text-[0.85em] text-xanh-deep">
       {children}
     </code>
   ),
@@ -293,7 +293,7 @@ function ChatPage() {
       const idsToDelete = messages
         .slice(index)
         .map((m) => m.id)
-        .filter(Boolean);
+        .filter((id): id is string => Boolean(id));
       if (idsToDelete.length > 0) {
         // @ts-ignore
         supabase
@@ -404,14 +404,14 @@ function ChatPage() {
         <button
           onClick={clearChat}
           type="button"
-          className="relative z-50 cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-white border border-border rounded-lg text-sm font-semibold text-xanh-deep hover:bg-muted transition-colors shadow-sm active:scale-95"
+          className="relative z-50 cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-card border border-border rounded-lg text-sm font-semibold text-xanh-deep hover:bg-muted transition-colors shadow-sm active:scale-95"
         >
           <Trash2 className="h-4 w-4" /> Cuộc trò chuyện mới
         </button>
       </div>
 
       <div className="flex-1 flex gap-4 overflow-hidden">
-        <div className="flex-[6] rounded-2xl border border-border bg-white shadow-[var(--shadow-card)] overflow-hidden flex flex-col">
+        <div className="flex-[6] rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] overflow-hidden flex flex-col">
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {messages.length === 0 && (
             <div className="text-center py-10">
@@ -430,7 +430,7 @@ function ChatPage() {
                   <button
                     key={s}
                     onClick={() => send(s)}
-                    className="text-left text-sm rounded-xl border border-border bg-white p-3 hover:border-xanh-green/40 hover:bg-xanh-mint/30 transition-all"
+                    className="text-left text-sm rounded-xl border border-border bg-card p-3 hover:border-xanh-green/40 hover:bg-xanh-mint/30 transition-all"
                   >
                     {s}
                   </button>
@@ -468,7 +468,7 @@ function ChatPage() {
             e.preventDefault();
             send();
           }}
-          className="border-t border-border p-3 flex items-end gap-2 bg-white"
+          className="border-t border-border p-3 flex items-end gap-2 bg-card"
         >
           <textarea
             value={input}
@@ -491,7 +491,7 @@ function ChatPage() {
         </form>
         </div>
         {(role !== "guest" && (messages.some(m => m.sources?.length) || loading)) && (
-          <div className="flex-[4] rounded-2xl border border-border bg-white shadow-[var(--shadow-card)] overflow-hidden flex flex-col">
+          <div className="flex-[4] rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] overflow-hidden flex flex-col">
             <div className="p-4 border-b border-border bg-muted/30">
               <h3 className="font-semibold text-sm flex items-center gap-2">
                 <FileText className="h-4 w-4 text-xanh-green" />
@@ -506,7 +506,7 @@ function ChatPage() {
                 </div>
               ) : (
                 messages[messages.length - 1]?.sources?.map((s: any, idx: number) => (
-                  <div key={idx} className="rounded-xl border border-border p-3 text-sm hover:border-xanh-green/50 transition-colors bg-white">
+                  <div key={idx} className="rounded-xl border border-border p-3 text-sm hover:border-xanh-green/50 transition-colors bg-card">
                     <div className="font-semibold text-xanh-deep mb-1 line-clamp-1">{s.document_title} - {s.heading}</div>
                     <div className="text-xs text-muted-foreground mb-2">Độ tương đồng: {Math.round(s.similarity * 100)}%</div>
                     <p className="text-muted-foreground line-clamp-4 text-xs">{s.content}</p>
@@ -648,7 +648,7 @@ function AssistantResponse({
       ))}
 
       {visibleCount < blocks.length && (
-        <div className="inline-flex rounded-xl border border-border bg-white px-3 py-2 shadow-sm animate-in fade-in duration-200">
+        <div className="inline-flex rounded-xl border border-border bg-card px-3 py-2 shadow-sm animate-in fade-in duration-200">
           <Dot /> <Dot d={150} /> <Dot d={300} />
         </div>
       )}
@@ -659,7 +659,7 @@ function AssistantResponse({
         <button
           onClick={onCopy}
           title="Sao chép câu trả lời"
-          className="absolute -right-10 top-1 p-1.5 rounded-full bg-white border border-border text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-xanh-deep"
+          className="absolute -right-10 top-1 p-1.5 rounded-full bg-card border border-border text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-xanh-deep"
         >
           {copied ? <Check className="h-4 w-4 text-xanh-green" /> : <Copy className="h-4 w-4" />}
         </button>
@@ -692,7 +692,7 @@ function ThinkingBlocks() {
 function Dot({ d = 0 }: { d?: number }) {
   return (
     <span
-      className="inline-block h-1.5 w-1.5 rounded-full bg-xanh-deep/60 animate-bounce"
+      className="typing-dot inline-block h-1.5 w-1.5 rounded-full bg-xanh-deep/60"
       style={{ animationDelay: `${d}ms` }}
     />
   );

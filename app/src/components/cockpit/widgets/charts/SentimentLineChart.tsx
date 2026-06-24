@@ -31,7 +31,7 @@ interface CustomTooltipProps {
 function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-xl border border-border bg-white p-3 shadow-lg text-xs">
+    <div className="rounded-xl border border-border bg-card p-3 shadow-lg text-xs">
       <div className="font-mono font-semibold text-muted-foreground mb-2">{label}</div>
       {payload.map((p) => (
         <div key={p.name} className="flex items-center justify-between gap-4">

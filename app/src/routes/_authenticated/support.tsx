@@ -68,6 +68,7 @@ function SupportPage() {
   
   const [cannedReply, setCannedReply] = useState("");
   const [resolving, setResolving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const { data: me } = useMe();
   const isManagerOrStaff = me?.role === "admin" || me?.role === "manager" || me?.role === "staff";
@@ -114,6 +115,7 @@ function SupportPage() {
     if (selectedTaskId === taskId) return;
     setSelectedTaskId(taskId);
     setCannedReply("");
+    setConfirming(false);
     setAlertsLoading(true);
     try {
       const json = await apiFetch<{ data: Alert[] }>(`/api/tasks/${taskId}/alerts`);
@@ -164,7 +166,7 @@ function SupportPage() {
       <div>
         <h1 className="font-display text-3xl font-bold flex items-center gap-2">
           <Headphones className="h-8 w-8 text-xanh-deep" />
-          CSKH Support Dashboard
+          Bảng điều phối Hỗ trợ CSKH
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
           Hàng đợi ưu tiên theo SLA. Các ticket báo đỏ đã quá hạn xử lý.
@@ -173,7 +175,7 @@ function SupportPage() {
 
       <div className="flex-1 flex gap-4 overflow-hidden h-full">
         {/* Left Panel: Queue */}
-        <div className="w-1/3 flex flex-col bg-white border border-border rounded-2xl shadow-[var(--shadow-card)] overflow-hidden">
+        <div className="w-1/3 flex flex-col bg-card border border-border rounded-2xl shadow-[var(--shadow-card)] overflow-hidden">
           <div className="p-4 border-b border-border bg-muted/20">
             <h3 className="font-semibold text-sm flex justify-between items-center text-xanh-deep mb-3">
               <span>Hàng đợi ({tasks.length})</span>
@@ -214,12 +216,12 @@ function SupportPage() {
                     key={task.id}
                     onClick={() => selectTask(task.id)}
                     className={`p-3 cursor-pointer transition-colors ${
-                      isSelected ? "bg-xanh-mint/40 border-l-4 border-l-xanh-deep" : "hover:bg-muted/30 border-l-4 border-l-transparent"
+                      isSelected ? "bg-xanh-mint/50 ring-1 ring-inset ring-xanh-green/40" : "hover:bg-muted/30"
                     }`}
                   >
                     <div className="flex justify-between items-start mb-1">
                       <div className="flex gap-1.5 flex-wrap">
-                        <span className={`text-[10px] font-mono font-bold px-1.5 rounded ${overdue ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                        <span className={`text-[10px] font-mono font-bold px-1.5 rounded ${overdue ? "bg-xanh-coral/15 text-xanh-coral" : "bg-xanh-amber/20 text-xanh-deep"}`}>
                           {overdue ? "QUÁ HẠN" : task.priority}
                         </span>
                         <span className="text-[10px] uppercase font-mono text-muted-foreground">
@@ -231,7 +233,7 @@ function SupportPage() {
                         {new Date(task.created_at).toLocaleTimeString("vi-VN", { hour: '2-digit', minute:'2-digit' })}
                       </span>
                     </div>
-                    <div className={`font-semibold text-sm line-clamp-1 ${overdue ? "text-red-700" : "text-xanh-deep"}`}>
+                    <div className={`font-semibold text-sm line-clamp-1 ${overdue ? "text-xanh-coral" : "text-xanh-deep"}`}>
                       {task.title}
                     </div>
                     <div className="text-xs text-muted-foreground line-clamp-1 mt-1">
@@ -245,7 +247,7 @@ function SupportPage() {
         </div>
 
         {/* Right Panel: Ticket Detail & Canned Response */}
-        <div className="w-2/3 bg-white border border-border rounded-2xl shadow-[var(--shadow-card)] flex flex-col overflow-hidden">
+        <div className="w-2/3 bg-card border border-border rounded-2xl shadow-[var(--shadow-card)] flex flex-col overflow-hidden">
           {!selectedTask ? (
             <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground space-y-4">
               <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center">
@@ -267,13 +269,13 @@ function SupportPage() {
                      </span>
                    )}
                    {isOverdue(selectedTask) && (
-                     <span className="text-xs flex items-center text-red-700 font-bold bg-red-100 px-2 py-0.5 rounded">
-                       <AlertTriangle className="h-3 w-3 mr-1" /> QUA HAN SLA
+                     <span className="text-xs flex items-center text-xanh-coral font-bold bg-xanh-coral/15 px-2 py-0.5 rounded">
+                       <AlertTriangle className="h-3 w-3 mr-1" /> QUÁ HẠN SLA
                      </span>
                    )}
                 </div>
                 <h2 className="text-xl font-bold text-xanh-deep">{selectedTask.title}</h2>
-                <div className="text-sm text-muted-foreground mt-2 bg-white p-3 rounded-lg border border-border">
+                <div className="text-sm text-muted-foreground mt-2 bg-card p-3 rounded-lg border border-border">
                   {selectedTask.summary}
                 </div>
               </div>
@@ -289,7 +291,7 @@ function SupportPage() {
                 ) : (
                   <div className="space-y-2">
                     {selectedAlerts.map(alert => (
-                      <div key={alert.id} className="p-3 bg-white border border-border rounded-lg text-sm flex gap-3">
+                      <div key={alert.id} className="p-3 bg-card border border-border rounded-lg text-sm flex gap-3">
                          <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${alert.severity === "P5" ? "bg-red-500" : "bg-amber-500"}`} />
                          <div>
                             <p className="font-medium">{alert.title}</p>
@@ -304,7 +306,7 @@ function SupportPage() {
               </div>
 
               {/* Reply Section */}
-              <div className="p-5 border-t border-border bg-white">
+              <div className="p-5 border-t border-border bg-card">
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-semibold text-xanh-deep flex items-center gap-2">
@@ -332,14 +334,35 @@ function SupportPage() {
                   />
 
                   <div className="flex justify-end">
-                    <button
-                      onClick={resolveTicket}
-                      disabled={resolving || !cannedReply.trim()}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-xanh-deep text-white rounded-xl text-sm font-bold shadow-md hover:bg-xanh-deep/90 transition-all disabled:opacity-50 disabled:shadow-none"
-                    >
-                      {resolving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                      Phản hồi & Đóng Ticket
-                    </button>
+                    {confirming ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">Xác nhận đóng ticket này?</span>
+                        <button
+                          onClick={resolveTicket}
+                          disabled={resolving}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-xanh-coral text-white rounded-xl text-sm font-bold hover:bg-xanh-coral/90 transition-all disabled:opacity-50"
+                        >
+                          {resolving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                          Đóng
+                        </button>
+                        <button
+                          onClick={() => setConfirming(false)}
+                          disabled={resolving}
+                          className="px-4 py-2 rounded-xl text-sm font-semibold bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
+                        >
+                          Hủy
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirming(true)}
+                        disabled={!cannedReply.trim()}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-xanh-deep text-white rounded-xl text-sm font-bold shadow-md hover:bg-xanh-deep/90 transition-all disabled:opacity-50 disabled:shadow-none"
+                      >
+                        <Send className="h-4 w-4" />
+                        Phản hồi & Đóng Ticket
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

@@ -33,14 +33,18 @@ export function TrendCard() {
         subtitle="Tổng phản hồi · Phản hồi tiêu cực · Spike"
         right={
           <div className="flex items-center gap-3 text-[11px] font-mono">
-            <Legend color="var(--xanh-green)" label="total" />
-            <Legend color="var(--xanh-coral)" label="negative" />
+            <Legend color="var(--xanh-green)" label="tổng" />
+            <Legend color="var(--xanh-coral)" label="tiêu cực" />
           </div>
         }
       />
       <div className="px-5 pb-5">
         {loading ? (
-          <div className="w-full h-44 flex items-center justify-center text-xs text-muted-foreground font-mono">Loading...</div>
+          <div className="w-full h-44 rounded-lg bg-muted/50 animate-pulse relative overflow-hidden">
+            {[0.25, 0.5, 0.75].map((p) => (
+              <div key={p} className="absolute w-full border-t border-border/40" style={{ top: `${p * 100}%` }} />
+            ))}
+          </div>
         ) : trend.length === 0 ? (
           <div className="w-full h-44 flex items-center justify-center text-xs text-muted-foreground font-mono">Chưa có dữ liệu xu hướng</div>
         ) : (

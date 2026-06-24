@@ -32,7 +32,7 @@ function CustomTooltip({ active, payload }: TooltipProps) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <div className="rounded-xl border border-border bg-white p-3 shadow-lg text-xs">
+    <div className="rounded-xl border border-border bg-card p-3 shadow-lg text-xs">
       <div className="font-semibold">{d.name}</div>
       <div className="font-mono mt-1">{d.value.toLocaleString()} · {d.pct}% của tổng</div>
     </div>

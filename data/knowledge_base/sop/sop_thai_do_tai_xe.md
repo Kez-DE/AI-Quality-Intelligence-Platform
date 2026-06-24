@@ -14,7 +14,7 @@ tags: [thai-do, chui-boi, xuc-pham, tranh-cai, duoi-khach]
 Áp dụng cho phản hồi về hành vi cư xử: tài xế chửi bới, xúc phạm, thái độ cộc cằn, tranh
 cãi gay gắt, đuổi khách xuống xe giữa đường. Theo Deep Risk Matrix, `risk_attitude >= 8`
 chốt **Bậc 4 (Nguy hiểm)**; `risk_attitude >= 6` góp vào **Bậc 3**. Route về **Team Vận
-hành** (topic Driver Behavior, SLA 8 giờ). Nếu kèm đe dọa an toàn thì nâng P5 → Safety.
+hành** (topic Driver Behavior, SLA 8 giờ). Nếu kèm đe dọa an toàn thì nâng P5 (đội Vận hành xử lý khẩn cấp).
 
 ## Bước 1 — Tiếp nhận và phân loại mức độ (0–1 giờ)
 

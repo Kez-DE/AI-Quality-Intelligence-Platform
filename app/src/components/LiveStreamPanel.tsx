@@ -257,7 +257,7 @@ export default function LiveStreamPanel() {
         </div>
       )}
 
-      <div className="rounded-xl border border-border bg-white p-5 space-y-4">
+      <div className="rounded-xl border border-border bg-card p-5 space-y-4">
         <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
           <Activity className="h-4 w-4" /> Cấu hình
         </h3>

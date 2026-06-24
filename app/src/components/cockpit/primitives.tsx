@@ -3,7 +3,7 @@ import type { LucideProps } from "lucide-react";
 export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
     <section
-      className={`rounded-2xl border border-border bg-white/80 backdrop-blur shadow-[var(--shadow-card)] ${className}`}
+      className={`rounded-2xl border border-border bg-card/80 backdrop-blur shadow-[var(--shadow-card)] ${className}`}
     >
       {children}
     </section>
@@ -70,11 +70,8 @@ export function Legend({ color, label }: { color: string; label: string }) {
 
 export function BigStat({ value, label }: { value: string; label: string }) {
   return (
-    <div className="rounded-xl border border-border bg-gradient-to-br from-white to-xanh-mint/40 p-5 text-center">
-      <div
-        className="font-display text-4xl font-bold bg-clip-text text-transparent"
-        style={{ backgroundImage: "var(--gradient-green)" }}
-      >
+    <div className="rounded-xl border border-border bg-gradient-to-br from-card to-xanh-mint/40 p-5 text-center">
+      <div className="font-display text-4xl font-bold text-xanh-green">
         {value}
       </div>
       <div className="text-sm text-muted-foreground mt-1">{label}</div>

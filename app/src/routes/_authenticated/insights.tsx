@@ -200,7 +200,7 @@ function InsightsPage() {
         onOpenChange={setShowCriticalModal} 
       />
 
-      <div className="rounded-2xl border border-border bg-white p-4 text-sm text-muted-foreground">
+      <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
         <div className="font-semibold text-foreground mb-1">Cách hoạt động</div>
         <ol className="list-decimal ml-5 space-y-1">
           <li>Feedback đã được classifier + rule engine gán topic/sentiment/severity.</li>
@@ -212,7 +212,7 @@ function InsightsPage() {
       </div>
 
       {loadingMetrics && departments.length === 0 ? (
-        <div className="rounded-2xl border border-border bg-white p-10 text-center shadow-[var(--shadow-card)]">
+        <div className="rounded-2xl border border-border bg-card p-10 text-center shadow-[var(--shadow-card)]">
           <Loader2 className="h-6 w-6 animate-spin inline text-xanh-green" />
           <p className="text-sm text-muted-foreground mt-3">Đang gom metric từ phòng ban...</p>
         </div>
@@ -248,7 +248,7 @@ function SummaryCard({
   return (
     <div 
       onClick={onClick}
-      className={`rounded-2xl border border-border bg-white p-4 shadow-[var(--shadow-card)] flex items-center gap-3 ${onClick ? 'cursor-pointer hover:border-xanh-coral/50 transition-colors' : ''}`}
+      className={`rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)] flex items-center gap-3 ${onClick ? 'cursor-pointer hover:border-xanh-coral/50 transition-colors' : ''}`}
     >
       <div className={`h-10 w-10 rounded-xl grid place-items-center ${tone === "coral" ? "bg-xanh-coral/10 text-xanh-coral" : "bg-xanh-mint text-xanh-deep"}`}>
         <Icon className="h-5 w-5" />
@@ -301,9 +301,9 @@ function CriticalCasesModal({ open, onOpenChange }: { open: boolean; onOpenChang
                 </div>
                 <p className="text-sm text-foreground/90 leading-relaxed">{f.text}</p>
                 <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-mono">
-                  <span className="bg-white/80 px-2 py-1 rounded border">Team: {f.team || "Chưa phân"}</span>
-                  <span className="bg-white/80 px-2 py-1 rounded border">Mức độ: {f.severity}</span>
-                  {f.area && <span className="bg-white/80 px-2 py-1 rounded border">Khu vực: {regionLabel(f.area)}</span>}
+                  <span className="bg-card/80 px-2 py-1 rounded border">Team: {f.team || "Chưa phân"}</span>
+                  <span className="bg-card/80 px-2 py-1 rounded border">Mức độ: {f.severity}</span>
+                  {f.area && <span className="bg-card/80 px-2 py-1 rounded border">Khu vực: {regionLabel(f.area)}</span>}
                 </div>
               </div>
             ))}
@@ -334,7 +334,7 @@ function DepartmentCard({
   const severity = dept.severity_distribution ?? {};
 
   return (
-    <section className="rounded-2xl border border-border bg-white p-5 shadow-[var(--shadow-card)] space-y-4">
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)] space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="font-display font-semibold flex items-center gap-2">

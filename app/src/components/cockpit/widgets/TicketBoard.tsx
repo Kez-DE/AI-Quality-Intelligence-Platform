@@ -53,7 +53,7 @@ export function TicketBoard() {
           STATUS_COLS.map((col) => {
             const items = byStatus(col.key);
             return (
-              <div key={col.key} className="rounded-xl border border-border bg-gradient-to-b from-white to-muted/40 p-3">
+              <div key={col.key} className="rounded-xl border border-border bg-gradient-to-b from-card to-muted/40 p-3">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: col.color }}>{col.label}</span>
                   <span className="text-[10px] font-mono text-muted-foreground">{items.length}</span>
@@ -63,7 +63,7 @@ export function TicketBoard() {
                     <p className="text-[11px] text-muted-foreground text-center py-3">Trống</p>
                   ) : (
                     items.map((t) => (
-                      <div key={t.id} className="rounded-lg border border-border bg-white p-2.5 hover:shadow-sm transition-shadow">
+                      <div key={t.id} className="rounded-lg border border-border bg-card p-2.5 hover:shadow-sm transition-shadow">
                         <div className="flex items-center justify-between">
                           <span className="font-mono text-[10px] text-muted-foreground">{t.assigned_team}</span>
                           <Pill tone={sevTone(t.priority)}>{t.priority}</Pill>

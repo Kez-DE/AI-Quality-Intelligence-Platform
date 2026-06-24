@@ -189,7 +189,7 @@ function SankeyCanvas({ flows }: { flows: SankeyLink[] }) {
       {/* Tooltip */}
       {tooltip && (
         <div
-          className="pointer-events-none absolute z-10 rounded-lg border border-border bg-white px-2.5 py-1.5 text-[11px] font-mono shadow-md whitespace-nowrap"
+          className="pointer-events-none absolute z-10 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-mono shadow-md whitespace-nowrap"
           style={{ left: tooltip.x, top: tooltip.y }}
         >
           {tooltip.text}

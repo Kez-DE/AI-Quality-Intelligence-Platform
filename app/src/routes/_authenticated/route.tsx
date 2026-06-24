@@ -31,6 +31,7 @@ export const Route = createFileRoute("/_authenticated")({
       "/admin",
       "/tasks",
       "/reports",
+      "/completion-reports",
       "/support",
       "/live-stream",
     ];
@@ -40,6 +41,11 @@ export const Route = createFileRoute("/_authenticated")({
 
     // Route Guard for Staff/Manager
     if ((role === "staff" || role === "manager") && location.pathname.startsWith("/admin")) {
+      throw redirect({ to: "/dashboard" });
+    }
+
+    // Báo cáo hoàn thành: chỉ quản lý/admin (staff gửi báo cáo ở Task Manager).
+    if (role === "staff" && location.pathname.startsWith("/completion-reports")) {
       throw redirect({ to: "/dashboard" });
     }
 

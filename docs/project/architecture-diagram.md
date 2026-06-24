@@ -1,7 +1,7 @@
 # Architecture Diagram — AI Quality Intelligence Platform
 
 Sơ đồ components + data flow cho Gate G2. GitHub render trực tiếp các khối Mermaid bên dưới.
-Bản mô tả chữ chi tiết: [`docs/architecture.md`](architecture.md).
+Bản mô tả chữ chi tiết: [`docs/project/architecture.md`](architecture.md).
 
 ## 1. Component diagram (tổng quan hệ thống)
 

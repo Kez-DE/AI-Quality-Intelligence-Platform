@@ -226,7 +226,7 @@ function FeedbackPage() {
       </div>
 
       {/* 1. Form phản hồi mới */}
-      <section className="rounded-2xl border border-border bg-white p-5 shadow-[var(--shadow-card)]">
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
         <div className="flex items-center gap-2 mb-4">
           <MessageSquarePlus className="h-4 w-4 text-xanh-green" />
           <h2 className="font-display font-semibold">Phản hồi mới</h2>
@@ -247,7 +247,7 @@ function FeedbackPage() {
               <select
                 value={form.area}
                 onChange={(e) => setForm({ ...form, area: e.target.value })}
-                className="w-full h-9 px-2 rounded-lg border border-border bg-white focus:outline-none focus:ring-2 focus:ring-xanh-green/40"
+                className="w-full h-9 px-2 rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-xanh-green/40"
               >
                 {AREAS.map((a) => (
                   <option key={a.code} value={a.code}>
@@ -314,7 +314,7 @@ function FeedbackPage() {
       {!isGuest && (
         <div className="grid lg:grid-cols-2 gap-4 items-start">
           {/* Cột trái: Luồng phản hồi */}
-        <section className="rounded-2xl border border-border bg-white shadow-[var(--shadow-card)]">
+        <section className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
           <div className="p-5 border-b border-border flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Inbox className="h-4 w-4 text-xanh-deep" />
@@ -529,7 +529,7 @@ function StatCard({
   return (
     <div 
       onClick={onClick}
-      className={`rounded-xl border bg-white p-4 shadow-[var(--shadow-card)] ${onClick ? 'cursor-pointer transition-all hover:shadow-md' : ''} ${isActive ? 'border-xanh-green ring-2 ring-xanh-green/20' : 'border-border'}`}
+      className={`rounded-xl border bg-card p-4 shadow-[var(--shadow-card)] ${onClick ? 'cursor-pointer transition-all hover:shadow-md' : ''} ${isActive ? 'border-xanh-green ring-2 ring-xanh-green/20' : 'border-border'}`}
     >
       <div className="flex items-center justify-between">
         <div className="text-[11px] text-muted-foreground">{label}</div>
@@ -559,7 +559,7 @@ function Select({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full h-9 px-2 rounded-lg border border-border bg-white focus:outline-none focus:ring-2 focus:ring-xanh-green/40"
+        className="w-full h-9 px-2 rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-xanh-green/40"
       >
         {options.map((o) => (
           <option key={o} value={o}>

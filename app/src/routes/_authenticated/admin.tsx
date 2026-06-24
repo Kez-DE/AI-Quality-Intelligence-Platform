@@ -229,7 +229,7 @@ function AdminPage() {
 
   // --- Table for active users (manager/staff/admin) ---
   const renderActiveTable = (users: ManagedUser[]) => (
-    <div className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden">
+    <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
       <div className="grid grid-cols-12 gap-3 px-5 py-3 border-b border-border bg-muted/40 text-xs font-semibold uppercase text-muted-foreground tracking-wide">
         <span className="col-span-3">Người dùng</span>
         <span className="col-span-2">Vai trò</span>
@@ -270,7 +270,7 @@ function AdminPage() {
                     setPendingId(u.id);
                     roleMutation.mutate({ id: u.id, role: e.target.value as Role });
                   }}
-                  className="h-8 px-2 rounded-lg border border-border bg-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-xanh-green/40 disabled:opacity-60 w-full"
+                  className="h-8 px-2 rounded-lg border border-border bg-card text-xs font-medium focus:outline-none focus:ring-2 focus:ring-xanh-green/40 disabled:opacity-60 w-full"
                 >
                   {ROLES.map((r) => (
                     <option key={r} value={r}>
@@ -287,7 +287,7 @@ function AdminPage() {
                     setPendingId(u.id);
                     departmentMutation.mutate({ id: u.id, department: e.target.value || null });
                   }}
-                  className="h-8 px-2 rounded-lg border border-border bg-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-xanh-green/40 disabled:opacity-60 w-full"
+                  className="h-8 px-2 rounded-lg border border-border bg-card text-xs font-medium focus:outline-none focus:ring-2 focus:ring-xanh-green/40 disabled:opacity-60 w-full"
                 >
                   <option value="">Chưa gán</option>
                   {DEPARTMENTS.map((d) => (
@@ -378,7 +378,7 @@ function AdminPage() {
           <TabsList className="mb-4 bg-muted/60 p-1 rounded-xl">
             <TabsTrigger
               value="pending"
-              className="rounded-lg gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow-sm"
+              className="rounded-lg gap-1.5 data-[state=active]:bg-card data-[state=active]:shadow-sm"
             >
               <Clock className="h-3.5 w-3.5" />
               Chờ duyệt
@@ -390,7 +390,7 @@ function AdminPage() {
             </TabsTrigger>
             <TabsTrigger
               value="manager"
-              className="rounded-lg gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow-sm"
+              className="rounded-lg gap-1.5 data-[state=active]:bg-card data-[state=active]:shadow-sm"
             >
               <Shield className="h-3.5 w-3.5" />
               Quản lý
@@ -400,7 +400,7 @@ function AdminPage() {
             </TabsTrigger>
             <TabsTrigger
               value="staff"
-              className="rounded-lg gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow-sm"
+              className="rounded-lg gap-1.5 data-[state=active]:bg-card data-[state=active]:shadow-sm"
             >
               <UserCheck className="h-3.5 w-3.5" />
               Nhân viên
@@ -408,7 +408,7 @@ function AdminPage() {
             </TabsTrigger>
             <TabsTrigger
               value="admin"
-              className="rounded-lg gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow-sm"
+              className="rounded-lg gap-1.5 data-[state=active]:bg-card data-[state=active]:shadow-sm"
             >
               <UserCog className="h-3.5 w-3.5" />
               Quản trị viên

@@ -38,7 +38,7 @@ Step 6-7  for team in TEAMS:
               upsert vào department_reports
 ```
 
-`TEAMS = [IT, Safety, CSKH, Vận hành, Pricing, Marketing]`.
+`TEAMS = [IT, CSKH, Vận hành, Marketing]`.
 
 Một chi tiết dễ nhầm: `insight_agent` bên trong tự gọi `router_agent.route_ticket` cho từng feedback để lọc đúng phòng, nên `router_agent` được dùng ở cả Step 3 lẫn Step 6.
 
@@ -56,7 +56,7 @@ Helper chung trong `agents/common.py`: `get_db()` (Supabase client singleton), `
 
 `route_ticket(topic, severity, sentiment=None)` đọc `data/taxonomy/routing_table.json`. Thứ tự ưu tiên:
 
-1. `severity_overrides`: P5 → Safety (thắng tất cả).
+1. `severity_overrides`: P5 → Vận hành (thắng tất cả).
 2. `sentiment_overrides`: positive → Marketing.
 3. `routes`: match theo topic.
 4. `default_team`: CSKH.
@@ -65,15 +65,15 @@ Bảng route thật:
 
 | Topic | Team | SLA | Priority |
 |-------|------|----:|----------|
-| Safety | Safety | 1h | P5 |
+| Safety | Vận hành | 1h | P5 |
 | Driver Behavior | Vận hành | 8h | P3 |
 | App Issue | IT | 12h | P3 |
 | Payment | CSKH | 12h | P3 |
-| Pricing | Pricing | 24h | P4 |
+| Pricing | CSKH | 12h | P3 |
 | Delay | Vận hành | 8h | P3 |
 | Other | CSKH | 24h | P4 |
 
-Override: P5 → Safety (1h); sentiment positive → Marketing (48h). Agent chỉ đọc JSON, đổi routing không cần sửa code.
+Override: P5 → Vận hành (1h); sentiment positive → Marketing (48h). Agent chỉ đọc JSON, đổi routing không cần sửa code.
 
 ### ticket_agent — tạo ticket
 
@@ -176,4 +176,4 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 2. Implement function chính + fallback.
 3. Import vào `orchestrator.py`, thêm vào đúng Step trong `run_agent_pipeline`.
 4. Thêm endpoint trong `main.py` nếu cần expose API.
-5. Cập nhật `MASTER_BLUEPRINT.md` và tài liệu này.
+5. Cập nhật `co_che.md` (cơ chế tổng thể) và tài liệu này.

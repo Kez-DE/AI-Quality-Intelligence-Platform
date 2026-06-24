@@ -7,7 +7,7 @@ Mục tiêu: cho hội đồng thấy luồng khép kín từ review thô → ph
 1. Điền `.env` ở root từ `.env.example`: Supabase URL + service role key + ít nhất 1 LLM key (OpenRouter). `LLM_PROVIDER=auto`.
 2. Áp migration lên Supabase: `supabase db push` (hoặc đã áp sẵn).
 3. Có sẵn tài khoản admin (`manhnguyn1912@gmail.com` / `Admin@12345`).
-4. Chạy 2 terminal theo `docs/setup-macos.md` hoặc `docs/setup-windows.md`: backend (8000) + frontend (5174).
+4. Chạy 2 terminal theo `docs/project/setup-macos.md` hoặc `docs/project/setup-windows.md`: backend (8000) + frontend (5174).
 5. (Tuỳ chọn) `POST /api/feedback/reclassify` để data cũ mang nhãn mới.
 
 ## Trên sân khấu

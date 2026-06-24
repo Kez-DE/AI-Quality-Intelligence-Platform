@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Shield, X } from "lucide-react";
+import { Info, Shield, X } from "lucide-react";
 import { useMe } from "@/lib/api";
 import { useCockpitRealtime } from "@/hooks/useCockpitRealtime";
 import { useCockpitFilter } from "./CockpitFilterContext";
@@ -70,17 +70,25 @@ export function CockpitView() {
 
   return (
     <div className="mt-6 space-y-6">
+      {isGuest && (
+        <div className="flex items-center gap-2.5 rounded-xl border border-xanh-green/20 bg-xanh-mint/30 px-4 py-2.5 text-sm text-xanh-deep">
+          <Info className="h-4 w-4 flex-shrink-0 text-xanh-green" />
+          <span>
+            Bạn đang xem ở chế độ <strong>Khách</strong> — dữ liệu nhạy cảm và tính năng vận hành đã được bảo mật.
+          </span>
+        </div>
+      )}
       <FilterChip filter={filter} clear={clear} />
       <KpiStrip />
       <div className="grid lg:grid-cols-12 gap-6">
         <div className="lg:col-span-8 space-y-6">
+          {!isGuest ? <LiveFeed /> : <SecurityNotice />}
           <TrendCard />
           <CategoryBreakdown
             onOpenDrawer={(topic) =>
               setDrawer({ topic, title: `Phản hồi · ${topic}` })
             }
           />
-          {!isGuest ? <LiveFeed /> : <SecurityNotice />}
         </div>
         <aside className="lg:col-span-4 space-y-6">
           {!isGuest && <AlertsPanel />}

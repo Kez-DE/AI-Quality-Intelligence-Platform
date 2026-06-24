@@ -16,8 +16,10 @@ export interface Notification {
   read: boolean;
 }
 
-export function useRealtimeNotifications() {
+export function useRealtimeNotifications(currentUserId?: string | null) {
   const [notifications, setNotifications] = React.useState<Notification[]>([]);
+  // Tránh báo trùng: mỗi task chỉ báo "được giao cho bạn" một lần / phiên.
+  const notifiedAssignments = React.useRef<Set<string>>(new Set());
 
   const unreadCount = React.useMemo(
     () => notifications.filter((n) => !n.read).length,
@@ -94,12 +96,51 @@ export function useRealtimeNotifications() {
           toast.info(notification.title);
         }
       )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "tasks" },
+        (payload) => {
+          // Luồng dispatch: manager giao task cho staff (owner_id được set).
+          // Chỉ báo cho đúng nhân viên được giao, mỗi task một lần / phiên.
+          const record = payload.new as Record<string, unknown>;
+          const ownerId = record.owner_id ? String(record.owner_id) : null;
+          const taskId = String(record.id ?? "");
+          if (!currentUserId || !ownerId || ownerId !== currentUserId) return;
+          if (!taskId || notifiedAssignments.current.has(taskId)) return;
+          notifiedAssignments.current.add(taskId);
+
+          const priority = record.priority ? String(record.priority) : undefined;
+          const isUrgent = priority === "P5" || priority === "P4";
+          const title = String(record.title ?? "Công việc mới");
+          const createdAtValue = new Date().toISOString();
+          const notification: Notification = {
+            id: `assign-${taskId}-${Date.now()}`,
+            type: "task",
+            title: `Bạn được giao: ${title}`,
+            priority: isUrgent ? (priority as "P4" | "P5") : undefined,
+            team: record.assigned_team ? String(record.assigned_team) : undefined,
+            created_at: createdAtValue,
+            createdAt: createdAtValue,
+            read: false,
+          };
+
+          setNotifications((prev) =>
+            [notification, ...prev].slice(0, MAX_NOTIFICATIONS)
+          );
+
+          if (isUrgent) {
+            toast.error(`🚨 Việc cần xử lý ngay: ${title}`);
+          } else {
+            toast.info(`Bạn được giao việc mới: ${title}`);
+          }
+        }
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [currentUserId]);
 
   return { notifications, unreadCount, markAsRead, markAllRead, clearAll };
 }

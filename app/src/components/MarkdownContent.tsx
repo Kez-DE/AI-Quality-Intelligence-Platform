@@ -1,5 +1,8 @@
-import ReactMarkdown, { type Components } from "react-markdown";
+import ReactMarkdown from "react-markdown";
+import type { ComponentProps } from "react";
 import remarkGfm from "remark-gfm";
+
+type Components = NonNullable<ComponentProps<typeof ReactMarkdown>["components"]>;
 
 const defaultComponents: Components = {
   h1: ({ children }) => (
@@ -24,7 +27,7 @@ const defaultComponents: Components = {
   ),
   strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
   table: ({ children }) => (
-    <div className="my-3 overflow-x-auto rounded-lg border border-border bg-white shadow-sm">
+    <div className="my-3 overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
       <table className="min-w-full border-collapse text-left text-sm">{children}</table>
     </div>
   ),

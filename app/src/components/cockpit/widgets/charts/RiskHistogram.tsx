@@ -28,7 +28,7 @@ interface TooltipProps {
 function CustomTooltip({ active, payload, label }: TooltipProps) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-xl border border-border bg-white p-3 shadow-lg text-xs font-mono">
+    <div className="rounded-xl border border-border bg-card p-3 shadow-lg text-xs font-mono">
       <div className="text-muted-foreground">Risk score {label}</div>
       <div className="font-semibold mt-0.5">{payload[0].value} phản hồi</div>
     </div>

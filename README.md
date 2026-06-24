@@ -25,7 +25,7 @@ Mục tiêu: giúp đội ngũ vận hành nắm bắt nhanh vấn đề chất 
 | 3 | Ma trận Rủi ro Sâu | Chấm điểm 5 chiều (safety, fraud, attitude, vehicle, compliance) qua LLM Scoring Agent |
 | 4 | Phát hiện Spike | Nhận diện điểm nóng → tự động tạo alert ticket |
 | 5 | Multi-Agent | 8 agent nghiệp vụ + Orchestrator |
-| 6 | Phân tích phòng ban | Insights 6 phòng ban với phân tích sâu bằng LLM |
+| 6 | Phân tích phòng ban | Insights 4 phòng ban với phân tích sâu bằng LLM |
 | 7 | Human-in-the-Loop | Hàng đợi duyệt nhãn — nhân viên sửa nhãn AI, ghi correction log |
 | 8 | AI Chat & RAG (Tiered) | Hỏi đáp tích hợp Hybrid Search KB, tự động phân quyền truy cập (Guest: Public FAQ / Staff: Internal Ops Tools) |
 | 9 | Streaming Realtime | Ingest phản hồi theo luồng thời gian thực |
@@ -62,7 +62,7 @@ Mục tiêu: giúp đội ngũ vận hành nắm bắt nhanh vấn đề chất 
 └─────────────────────────────────────────────────┘
 ```
 
-LLM Providers: OpenRouter, OpenAI, Gemini, Groq (cấu hình qua `LLM_PROVIDER` trong `.env`). Deploy: 6 Railway service Docker, xem [`docs/deploy-railway.md`](docs/deploy-railway.md).
+LLM Providers: OpenRouter, OpenAI, Gemini, Groq (cấu hình qua `LLM_PROVIDER` trong `.env`). Deploy: 6 Railway service Docker, xem [`docs/project/deploy-railway.md`](docs/project/deploy-railway.md).
 
 ---
 
@@ -104,7 +104,7 @@ cd pipeline
 python3 -m venv .venv
 source .venv/bin/activate            # Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-set -a && source ../.env && set +a   # Windows: xem docs/setup-windows.md
+set -a && source ../.env && set +a   # Windows: xem docs/project/setup-windows.md
 python -m uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
@@ -158,7 +158,6 @@ C2-App-116/
 │   ├── train/ demo/        Split ML + seed demo 150 review
 │   └── auxiliary/data2/    Dataset phụ trợ/thí nghiệm, không thay runtime
 ├── docs/                   Tài liệu chi tiết (xem mục Tài liệu)
-├── Todo.md                 Backlog cải tiến
 ├── JOURNAL.md              Nhật ký cohort
 └── WORKLOG.md              Quyết định kỹ thuật
 ```
@@ -169,20 +168,20 @@ C2-App-116/
 
 | Trang | Admin | Manager | Staff | Guest |
 |-------|:-----:|:-------:|:-----:|:-----:|
-| Dashboard | ✅ | ✅ | ✅ | ✅ |
-| Ticket Triage (Alerts) | ✅ | ✅ | ✅ | ❌ |
-| Phản hồi (list + HITL) | ✅ | ✅ | ✅ | ✅ |
-| Phân tích phòng ban | ✅ | ✅ | ✅ | ❌ |
-| AI Chat / Hỗ trợ CSKH | ✅ | ✅ | ✅ | ✅ |
-| Quản lý người dùng | ✅ | ❌ | ❌ | ❌ |
-| Trigger Operations | ✅ | ❌ | ❌ | ❌ |
+| Dashboard | có | có | có | có |
+| Ticket Triage (Alerts) | có | có | có | không |
+| Phản hồi (list + HITL) | có | có | có | có |
+| Phân tích phòng ban | có | có | có | không |
+| AI Chat / Hỗ trợ CSKH | có | có | có | có |
+| Quản lý người dùng | có | không | không | không |
+| Trigger Operations | có | không | không | không |
 
 - **Admin**: toàn quyền, quản lý user, trigger ingest/streaming, xem mọi phòng
 - **Manager**: giám sát phòng mình — alerts, feedback, insights, reports, chat
 - **Staff**: công việc hàng ngày phòng mình — feedback, tasks, chat
 - **Guest**: dashboard, feedback, chat hỗ trợ CSKH
 
-Ngoài role, mỗi ops user gắn một **phòng ban** (IT/Safety/CSKH/Vận hành/Pricing/Marketing) quyết định họ thấy dữ liệu của ai. Manager/staff chỉ xem và thao tác trong phòng mình; admin xem tất cả. Chi tiết cơ chế scope: [`docs/rbac-departments.md`](docs/rbac-departments.md).
+Ngoài role, mỗi ops user gắn một **phòng ban** (IT/CSKH/Vận hành/Marketing) quyết định họ thấy dữ liệu của ai. Manager/staff chỉ xem và thao tác trong phòng mình; admin xem tất cả. Chi tiết cơ chế scope: [`docs/project/rbac-departments.md`](docs/project/rbac-departments.md).
 
 ---
 
@@ -197,7 +196,7 @@ Ngoài role, mỗi ops user gắn một **phòng ban** (IT/Safety/CSKH/Vận hà
 7. Phân tích phòng ban → bấm "Phân tích sâu"
 8. AI Chat: hỏi "khu vực nào đang nóng?"
 
-Kịch bản chi tiết: [`docs/demo-script.md`](docs/demo-script.md)
+Kịch bản chi tiết: [`docs/project/demo-script.md`](docs/project/demo-script.md)
 
 ---
 
@@ -207,20 +206,21 @@ Kịch bản chi tiết: [`docs/demo-script.md`](docs/demo-script.md)
 
 | File | Nội dung |
 |------|----------|
-| [`docs/setup-macos.md`](docs/setup-macos.md) | Cài đặt trên macOS |
-| [`docs/setup-windows.md`](docs/setup-windows.md) | Cài đặt trên Windows |
-| [`docs/setup-supabase.md`](docs/setup-supabase.md) | Cấu hình Supabase (auth, schema, migration) |
+| [`docs/project/setup-macos.md`](docs/project/setup-macos.md) | Cài đặt trên macOS |
+| [`docs/project/setup-windows.md`](docs/project/setup-windows.md) | Cài đặt trên Windows |
+| [`docs/project/setup-supabase.md`](docs/project/setup-supabase.md) | Cấu hình Supabase (auth, schema, migration) |
 | [`pipeline/README.md`](pipeline/README.md) | Backend/ML pipeline chi tiết |
 
 **Kiến trúc & AI**
 
 | File | Nội dung |
 |------|----------|
-| [`docs/architecture.md`](docs/architecture.md) | Kiến trúc tổng thể, 3 tầng, cấu trúc data, 6 service |
-| [`docs/architecture-diagram.md`](docs/architecture-diagram.md) | Sơ đồ Mermaid các module |
-| [`docs/ai-systems.md`](docs/ai-systems.md) | 4 lớp AI, LLM router, luồng dữ liệu theo worker |
-| [`docs/agents-guide.md`](docs/agents-guide.md) | 8 agent + orchestrator: thứ tự thực thi, I/O, routing |
-| [`docs/rbac-departments.md`](docs/rbac-departments.md) | Phân quyền role + scope theo phòng ban |
+| [`docs/project/co_che.md`](docs/project/co_che.md) | Cơ chế tổng thể: luồng → ticket/alert/task/report, phân quyền, chia việc, lộ trình cải thiện (đọc trước khi build lại) |
+| [`docs/project/architecture.md`](docs/project/architecture.md) | Kiến trúc tổng thể, 3 tầng, cấu trúc data, 6 service |
+| [`docs/project/architecture-diagram.md`](docs/project/architecture-diagram.md) | Sơ đồ Mermaid các module |
+| [`docs/project/ai-systems.md`](docs/project/ai-systems.md) | 4 lớp AI, LLM router, luồng dữ liệu theo worker |
+| [`docs/project/agents-guide.md`](docs/project/agents-guide.md) | 8 agent + orchestrator: thứ tự thực thi, I/O, routing |
+| [`docs/project/rbac-departments.md`](docs/project/rbac-departments.md) | Phân quyền role + scope theo phòng ban |
 
 **Dữ liệu & KB**
 
@@ -235,10 +235,10 @@ Kịch bản chi tiết: [`docs/demo-script.md`](docs/demo-script.md)
 
 | File | Nội dung |
 |------|----------|
-| [`docs/deploy-railway.md`](docs/deploy-railway.md) | Deploy 6 service lên Railway qua GitHub Actions |
-| [`docs/demo-script.md`](docs/demo-script.md) | Kịch bản demo 5-7 phút |
-| [`docs/guest-account.md`](docs/guest-account.md) | Cơ chế tài khoản khách + chatbot CSKH |
-| [`docs/eval-evidence.md`](docs/eval-evidence.md) | Bằng chứng đánh giá model (Gate G2) |
+| [`docs/project/deploy-railway.md`](docs/project/deploy-railway.md) | Deploy 6 service lên Railway qua GitHub Actions |
+| [`docs/project/demo-script.md`](docs/project/demo-script.md) | Kịch bản demo 5-7 phút |
+| [`docs/project/guest-account.md`](docs/project/guest-account.md) | Cơ chế tài khoản khách + chatbot CSKH |
+| [`docs/project/eval-evidence.md`](docs/project/eval-evidence.md) | Bằng chứng đánh giá model (Gate G2) |
 
 ---
 

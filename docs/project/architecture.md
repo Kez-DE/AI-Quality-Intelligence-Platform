@@ -141,7 +141,7 @@ Trang `/feedback` tách 2 luồng rõ ràng:
 
 ## Multi-agent layer
 
-`pipeline/agents/` — 8 agent nghiệp vụ + orchestrator, phân tích theo phòng ban (IT/Safety/CSKH/Vận hành/Pricing/Marketing). Điều phối bởi `orchestrator.run_agent_pipeline()` chạy trong `agent-worker`:
+`pipeline/agents/` — 8 agent nghiệp vụ + orchestrator, phân tích theo phòng ban (IT/CSKH/Vận hành/Marketing). Điều phối bởi `orchestrator.run_agent_pipeline()` chạy trong `agent-worker`:
 
 - **alert_agent** — phân cấp WATCH/WARNING/CRITICAL + chống alert trùng (cooldown).
 - **router_agent** — định tuyến ticket theo topic → phòng ban + SLA; P5 override → Safety.

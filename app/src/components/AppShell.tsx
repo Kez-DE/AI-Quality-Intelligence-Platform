@@ -11,6 +11,7 @@ import {
   Bot,
   Building2,
   Car,
+  ClipboardCheck,
   FileText,
   Gauge,
   Kanban,
@@ -27,31 +28,53 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+type NavGroup = "overview" | "operations" | "analytics" | "assistant" | "admin";
+
 type NavItem = {
   to: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   roles: Role[];
+  group: NavGroup;
 };
 
 const ALL_ROLES: Role[] = ["admin", "manager", "staff", "guest"];
 const AUTHENTICATED_ROLES: Role[] = ["admin", "manager", "staff"];
 
-const NAV: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", icon: Gauge, roles: ALL_ROLES },
-  { to: "/alerts", label: "Ticket Triage 🔴", icon: Bell, roles: AUTHENTICATED_ROLES },
-  { to: "/tasks", label: "Task Manager", icon: Kanban, roles: AUTHENTICATED_ROLES },
-  { to: "/feedback", label: "Phản hồi", icon: MessageSquare, roles: ALL_ROLES },
-  { to: "/support", label: "CSKH Support", icon: Headphones, roles: AUTHENTICATED_ROLES },
-  { to: "/reports", label: "Báo cáo AI", icon: FileText, roles: ["admin", "manager"] },
-  { to: "/insights", label: "Phân tích phòng ban", icon: Building2, roles: AUTHENTICATED_ROLES },
-  { to: "/chat", label: "AI Chat", icon: Sparkles, roles: ALL_ROLES },
-];
+// Nhãn nhóm hiển thị trên sidebar — sắp theo luồng nghiệp vụ end-to-end.
+const GROUP_LABELS: Record<NavGroup, string> = {
+  overview: "Tổng quan",
+  operations: "Vận hành",
+  analytics: "Phân tích & Báo cáo",
+  assistant: "Trợ lý",
+  admin: "Quản trị",
+};
 
-// Link chỉ hiện với admin.
-const ADMIN_NAV: NavItem[] = [
-  { to: "/live-stream", label: "Live Stream", icon: Radio, roles: ["admin"] },
-  { to: "/admin", label: "Quản lý người dùng", icon: Shield, roles: ["admin"] },
+const GROUP_ORDER: NavGroup[] = ["overview", "operations", "analytics", "assistant", "admin"];
+
+// Thứ tự item bám theo luồng: Tổng quan → (Phản hồi vào → Phân loại → Xử lý → CSKH)
+// → (Phân tích → Báo cáo) → Trợ lý AI → Quản trị.
+const NAV: NavItem[] = [
+  // 1. Tổng quan — đăng nhập vào là thấy ngay.
+  { to: "/dashboard", label: "Tổng quan", icon: Gauge, roles: ALL_ROLES, group: "overview" },
+
+  // 2. Vận hành — theo đúng luồng dữ liệu đi qua hệ thống.
+  { to: "/feedback", label: "Phản hồi", icon: MessageSquare, roles: ALL_ROLES, group: "operations" },
+  { to: "/alerts", label: "Phân loại Ticket", icon: Bell, roles: AUTHENTICATED_ROLES, group: "operations" },
+  { to: "/tasks", label: "Quản lý công việc", icon: Kanban, roles: AUTHENTICATED_ROLES, group: "operations" },
+  { to: "/support", label: "Hỗ trợ CSKH", icon: Headphones, roles: AUTHENTICATED_ROLES, group: "operations" },
+
+  // 3. Phân tích & Báo cáo — đầu ra của luồng.
+  { to: "/insights", label: "Phân tích phòng ban", icon: Building2, roles: AUTHENTICATED_ROLES, group: "analytics" },
+  { to: "/reports", label: "Báo cáo AI", icon: FileText, roles: ["admin", "manager"], group: "analytics" },
+  { to: "/completion-reports", label: "Báo cáo hoàn thành", icon: ClipboardCheck, roles: ["admin", "manager"], group: "analytics" },
+
+  // 4. Trợ lý AI.
+  { to: "/chat", label: "Trợ lý AI", icon: Sparkles, roles: ALL_ROLES, group: "assistant" },
+
+  // 5. Quản trị — chỉ admin.
+  { to: "/live-stream", label: "Luồng trực tiếp", icon: Radio, roles: ["admin"], group: "admin" },
+  { to: "/admin", label: "Quản lý người dùng", icon: Shield, roles: ["admin"], group: "admin" },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -61,7 +84,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { data: me } = useMe();
 
   const role = me?.role || "guest";
-  const { notifications, unreadCount, markAsRead, markAllRead } = useRealtimeNotifications();
+  const { notifications, unreadCount, markAsRead, markAllRead } = useRealtimeNotifications(me?.id);
   const { theme, toggleTheme } = useTheme();
 
   const navItems = NAV.filter((n) => n.roles.includes(role)).map((n) => {
@@ -71,9 +94,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return n;
   });
 
-  if (role === "admin") {
-    navItems.push(...ADMIN_NAV);
-  }
+  // Gom item theo nhóm, giữ đúng thứ tự nhóm và bỏ nhóm rỗng (tùy role).
+  const navGroups = GROUP_ORDER.map((group) => ({
+    group,
+    label: GROUP_LABELS[group],
+    items: navItems.filter((n) => n.group === group),
+  })).filter((g) => g.items.length > 0);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -120,25 +146,32 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             />
           </div>
         )}
-        <nav className="p-3 flex-1 space-y-1">
-          {navItems.map((n) => {
-            const Icon = n.icon;
-            const active = pathname === n.to;
-            return (
-              <Link
-                key={n.to}
-                to={n.to}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${
-                  active
-                    ? "bg-xanh-mint text-xanh-deep font-semibold shadow-sm"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {n.label}
-              </Link>
-            );
-          })}
+        <nav className="p-3 flex-1 space-y-4 overflow-y-auto">
+          {navGroups.map((g) => (
+            <div key={g.group} className="space-y-1">
+              <div className="px-3 pb-1 text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground/70">
+                {g.label}
+              </div>
+              {g.items.map((n) => {
+                const Icon = n.icon;
+                const active = pathname === n.to;
+                return (
+                  <Link
+                    key={n.to}
+                    to={n.to}
+                    className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${
+                      active
+                        ? "bg-xanh-mint text-xanh-deep font-semibold shadow-sm"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {n.label}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
         <div className="p-3 border-t border-border space-y-2">
           <div className="flex items-center gap-2 px-2 py-1.5 text-xs">
@@ -214,7 +247,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 key={n.to}
                 to={n.to}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs whitespace-nowrap ${
-                  active ? "bg-xanh-deep text-white" : "bg-muted text-muted-foreground"
+                  active ? "bg-xanh-mint text-xanh-deep font-semibold" : "bg-muted text-muted-foreground"
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" />

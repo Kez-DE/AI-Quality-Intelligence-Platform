@@ -676,15 +676,15 @@ function TypingIndicator() {
           style={{ boxShadow: "var(--shadow-bubble)" }}
         >
           <span
-            className="h-2 w-2 animate-bounce rounded-full bg-primary"
+            className="typing-dot h-2 w-2 rounded-full bg-primary"
             style={{ animationDelay: "0ms" }}
           />
           <span
-            className="h-2 w-2 animate-bounce rounded-full bg-primary"
+            className="typing-dot h-2 w-2 rounded-full bg-primary"
             style={{ animationDelay: "150ms" }}
           />
           <span
-            className="h-2 w-2 animate-bounce rounded-full bg-primary"
+            className="typing-dot h-2 w-2 rounded-full bg-primary"
             style={{ animationDelay: "300ms" }}
           />
         </div>

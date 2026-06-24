@@ -29,7 +29,13 @@ export const Route = createFileRoute("/")({
 
 function Landing() {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Nền trang trí — gradient mềm + lưới, tạo chiều sâu cho landing */}
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute -top-32 -right-24 h-[28rem] w-[28rem] rounded-full bg-xanh-green/20 blur-3xl" />
+        <div className="absolute top-1/4 -left-32 h-[24rem] w-[24rem] rounded-full bg-xanh-cyan/15 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 h-[20rem] w-[20rem] rounded-full bg-xanh-mint/40 blur-3xl" />
+      </div>
       {/* Nav */}
       <header className="sticky top-0 z-30 backdrop-blur-xl bg-background/70 border-b border-border/60">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -66,12 +72,7 @@ function Landing() {
             </div>
             <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold leading-[1.05]">
               Biến hàng nghìn phản hồi mỗi ngày thành{" "}
-              <span
-                className="bg-clip-text text-transparent"
-                style={{ backgroundImage: "var(--gradient-green)" }}
-              >
-                hành động vận hành
-              </span>
+              <span className="text-xanh-green">hành động vận hành</span>
               .
             </h1>
             <p className="mt-5 text-lg text-muted-foreground max-w-2xl">
@@ -90,7 +91,7 @@ function Landing() {
               </Link>
               <Link
                 to="/auth"
-                className="h-12 px-6 rounded-xl border border-border bg-white font-semibold flex items-center gap-2 hover:border-xanh-green/40"
+                className="h-12 px-6 rounded-xl border border-border bg-card font-semibold flex items-center gap-2 hover:border-xanh-green/40"
               >
                 Đăng nhập
               </Link>
@@ -105,7 +106,7 @@ function Landing() {
       {/* Features */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
         <div className="text-center max-w-2xl mx-auto mb-10">
-          <div className="text-xs font-mono text-xanh-deep">FEATURES</div>
+          <div className="text-xs font-mono text-xanh-deep">TÍNH NĂNG</div>
           <h2 className="font-display text-3xl sm:text-4xl font-bold mt-1">
             Một khoang lái — toàn bộ vòng đời chất lượng
           </h2>
@@ -123,7 +124,7 @@ function Landing() {
           />
           <Feature
             icon={BarChart3}
-            title="Dashboard & charts"
+            title="Bảng điều khiển & biểu đồ"
             desc="KPI, trend, heatmap khu vực × giờ, breakdown theo chủ đề."
           />
           <Feature
@@ -162,7 +163,7 @@ function Landing() {
             return (
               <div
                 key={p.t}
-                className="rounded-2xl border border-border bg-white p-5 hover:shadow-[var(--shadow-card)] transition-shadow"
+                className="rounded-2xl border border-border bg-card p-5 hover:shadow-[var(--shadow-card)] transition-shadow"
               >
                 <div className="h-10 w-10 rounded-lg bg-xanh-mint grid place-items-center">
                   <Icon className="h-5 w-5 text-xanh-deep" />
@@ -190,7 +191,7 @@ function Landing() {
           </p>
           <Link
             to="/auth"
-            className="inline-flex mt-6 h-12 px-7 rounded-xl bg-white text-xanh-deep font-semibold items-center gap-2 hover:scale-[1.02] transition-transform"
+            className="inline-flex mt-6 h-12 px-7 rounded-xl bg-card text-xanh-deep font-semibold items-center gap-2 hover:scale-[1.02] transition-transform"
           >
             Đăng nhập <ArrowRight className="h-4 w-4" />
           </Link>
@@ -217,7 +218,7 @@ function Feature({
   desc: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-white p-5 hover:border-xanh-green/40 transition-colors">
+    <div className="rounded-2xl border border-border bg-card p-5 hover:border-xanh-green/40 transition-colors">
       <div
         className="h-10 w-10 rounded-lg grid place-items-center text-white"
         style={{ background: "var(--gradient-green)" }}
@@ -232,7 +233,7 @@ function Feature({
 
 function PreviewCard() {
   return (
-    <div className="rounded-3xl border border-border bg-white p-5 shadow-[var(--shadow-card)]">
+    <div className="rounded-3xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
       <div className="flex items-center justify-between mb-3">
         <div className="text-xs font-mono text-muted-foreground">QUALITY · SNAPSHOT</div>
         <span className="text-[10px] font-mono text-xanh-green inline-flex items-center gap-1">
@@ -248,14 +249,14 @@ function PreviewCard() {
         ].map((s) => (
           <div
             key={s.l}
-            className="rounded-xl p-3 border border-border bg-gradient-to-br from-white to-xanh-mint/40"
+            className="rounded-xl p-3 border border-border bg-gradient-to-br from-card to-xanh-mint/40"
           >
             <div className="font-display text-2xl font-bold text-xanh-deep">{s.v}</div>
             <div className="text-[11px] text-muted-foreground">{s.l}</div>
           </div>
         ))}
       </div>
-      <div className="mt-4 rounded-xl border border-border p-3 bg-gradient-to-br from-xanh-mint/20 to-white">
+      <div className="mt-4 rounded-xl border border-border p-3 bg-gradient-to-br from-xanh-mint/20 to-card">
         <div className="text-[10px] font-mono text-muted-foreground mb-1">
           ALERT · 2′ trước
         </div>

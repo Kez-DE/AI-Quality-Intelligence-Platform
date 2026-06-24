@@ -305,4 +305,4 @@ Nếu bạn quen Linux, có thể dùng WSL2 và làm theo hướng dẫn macOS.
 wsl --install
 ```
 
-Sau đó mở Ubuntu terminal và làm theo `docs/setup-macos.md`.
+Sau đó mở Ubuntu terminal và làm theo `docs/project/setup-macos.md`.

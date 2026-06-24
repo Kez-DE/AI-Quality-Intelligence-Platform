@@ -24,7 +24,7 @@ export function TeamLeaderboard() {
           <div className="p-4 text-center text-xs text-muted-foreground">Chưa có dữ liệu.</div>
         ) : (
           data.map((t, idx) => (
-            <div key={t.team} className="flex items-center justify-between rounded-xl border border-border bg-white p-3">
+            <div key={t.team} className="flex items-center justify-between rounded-xl border border-border bg-card p-3">
               <div className="flex items-center gap-3">
                 <span className={`font-bold text-sm ${idx === 0 ? "text-yellow-600" : idx === 1 ? "text-gray-400" : idx === 2 ? "text-orange-600" : "text-muted-foreground"}`}>
                   #{idx + 1}

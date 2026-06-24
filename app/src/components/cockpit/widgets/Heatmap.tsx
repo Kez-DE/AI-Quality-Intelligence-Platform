@@ -39,7 +39,16 @@ export function Heatmap({ onOpenDrawer }: Props) {
       <SectionHeader icon={Radar} title="Heatmap khu vực × giờ" subtitle="Click ô để lọc · mật độ tiêu cực" />
       <div className="px-4 pb-4">
         {loading ? (
-          <div className="py-8 text-center text-xs text-muted-foreground">Loading...</div>
+          <div className="space-y-1 animate-pulse">
+            {Array.from({ length: 4 }).map((_, rowIdx) => (
+              <div key={rowIdx} className="flex items-center gap-1">
+                <div className="w-20 h-5 bg-muted rounded" />
+                {Array.from({ length: 6 }).map((_, colIdx) => (
+                  <div key={colIdx} className="flex-1 h-6 bg-muted rounded" />
+                ))}
+              </div>
+            ))}
+          </div>
         ) : areas.length === 0 ? (
           <div className="py-8 text-center text-xs text-muted-foreground">Chưa có dữ liệu heatmap</div>
         ) : (

@@ -15,10 +15,10 @@ function LiveStreamPage() {
       <div className="space-y-6">
         <h1 className="font-display text-3xl font-bold flex items-center gap-2">
           <Radio className="h-7 w-7 text-xanh-green" />
-          Live Stream
+          Luồng trực tiếp
         </h1>
         <div className="rounded-lg border border-dashed border-muted-foreground/30 bg-muted/20 px-6 py-12 text-center text-sm text-muted-foreground">
-          Live Stream là thao tác toàn hệ thống, chỉ dành cho quản trị viên.
+          Luồng trực tiếp là thao tác toàn hệ thống, chỉ dành cho quản trị viên.
         </div>
       </div>
     );
@@ -34,7 +34,7 @@ function LiveStreamPage() {
           <Radio className="h-6 w-6" />
         </div>
         <div>
-          <h1 className="font-display text-2xl font-bold text-foreground">Live Stream</h1>
+          <h1 className="font-display text-2xl font-bold text-foreground">Luồng trực tiếp</h1>
           <p className="text-sm text-muted-foreground">
             Bật/tắt luồng ingest phản hồi demo và cấu hình auto ticket.
           </p>

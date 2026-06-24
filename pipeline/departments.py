@@ -17,7 +17,7 @@ _DEPARTMENT_ALIASES = {
 
 
 def normalize_department(value: object, default: Optional[str] = None) -> Optional[str]:
-    """Map legacy/free-text team names to one of the six RBAC departments."""
+    """Map legacy/free-text team names to one of the four RBAC departments."""
     raw = str(value or "").strip()
     if not raw:
         return default

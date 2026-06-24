@@ -157,7 +157,7 @@ function ReportsPage() {
             <div className="flex items-center gap-2">
               <Building2 className="h-4 w-4 text-muted-foreground" />
               <select
-                className="border-border bg-white text-sm rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-xanh-green/50"
+                className="border-border bg-card text-sm rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-xanh-green/50"
                 value={selectedTeam}
                 onChange={(e) => setSelectedTeam(e.target.value)}
               >
@@ -202,7 +202,7 @@ function ReportsPage() {
           <Loader2 className="h-8 w-8 animate-spin text-xanh-green" />
         </div>
       ) : reports.length === 0 ? (
-        <div className="border border-border bg-white p-12 text-center text-muted-foreground shadow-sm rounded-lg">
+        <div className="border border-border bg-card p-12 text-center text-muted-foreground shadow-sm rounded-lg">
           Chưa có báo cáo nào được sinh ra cho phòng ban này.
         </div>
       ) : (
@@ -216,7 +216,7 @@ function ReportsPage() {
             return (
               <div
                 key={report.id}
-                className={`overflow-hidden rounded-lg border bg-white shadow-[var(--shadow-card)] ${hasCritical ? "border-red-500/50 shadow-red-500/10" : hasWarning ? "border-amber-500/50 shadow-amber-500/10" : "border-border"}`}
+                className={`overflow-hidden rounded-lg border bg-card shadow-[var(--shadow-card)] ${hasCritical ? "border-red-500/50 shadow-red-500/10" : hasWarning ? "border-amber-500/50 shadow-amber-500/10" : "border-border"}`}
               >
                 <div
                   className={`flex flex-wrap items-center justify-between gap-3 border-b border-border p-5 ${hasCritical ? "bg-red-50" : hasWarning ? "bg-amber-50" : "bg-muted/5"}`}
@@ -280,7 +280,7 @@ function ReportsPage() {
                       onClick={() => handleCopyMarkdown(content)}
                       title="Sao chép báo cáo Markdown"
                       aria-label="Sao chép báo cáo Markdown"
-                      className="grid h-8 w-8 place-items-center rounded-md border border-border bg-white text-muted-foreground transition-colors hover:text-foreground"
+                      className="grid h-8 w-8 place-items-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:text-foreground"
                     >
                       <ClipboardCopy className="h-4 w-4" />
                     </button>

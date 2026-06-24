@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
-import QualityCockpit from '../components/QualityCockpit'
+import { CockpitFilterProvider } from '../components/cockpit/CockpitFilterContext'
+import { CockpitView } from '../components/cockpit/CockpitView'
 import AppShell from '../components/AppShell'
 
 // Mock react-router dependencies
@@ -32,6 +33,11 @@ vi.mock('@tanstack/react-query', () => ({
     mutate: vi.fn(),
     isLoading: false,
   }),
+  useQueryClient: () => ({
+    invalidateQueries: vi.fn(),
+    setQueryData: vi.fn(),
+    getQueryData: vi.fn(),
+  }),
 }))
 
 describe('Smoke Tests', () => {
@@ -44,8 +50,12 @@ describe('Smoke Tests', () => {
     expect(screen.getByText('Content')).toBeInTheDocument()
   })
 
-  it('renders QualityCockpit without crashing', () => {
-    render(<QualityCockpit />)
-    expect(screen.getAllByText(/AI Quality Intelligence/i).length).toBeGreaterThan(0)
+  it('renders the cockpit without crashing', () => {
+    render(
+      <CockpitFilterProvider>
+        <CockpitView />
+      </CockpitFilterProvider>
+    )
+    expect(screen.getAllByText(/Feedback hôm nay/i).length).toBeGreaterThan(0)
   })
 })

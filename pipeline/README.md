@@ -108,7 +108,7 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" \
 curl -s -H "Authorization: Bearer $TOKEN" \
  "http://127.0.0.1:8000/api/insights/departments/Safety?with_analysis=true"
 
-# toàn bộ 6 phòng ban (chạy ~2 phút vì gọi LLM nhiều lần):
+# toàn bộ 4 phòng ban (chạy ~2 phút vì gọi LLM nhiều lần):
 curl -s -X POST -H "Authorization: Bearer $TOKEN" \
  "http://127.0.0.1:8000/api/agent/run?hours=24"
 ```

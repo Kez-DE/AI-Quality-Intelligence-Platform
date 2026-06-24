@@ -97,7 +97,7 @@ export function ArchitectureView() {
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {l.items.map((it) => (
-                        <span key={it} className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-white/80 text-foreground/80 border border-border/60 backdrop-blur">
+                        <span key={it} className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-card/80 text-foreground/80 border border-border/60 backdrop-blur">
                           {it}
                         </span>
                       ))}
@@ -154,7 +154,7 @@ export function ArchitectureView() {
         <SectionHeader icon={Database} title="Tech stack" subtitle="Công nghệ triển khai thực tế" />
         <div className="p-5 grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
           {TECH_STACK.map((s) => (
-            <div key={s.cat} className="rounded-xl border border-border bg-white p-4">
+            <div key={s.cat} className="rounded-xl border border-border bg-card p-4">
               <div className="text-[10px] font-mono font-bold text-xanh-deep uppercase tracking-wider mb-2">{s.cat}</div>
               <div className="space-y-1">
                 {s.items.map((it) => (

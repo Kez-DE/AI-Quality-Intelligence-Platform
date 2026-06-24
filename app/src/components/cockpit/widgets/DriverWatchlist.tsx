@@ -18,12 +18,24 @@ export function DriverWatchlist() {
       <SectionHeader icon={MapPin} title="Khu vực rủi ro" subtitle="Mật độ phản hồi tiêu cực · 14 ngày" />
       <div className="px-3 pb-3 space-y-2">
         {!ov ? (
-          <div className="py-6 text-center text-xs text-muted-foreground">Loading...</div>
+          <div className="space-y-2 animate-pulse">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="rounded-xl border border-border bg-card p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-5 bg-muted rounded" />
+                    <div className="h-3.5 bg-muted rounded w-24" />
+                  </div>
+                  <div className="h-3.5 bg-muted rounded w-16" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : sorted.length === 0 ? (
           <div className="py-6 text-center text-xs text-muted-foreground">Chưa có dữ liệu khu vực</div>
         ) : (
           sorted.map(([area, count], idx) => (
-            <div key={area} className="flex items-center justify-between rounded-xl border border-border bg-white p-3">
+            <div key={area} className="flex items-center justify-between rounded-xl border border-border bg-card p-3">
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-mono text-muted-foreground">#{idx + 1}</span>
                 <div className="font-mono text-sm font-semibold text-xanh-deep">{area}</div>

@@ -187,7 +187,7 @@ function UploadFeedbackPage() {
       </div>
 
       {mode === "text" && (
-        <section className="rounded-2xl border border-border bg-white p-6 shadow-[var(--shadow-card)] animate-in fade-in slide-in-from-bottom-2">
+        <section className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] animate-in fade-in slide-in-from-bottom-2">
            <label className="block text-sm font-semibold mb-2">Nội dung phản hồi</label>
            <textarea
              rows={4}
@@ -228,7 +228,7 @@ function UploadFeedbackPage() {
               onDragOver={handleDrag}
               onDrop={handleDrop}
               className={`border-2 border-dashed rounded-2xl p-12 flex flex-col items-center justify-center text-center transition-colors
-                ${dragActive ? "border-xanh-green bg-xanh-green/5" : "border-border bg-white hover:bg-muted/30"}
+                ${dragActive ? "border-xanh-green bg-xanh-green/5" : "border-border bg-card hover:bg-muted/30"}
               `}
             >
               <div className="h-14 w-14 rounded-full bg-xanh-green/10 flex items-center justify-center mb-4">
@@ -238,7 +238,7 @@ function UploadFeedbackPage() {
               <p className="text-muted-foreground text-sm mt-1 mb-6">
                 hoặc click để chọn file từ máy tính
               </p>
-              <label className="cursor-pointer h-10 px-5 rounded-xl bg-white border border-border text-sm font-semibold flex items-center shadow-sm hover:bg-muted/50 transition-colors">
+              <label className="cursor-pointer h-10 px-5 rounded-xl bg-card border border-border text-sm font-semibold flex items-center shadow-sm hover:bg-muted/50 transition-colors">
                 Chọn File
                 <input type="file" accept=".csv" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
               </label>
@@ -250,7 +250,7 @@ function UploadFeedbackPage() {
           )}
 
           {file && !isProcessing && (
-             <div className="rounded-2xl border border-border bg-white shadow-[var(--shadow-card)] overflow-hidden animate-in fade-in slide-in-from-bottom-2">
+             <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] overflow-hidden animate-in fade-in slide-in-from-bottom-2">
                 <div className="p-4 border-b border-border bg-muted/20 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <FileArchive className="h-8 w-8 text-xanh-deep opacity-80" />
@@ -322,7 +322,7 @@ function UploadFeedbackPage() {
           )}
 
           {isProcessing && mode === "csv" && (
-            <div className="rounded-2xl border border-border bg-white p-8 shadow-[var(--shadow-card)] text-center animate-in fade-in zoom-in-95">
+            <div className="rounded-2xl border border-border bg-card p-8 shadow-[var(--shadow-card)] text-center animate-in fade-in zoom-in-95">
               <div className="relative w-20 h-20 mx-auto mb-6">
                 <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
                   <circle cx="50" cy="50" r="45" className="stroke-muted fill-none stroke-[8]" />
