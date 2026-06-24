@@ -16,6 +16,7 @@ from ingest import get_supabase
 from agent import chat_completion, get_agent_status, run_chat_agent
 from agent.rag_engine import rag_chat
 from auth_guard import AuthUser, can_view_team, get_current_user, require_admin, require_ops_staff, scoped_team
+from dispatch_utils import parse_deadline
 from users_admin import router as users_router, audit_router
 from rate_limiter import RateLimiter, check_rate_limit
 from clean import mask_pii
@@ -56,6 +57,14 @@ class CompletionReportReq(BaseModel):
 class ReviewReportReq(BaseModel):
     status: str  # approved | rejected
     review_note: Optional[str] = Field(default=None, max_length=2000)
+
+
+class DraftTasksReq(BaseModel):
+    suggested_tasks: list[dict]
+
+
+class ApproveDispatchReq(BaseModel):
+    suggested_tasks: list[dict]
 
 
 _s = get_settings()
@@ -475,6 +484,70 @@ def approve_report(report_id: str, user: AuthUser = Depends(require_ops_staff)):
     if not data:
         raise HTTPException(status_code=404, detail="Report not found")
     return {"status": "success", "data": data[0]}
+
+
+@app.put("/api/reports/{report_id}/draft-tasks")
+def update_draft_tasks(
+    report_id: str,
+    payload: DraftTasksReq,
+    user: AuthUser = Depends(require_ops_staff),
+):
+    """Manager lưu nháp danh sách Draft Task. 409 nếu báo cáo đã duyệt."""
+    db = get_supabase()
+    existing = db.table("department_reports").select("team,approved").eq("id", report_id).limit(1).execute().data or []
+    if not existing:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if not can_view_team(user, existing[0].get("team")):
+        raise HTTPException(status_code=403, detail="Bạn không có quyền sửa báo cáo của phòng ban khác.")
+    if existing[0].get("approved"):
+        raise HTTPException(status_code=409, detail="Báo cáo đã duyệt, không thể sửa.")
+    try:
+        data = db.table("department_reports").update(
+            {"suggested_tasks": payload.suggested_tasks}
+        ).eq("id", report_id).eq("approved", False).execute().data or []
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Cannot save draft: {str(exc)[:300]}") from exc
+    if not data:
+        raise HTTPException(status_code=409, detail="Báo cáo đã duyệt, không thể sửa.")
+    return {"status": "success", "data": data[0]}
+
+
+@app.post("/api/reports/{report_id}/approve-and-dispatch")
+def approve_and_dispatch(
+    report_id: str,
+    payload: ApproveDispatchReq,
+    user: AuthUser = Depends(require_ops_staff),
+):
+    """Duyệt báo cáo + tạo task chính thức (atomic qua RPC)."""
+    db = get_supabase()
+    existing = db.table("department_reports").select("team,approved").eq("id", report_id).limit(1).execute().data or []
+    if not existing:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if not can_view_team(user, existing[0].get("team")):
+        raise HTTPException(status_code=403, detail="Bạn không có quyền duyệt báo cáo của phòng ban khác.")
+    if existing[0].get("approved"):
+        raise HTTPException(status_code=409, detail="Báo cáo đã được duyệt.")
+
+    enriched = []
+    for t in payload.suggested_tasks:
+        item = dict(t)
+        item["due_at"] = parse_deadline(item.get("deadline")).isoformat()
+        enriched.append(item)
+
+    try:
+        res = db.rpc("approve_report_and_dispatch", {
+            "p_report_id": report_id,
+            "p_tasks": enriched,
+            "p_approver": user.id,
+        }).execute()
+        tasks_created = res.data if isinstance(res.data, int) else (res.data or 0)
+    except Exception as exc:
+        if "report_not_found_or_already_approved" in str(exc):
+            raise HTTPException(status_code=409, detail="Báo cáo đã được duyệt.") from exc
+        raise HTTPException(status_code=503, detail=f"Cannot dispatch: {str(exc)[:300]}") from exc
+
+    report = db.table("department_reports").select("*").eq("id", report_id).limit(1).execute().data or []
+    return {"status": "success", "tasks_created": tasks_created, "report": report[0] if report else None}
 
 
 @app.get("/api/users/assignable")
