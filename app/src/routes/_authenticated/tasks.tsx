@@ -39,6 +39,8 @@ type Task = {
   owner_email: string | null;
   due_at: string | null;
   created_at: string;
+  report_id?: string | null;
+  source?: string;
 };
 
 type Alert = {
@@ -535,6 +537,18 @@ function TasksPage() {
                       <span className="px-2 py-0.5 rounded bg-muted text-[10px] uppercase font-mono border border-border">
                         Phòng: {task.assigned_team}
                       </span>
+                      <span className="px-2 py-0.5 rounded bg-muted text-[10px] uppercase font-mono border border-border">
+                        {task.source === "report" ? "Từ báo cáo" : "Từ cảnh báo"}
+                      </span>
+                      {task.report_id && (
+                        <a
+                          href="/reports"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[11px] text-xanh-deep underline font-mono"
+                        >
+                          Xem báo cáo gốc
+                        </a>
+                      )}
                       {task.priority && (
                         <span className="px-2 py-0.5 rounded bg-muted text-[10px] uppercase font-mono border border-border">
                           {task.priority}
