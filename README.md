@@ -30,6 +30,7 @@ Mục tiêu: giúp đội ngũ vận hành nắm bắt nhanh vấn đề chất 
 | 8 | AI Chat & RAG (Tiered) | Hỏi đáp tích hợp Hybrid Search KB, tự động phân quyền truy cập (Guest: Public FAQ / Staff: Internal Ops Tools) |
 | 9 | Streaming Realtime | Ingest phản hồi theo luồng thời gian thực |
 | 10 | RBAC 4 vai trò | Phân quyền admin, manager, staff, guest |
+| 11 | Khép kín Báo cáo → Task | HI-Loop Approval: Manager biên tập hành động AI đề xuất trong báo cáo rồi duyệt một nút để tự tạo task chính thức, có liên kết ngược về báo cáo gốc |
 
 ---
 
@@ -194,7 +195,8 @@ Ngoài role, mỗi ops user gắn một **phòng ban** (IT/CSKH/Vận hành/Mark
 5. Chạy streaming hoặc ingest 150 review
 6. Vào Ticket Triage xem alert
 7. Phân tích phòng ban → bấm "Phân tích sâu"
-8. AI Chat: hỏi "khu vực nào đang nóng?"
+8. Vào Báo cáo AI → sửa Draft Task → bấm "Duyệt và triển khai task" → xem task mới trên Task Board (badge "Từ báo cáo")
+9. AI Chat: hỏi "khu vực nào đang nóng?"
 
 Kịch bản chi tiết: [`docs/project/demo-script.md`](docs/project/demo-script.md)
 

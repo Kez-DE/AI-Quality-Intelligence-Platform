@@ -85,3 +85,21 @@ flowchart LR
 
     REQ --> OR -- lỗi/hết key --> OA -- lỗi/hết key --> GM -- lỗi/hết key --> GR -- hết key --> MK
 ```
+
+## 5. HI-Loop Approval (báo cáo → task khép kín)
+
+```mermaid
+flowchart LR
+    AA["analyst_agent<br/>action_items + root_cause"]
+    DR[("department_reports<br/>suggested_tasks (JSONB)")]
+    MGR{"Manager<br/>biên tập Draft Task"}
+    DRAFT["PUT /draft-tasks<br/>lưu nháp (409 nếu đã duyệt)"]
+    DISP["POST /approve-and-dispatch<br/>RPC atomic"]
+    TK[("tasks<br/>source=report, report_id")]
+    BOARD["Task Board<br/>badge 'Từ báo cáo' + link gốc"]
+
+    AA --> DR --> MGR
+    MGR --> DRAFT --> DR
+    MGR --> DISP --> TK --> BOARD
+```
+

@@ -217,7 +217,14 @@ Mỗi phòng ban là một thẻ hiện phân bố mức độ, chủ đề nổ
 
 Màn `/reports` chỉ dành cho manager và admin. Admin chọn phòng ban qua dropdown, manager xem phòng mình. Nút "Tạo báo cáo mới" gọi `POST /api/agent/generate-report` để Analyst Agent sinh báo cáo vận hành cho phòng đó. Nếu báo cáo hôm nay đã được duyệt thì không ghi đè được.
 
-Mỗi báo cáo hiện dưới dạng thẻ, viền đổi màu theo mức độ (đỏ nếu có CRITICAL, vàng nếu có WARNING). Nội dung render từ Markdown. Hai nút: dấu tích để duyệt báo cáo (`PATCH /api/reports/{id}/approve`, sau khi duyệt thì khóa lại), và nút copy để sao chép nội dung Markdown.
+Mỗi báo cáo hiện dưới dạng thẻ, viền đổi màu theo mức độ (đỏ nếu có CRITICAL, vàng nếu có WARNING). Nội dung render từ Markdown. Nút copy để sao chép nội dung Markdown.
+
+Bên dưới phần Markdown của báo cáo chưa duyệt có **trình biên tập Dự thảo kế hoạch hành động** (Draft Task Editor): danh sách hành động AI đề xuất (từ cột `suggested_tasks`), manager có thể sửa nội dung, mức ưu tiên, thời hạn, thêm hoặc xóa từng dòng. Hai nút:
+
+- **Lưu nháp** (`PUT /api/reports/{id}/draft-tasks`) — lưu danh sách đã chỉnh, mở lại vẫn còn.
+- **Duyệt và triển khai task** (`POST /api/reports/{id}/approve-and-dispatch`) — duyệt báo cáo đồng thời tạo từng hành động thành task chính thức trên Task Board (atomic qua RPC). Toast báo "Đã duyệt, tạo N task".
+
+Sau khi duyệt, báo cáo bị khóa: editor ẩn đi, chỉ còn thông báo "Đã duyệt, các task đã được tạo trên Task Board". Các task này hiện badge "Từ báo cáo" + link "Xem báo cáo gốc" ở màn `/tasks`. Vẫn giữ đường duyệt cũ chỉ-duyệt-không-tạo-task (`PATCH /api/reports/{id}/approve`) để tương thích ngược.
 
 ### AI Chat
 

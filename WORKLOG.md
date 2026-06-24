@@ -241,3 +241,24 @@ Chưa phân công. TODO: ai làm module nào, deadline nội bộ.
 - **Cập nhật code phụ trợ**: `router_agent.py` đổi fallback default của P5 override `"Safety"`→`"Vận hành"`, sửa docstring/comment/demo `__main__`.
 - **Lưu ý**: Phòng `Safety` và `Pricing` VẪN giữ trong `departments.py` (RBAC + alias) — chỉ bỏ vai trò làm đích routing tự động, KHÔNG xóa khỏi phân quyền (sẽ là thay đổi riêng nếu cần).
 - **Test**: Cập nhật `tests/test_router_agent.py`, `tests/test_spike_detector.py`, `tests/test_feedback_scope.py` cho khớp hành vi mới. Chạy `python -m pytest tests/test_router_agent.py tests/test_spike_detector.py -q` → 10 passed. (`test_feedback_scope.py` không collect được do môi trường thiếu `apscheduler` khi import `main.py` — lỗi sẵn có, không liên quan thay đổi.)
+
+
+## 2026-06-25
+
+### Tính năng — HI-Loop Approval (Báo cáo → Task khép kín)
+
+Biến `action_items` AI sinh trong báo cáo thành task chính thức bằng một nút duyệt của manager, có liên kết ngược về báo cáo gốc.
+
+**Quyết định kỹ thuật:**
+- Thêm 2 cột vào `department_reports`: `suggested_tasks` (JSONB, default `[]`), `root_cause_summary` (TEXT). Thêm 2 cột vào `tasks`: `report_id` (FK → department_reports, ON DELETE SET NULL), `source` (CHECK in `agent`/`report`, default `agent`).
+- Duyệt + tạo task phải **atomic** → dùng RPC Postgres `approve_report_and_dispatch(p_report_id, p_tasks, p_approver)` chạy trong một transaction, KHÔNG dùng try/except bù trừ ở app.
+- Parse deadline ở Python (`dispatch_utils.parse_deadline`): token `Nh`/`Nd`/`Nw`, không khớp → default +48h.
+- Giữ nguyên `PATCH /api/reports/{id}/approve` cũ (tương thích ngược). Thêm `PUT /api/reports/{id}/draft-tasks` (lưu nháp, 409 khi đã duyệt) và `POST /api/reports/{id}/approve-and-dispatch`.
+- Báo cáo đã duyệt bị khóa: không sửa Draft Task được nữa.
+- RBAC gate ở tầng API bằng `can_view_team(user, report.team)`; backend chạy service role nên không sửa RLS trong phạm vi này.
+
+**Files:** migration `20260627000000_suggested_tasks_and_report_link.sql`, `pipeline/dispatch_utils.py` (+ test), `pipeline/main.py`, `pipeline/agents/report_builder.py`, `pipeline/agents/orchestrator.py`, `app/src/routes/_authenticated/reports.tsx`, `app/src/routes/_authenticated/tasks.tsx`.
+
+**Verify:** migration đã apply Supabase (verified cột + RPC); backend pytest 68 passed/3 skipped; frontend `tsc --noEmit` + `vite build` pass; E2E RPC trên DB thật (2 task `source=report` đúng `report_id`/`due_at`, gọi lần 2 → đã-duyệt, cleanup). Deploy 6 service Railway thành công qua GitHub Actions.
+
+Docs cập nhật theo luồng: `co_che.md` (mục 5, 7, 8, 10, phụ lục A), `agents-guide.md`, `architecture-diagram.md` (mục 5), `ai-systems.md`, `giai_thich.md`, `rbac-departments.md`, `README.md`.

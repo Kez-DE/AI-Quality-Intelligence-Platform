@@ -70,10 +70,12 @@ Step 1-4 spike_detector gom area + topic + team, áp ngưỡng risk/volume,
 Step 5   task_agent.cluster_alerts_into_tasks()              [RULE + 1 LLM/cụm mới]
 Step 5.5 ticket_agent.get_overdue_tickets(24h)               [RULE]  quá SLA
 Step 6   for team in TEAMS: insight_agent.generate(...)      [RULE]  metric theo phòng
-Step 7   analyst_agent.analyze_root_cause(team, insights)    [LLM]   → department_reports
+Step 7   analyst_agent.analyze_root_cause(team, insights)    [LLM]   → department_reports (content + root_cause_summary + suggested_tasks)
 ```
 
 `TEAMS = [IT, CSKH, Vận hành, Marketing]`
+
+Báo cáo sinh ra ở Step 7 lưu kèm `suggested_tasks` (JSONB) — manager biên tập rồi duyệt thành task `source=report` qua RPC `approve_report_and_dispatch` (luồng HI-Loop Approval, xem `co_che.md` mục 8).
 
 ### Các agent
 

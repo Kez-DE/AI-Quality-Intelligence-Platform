@@ -66,6 +66,8 @@ Endpoint dùng `can_view_team` để chặn thao tác chéo phòng:
 | `PATCH /api/tasks/{id}/assign` | team của task |
 | `PATCH /api/alerts/{id}/status` | team (qua `task_id → assigned_team`) |
 | `PATCH /api/reports/{id}/approve` | team của report |
+| `PUT /api/reports/{id}/draft-tasks` | team của report (409 nếu đã duyệt) |
+| `POST /api/reports/{id}/approve-and-dispatch` | team của report (409 nếu đã duyệt) |
 | `GET /api/insights/departments/{team}` | team trong path |
 
 Endpoint admin-only (qua `require_admin`): `GET /api/agent/stats`, `POST /api/ingest-real-dataset`, `POST /api/live-stream/start|stop`, `POST /api/run-real-pipeline`, `POST /api/trigger-spike-detect`, `POST /api/feedback/reclassify`, và toàn bộ quản lý user.

@@ -176,8 +176,13 @@ Hai luật ghi đè quan trọng: mọi ticket P5 ép về Vận hành (đội p
 Đây là phần hay bị hiểu sai. Có ba lớp dữ liệu khác nhau, đừng lẫn:
 
 - **alert** (bảng `alerts`): một sự cố hoặc cụm vấn đề, đã định tuyến phòng ban và SLA.
-- **task** (bảng `tasks`): nhóm nhiều alert cùng `(phòng, khu vực)` thành một đầu việc để phòng nhận và xử lý.
+- **task** (bảng `tasks`): một đầu việc để phòng nhận và xử lý. Mỗi task có cột `source` cho biết nguồn gốc: `agent` (máy gom nhiều alert cùng `(phòng, khu vực)`) hoặc `report` (manager duyệt báo cáo rồi triển khai). Task từ báo cáo còn có `report_id` trỏ ngược về `department_reports` để nhân viên biết ngữ cảnh.
 - **task_completion_report** (bảng `task_completion_reports`): nhân viên báo cáo đã xử lý task tới đâu, quản lý duyệt.
+
+Task sinh ra theo **hai đường**, cùng đổ về bảng `tasks` và cùng hiển thị trên Task Board:
+
+1. **Tự động từ alert (`source=agent`)** — `task_agent` gom các alert chưa có task theo `(phòng, khu vực)`. Không cần con người.
+2. **Manager duyệt báo cáo (`source=report`)** — luồng HI-Loop Approval: AI đề xuất danh sách hành động trong báo cáo, manager chỉnh sửa rồi bấm một nút để biến chúng thành task chính thức (xem mục 8).
 
 Việc chảy từ trên xuống theo sơ đồ sau. Hệ thống sinh việc tự động, admin và manager nhìn toàn cảnh, việc rớt xuống đúng phòng, staff xử lý và báo cáo ngược lên.
 
@@ -185,9 +190,11 @@ Việc chảy từ trên xuống theo sơ đồ sau. Hệ thống sinh việc t�
 flowchart TD
     A[alerts mới<br/>task_id null, status open] -->|task_agent gom theo team+area| B{Đã có task open<br/>cùng team+area?}
     B -->|có| C[gán alert vào task cũ]
-    B -->|chưa| D[LLM đặt title/summary<br/>INSERT task mới]
+    B -->|chưa| D[LLM đặt title/summary<br/>INSERT task source=agent]
+    R[department_reports<br/>suggested_tasks] -->|manager duyệt & triển khai| RD[INSERT task source=report<br/>report_id trỏ về báo cáo]
     C --> E[Task thuộc 1 phòng ban]
     D --> E
+    RD --> E
     E -->|backend-worker đẩy vòng đời| F[open → in_progress → resolved]
     E -->|staff phòng đó nhận| G[Staff xử lý task]
     G --> H[Staff gửi task_completion_report<br/>completion_level: completed/partial/blocked]
@@ -196,15 +203,15 @@ flowchart TD
     I -->|approved| J[Task khép vòng]
 ```
 
-Cơ chế gom task (`task_agent.cluster_alerts_into_tasks`): đọc `alerts` có `task_id` null và `status=open`, gom theo `(assigned_team, area)`. Mỗi cụm tìm task open cùng team và area, chưa có thì gọi LLM sinh title và summary rồi INSERT. Đúng phải thế nào: một cụm `(team, area)` chỉ có một task open tại một thời điểm, để tránh phòng nhận trùng việc.
+Cơ chế gom task (`task_agent.cluster_alerts_into_tasks`): đọc `alerts` có `task_id` null và `status=open`, gom theo `(assigned_team, area)`. Mỗi cụm tìm task open cùng team và area, chưa có thì gọi LLM sinh title và summary rồi INSERT (`source=agent`). Đúng phải thế nào: một cụm `(team, area)` chỉ có một task open tại một thời điểm, để tránh phòng nhận trùng việc.
 
 Vòng đời ticket (`backend-worker`, mỗi 5 giây): đẩy `open → in_progress → resolved` theo rule, không tốn LLM. SLA quá hạn được `ticket_agent.get_overdue_tickets(sla_hours=24)` quét ra.
 
 Phân quyền top-down trong việc chia việc:
 
-- **admin và manager** nhìn toàn cảnh (admin toàn hệ thống, manager phòng mình), thấy task rơi vào phòng, theo dõi tiến độ và SLA.
+- **admin và manager** nhìn toàn cảnh (admin toàn hệ thống, manager phòng mình), thấy task rơi vào phòng, theo dõi tiến độ và SLA. Manager cũng là người duyệt báo cáo để triển khai task `source=report`.
 - **staff** chỉ thấy task phòng mình, nhận và xử lý, gửi báo cáo hoàn thành.
-- Hệ thống (task_agent) là cái sinh task tự động từ alert. Con người không phải tạo task thủ công, chỉ xử lý và duyệt.
+- Hệ thống (task_agent) sinh task tự động từ alert. Ngoài ra task còn đến từ manager duyệt báo cáo. Staff không tạo task thủ công, chỉ xử lý và duyệt.
 
 ## 6. Phòng ban
 
@@ -284,6 +291,8 @@ Endpoint dùng `can_view_team` (chặn thao tác chéo phòng):
 | `PATCH /api/tasks/{id}/assign` | task |
 | `PATCH /api/alerts/{id}/status` | task_id → assigned_team |
 | `PATCH /api/reports/{id}/approve` | report |
+| `PUT /api/reports/{id}/draft-tasks` | report (lưu nháp danh sách hành động, 409 nếu đã duyệt) |
+| `POST /api/reports/{id}/approve-and-dispatch` | report (duyệt + tạo task, 409 nếu đã duyệt) |
 | `GET /api/insights/departments/{team}` | team trong path |
 
 Endpoint admin-only (qua `require_admin`): `GET /api/agent/stats`, `POST /api/ingest-real-dataset`, `POST /api/live-stream/start|stop`, `POST /api/run-real-pipeline`, `POST /api/trigger-spike-detect`, `POST /api/feedback/reclassify`, và toàn bộ quản lý user (`PATCH /api/users/{id}/role`, `PATCH /api/users/{id}/department`).
@@ -320,16 +329,33 @@ Frontend (`AppShell.tsx`) lọc nav theo role, `route.tsx` redirect guest khỏi
 
 Có hai loại báo cáo khác nhau, đừng lẫn:
 
-**department_reports — báo cáo phân tích của analyst_agent (máy sinh).** Orchestrator chạy `insight_agent` gom metric theo phòng, rồi nếu phòng có feedback và analyst bật thì gọi `analyst_agent.analyze_root_cause` để LLM viết `{root_cause_summary, risk_level, action_items}`. Orchestrator upsert vào `department_reports`. Có trường duyệt: `approved`, `approved_by`, `approved_at`. Manager hoặc admin duyệt qua `PATCH /api/reports/{id}/approve`.
+**department_reports — báo cáo phân tích của analyst_agent (máy sinh).** Orchestrator chạy `insight_agent` gom metric theo phòng, rồi nếu phòng có feedback và analyst bật thì gọi `analyst_agent.analyze_root_cause` để LLM viết `{root_cause_summary, risk_level, action_items}`. Orchestrator upsert vào `department_reports`, ghi đồng thời:
+
+- `content` (Markdown báo cáo, để đọc),
+- `root_cause_summary` (TEXT, tách riêng để query/hiển thị),
+- `suggested_tasks` (JSONB, chính là `action_items` đã chuẩn hóa — danh sách hành động đề xuất để manager biên tập).
+
+Có trường duyệt: `approved`, `approved_by`, `approved_at`.
+
+**Luồng HI-Loop Approval (báo cáo → task).** Đây là cầu nối biến báo cáo tĩnh thành việc thực thi:
+
+1. Manager mở trang Báo cáo, đọc Markdown + danh sách Draft Task (từ `suggested_tasks`).
+2. Manager thêm/sửa/xóa Draft Task, lưu nháp qua `PUT /api/reports/{id}/draft-tasks` (trả `409` nếu báo cáo đã duyệt — đã duyệt thì khóa, không sửa được nữa).
+3. Manager bấm "Duyệt và triển khai task" → `POST /api/reports/{id}/approve-and-dispatch`. Endpoint gọi RPC Postgres `approve_report_and_dispatch(p_report_id, p_tasks, p_approver)` chạy **atomic trong một transaction**: vừa set `approved=true/approved_by/approved_at/suggested_tasks`, vừa INSERT từng Draft Task vào bảng `tasks` với `source='report'`, `report_id` trỏ về báo cáo, `status='open'`. Deadline chuỗi (`1h`/`24h`/`48h`/`7d`/`1w`) được `parse_deadline` (Python) đổi sang `due_at` tuyệt đối, không khớp thì mặc định +48h.
+4. Task xuất hiện trên Task Board với badge "Từ báo cáo" + link "Xem báo cáo gốc" để nhân viên có ngữ cảnh.
+
+Giữ nguyên `PATCH /api/reports/{id}/approve` cũ (chỉ duyệt, không tạo task) để tương thích ngược.
 
 **task_completion_reports — báo cáo hoàn thành của nhân viên (người gửi).** Staff sau khi xử lý task gửi báo cáo với `completion_level` (completed/partial/blocked) và `note`. Manager duyệt với `status` (submitted/approved/rejected) và `review_note`. Realtime bật để quản lý nhận thông báo khi có báo cáo mới.
 
 ```mermaid
 flowchart LR
-    subgraph Máy sinh
-        IA[insight_agent<br/>gom metric] --> AA[analyst_agent<br/>LLM root cause]
-        AA --> DR[(department_reports)]
-        DR --> MA1[manager/admin duyệt approve]
+    subgraph Máy sinh + HI-Loop
+        IA[insight_agent<br/>gom metric] --> AA[analyst_agent<br/>LLM root cause + action_items]
+        AA --> DR[(department_reports<br/>content + root_cause_summary<br/>+ suggested_tasks)]
+        DR --> ED[Manager biên tập Draft Task<br/>PUT draft-tasks]
+        ED --> AP[Manager duyệt & triển khai<br/>POST approve-and-dispatch → RPC atomic]
+        AP --> TK[(tasks source=report<br/>report_id)]
     end
     subgraph Người gửi
         ST[staff xử lý task] --> TCR[(task_completion_reports)]
@@ -337,7 +363,7 @@ flowchart LR
     end
 ```
 
-Đúng phải thế nào: analyst chỉ chạy cho phòng có feedback (tiết kiệm quota). Báo cáo phân tích là máy sinh nhưng phải có người duyệt mới coi là chính thức. Báo cáo hoàn thành là người gửi, máy chỉ chuyển và thông báo.
+Đúng phải thế nào: analyst chỉ chạy cho phòng có feedback (tiết kiệm quota). Báo cáo phân tích là máy sinh nhưng phải có người duyệt mới coi là chính thức; việc tạo task khi duyệt phải atomic (qua RPC, không bù trừ try/except ở app). Báo cáo đã duyệt bị khóa, không sửa Draft Task được nữa. Báo cáo hoàn thành là người gửi, máy chỉ chuyển và thông báo.
 
 ## 9. Streaming và điều phối của admin
 
@@ -371,7 +397,7 @@ Multi-agent gồm tám agent nghiệp vụ + orchestrator. Orchestrator không p
 | `ticket_agent` | DB | Tạo/cập nhật ticket, quét ticket quá hạn SLA | orchestrator |
 | `task_agent` | Rule + LLM | Gom alert cùng (phòng, khu vực) thành task, LLM đặt tên | orchestrator |
 | `insight_agent` | Rule | Tổng hợp metric và topic theo phòng | orchestrator |
-| `analyst_agent` | LLM | Phân tích root cause + action, persona theo phòng | orchestrator |
+| `analyst_agent` | LLM | Phân tích root cause + action items, persona theo phòng. `action_items` được lưu thành `suggested_tasks` để manager duyệt | orchestrator |
 
 Thứ tự thực thi trong `orchestrator.run_agent_pipeline(hours=24)`, chạy mỗi 300s ở agent-worker:
 
@@ -384,7 +410,7 @@ Step 6-7   for team in [IT, CSKH, Vận hành, Marketing]:
              insight_agent.generate_department_insights(team)   [RULE]
              nếu có feedback và analyst bật:
                analyst_agent.analyze_root_cause(team, insights) [LLM]
-               upsert vào department_reports
+               upsert vào department_reports (content + root_cause_summary + suggested_tasks)
 ```
 
 Cờ bật/tắt (mặc định True): `AGENT_ALERT_ENABLED`, `AGENT_TASK_ENABLED`, `AGENT_INSIGHT_ENABLED`, `AGENT_ANALYST_ENABLED`. Cấp worker: `WORKER_AGENT_ENABLED`, `WORKER_AGENT_INTERVAL_SECONDS` (300), `WORKER_AGENT_HOURS` (24).
@@ -454,8 +480,8 @@ Làm P0 trước tiên và trọn vẹn (đây là điều kiện để chạm d
 | `profiles` | trigger signup, users_admin | auth_guard, ticket_agent | role + department của user |
 | `feedback` | ingestion_agent, ingest.py | orchestrator, insight_agent, scoring_agent | review đã phân loại |
 | `alerts` | ticket_agent | alert_agent (dedup), task_agent | ticket sự cố, có routing fields |
-| `tasks` | task_agent | task_agent, API tasks | đầu việc gom theo (team, area) |
-| `department_reports` | orchestrator (upsert) | API reports | báo cáo phân tích máy sinh, có approval |
+| `tasks` | task_agent, RPC approve_report_and_dispatch | task_agent, API tasks | đầu việc; `source` = agent (gom theo team/area) hoặc report (từ duyệt báo cáo), `report_id` trỏ về báo cáo gốc |
+| `department_reports` | orchestrator (upsert), API draft-tasks/approve | API reports | báo cáo phân tích máy sinh; có `content`, `root_cause_summary`, `suggested_tasks` (JSONB), approval fields |
 | `task_completion_reports` | API (staff gửi) | manager duyệt | báo cáo hoàn thành người gửi |
 | `correction_logs` | API label | retrain tương lai | audit + dữ liệu học khép vòng |
 | `audit_logs` | users_admin | admin | log đổi role và department |

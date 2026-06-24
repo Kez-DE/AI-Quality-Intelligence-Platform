@@ -81,7 +81,7 @@ Override: P5 → Vận hành (1h); sentiment positive → Marketing (48h). Agent
 
 ### task_agent — gom alert thành task
 
-`cluster_alerts_into_tasks()` đọc bảng `alerts` (task_id null, status open), gom theo `(assigned_team, area)`; ticket cũ fallback parse Markdown. Mỗi cụm: tìm task open cùng team/area, chưa có thì gọi LLM sinh title/summary rồi INSERT.
+`cluster_alerts_into_tasks()` đọc bảng `alerts` (task_id null, status open), gom theo `(assigned_team, area)`; ticket cũ fallback parse Markdown. Mỗi cụm: tìm task open cùng team/area, chưa có thì gọi LLM sinh title/summary rồi INSERT với `source='agent'`. Ngoài đường này, bảng `tasks` còn nhận task `source='report'` (kèm `report_id`) khi manager duyệt báo cáo qua RPC `approve_report_and_dispatch`.
 
 ### insight_agent — tổng hợp metric theo phòng
 
@@ -89,7 +89,7 @@ Override: P5 → Vận hành (1h); sentiment positive → Marketing (48h). Agent
 
 ### analyst_agent — phân tích root cause
 
-`analyze_root_cause(team, insights)` lấy recent samples, build system prompt theo persona phòng ban, gọi LLM trả JSON `{root_cause_summary, risk_level, action_items}`. Fallback `_fallback_analysis` dùng `fallback_actions` của persona khi LLM lỗi. Agent không tự ghi DB; orchestrator mới upsert kết quả vào `department_reports`.
+`analyze_root_cause(team, insights)` lấy recent samples, build system prompt theo persona phòng ban, gọi LLM trả JSON `{root_cause_summary, risk_level, action_items}`. Fallback `_fallback_analysis` dùng `fallback_actions` của persona khi LLM lỗi. Agent không tự ghi DB; orchestrator mới upsert kết quả vào `department_reports`, trong đó `action_items` được lưu thành cột `suggested_tasks` (JSONB) và `root_cause_summary` lưu thành cột riêng — đây là dữ liệu manager biên tập rồi duyệt thành task ở luồng HI-Loop Approval (xem `co_che.md` mục 8).
 
 Persona theo phòng ban hardcode trong dict `DEPARTMENT_PERSONAS` ngay trong `analyst_agent.py` (không đọc file/DB ngoài). Mỗi key (Safety, Pricing, IT, CSKH, Vận hành, Marketing) có persona, priorities (chèn vào system prompt) và `fallback_actions`. Phòng không có trong dict thì dùng persona rỗng + action generic.
 
@@ -120,8 +120,8 @@ Cấp worker: `WORKER_AGENT_ENABLED` (false thì worker không chạy pipeline, 
 |------|--------|--------|
 | `feedback` | ingestion_agent | orchestrator, insight_agent, scoring_agent |
 | `alerts` | ticket_agent | alert_agent (dedup), task_agent (gán task_id) |
-| `tasks` | task_agent | task_agent |
-| `department_reports` | orchestrator, task_agent (upsert) | API reports |
+| `tasks` | task_agent (`source=agent`), RPC approve_report_and_dispatch (`source=report`) | task_agent, API tasks |
+| `department_reports` | orchestrator (upsert content + root_cause_summary + suggested_tasks), API draft-tasks/approve | API reports |
 | `profiles` | — | ticket_agent (lấy user_id mặc định) |
 | `agent_run_logs` | mọi agent qua `common.log_agent_run` | API stats, System Health |
 
