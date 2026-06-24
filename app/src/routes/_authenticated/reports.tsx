@@ -18,6 +18,14 @@ export const Route = createFileRoute("/_authenticated/reports")({
   component: ReportsPage,
 });
 
+type DraftTask = {
+  action: string;
+  priority?: string;
+  deadline?: string;
+  owner?: string;
+  success_metric?: string;
+};
+
 type Report = {
   id: string;
   team: string;
@@ -27,7 +35,155 @@ type Report = {
   approved: boolean;
   approved_by: string | null;
   approved_at: string | null;
+  suggested_tasks?: DraftTask[];
+  root_cause_summary?: string | null;
 };
+
+function DraftTaskEditor({
+  report,
+  onApproved,
+}: {
+  report: Report;
+  onApproved: () => void;
+}) {
+  const [tasks, setTasks] = useState<DraftTask[]>(report.suggested_tasks ?? []);
+  const [openTasks, setOpenTasks] = useState<{ title: string }[]>([]);
+  const [loadedOpen, setLoadedOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  // Hiện task open hiện có của phòng để Manager tránh đặt trùng.
+  async function loadOpenTasks() {
+    if (loadedOpen) return;
+    setLoadedOpen(true);
+    try {
+      const j = await apiFetch<{ data: { title: string }[] }>(
+        `/api/tasks?team=${encodeURIComponent(report.team)}&status=open&limit=50`,
+      );
+      setOpenTasks(j.data ?? []);
+    } catch {
+      /* không chặn editor nếu lỗi */
+    }
+  }
+
+  function update(i: number, field: keyof DraftTask, value: string) {
+    setTasks((prev) => prev.map((t, idx) => (idx === i ? { ...t, [field]: value } : t)));
+  }
+  function remove(i: number) {
+    setTasks((prev) => prev.filter((_, idx) => idx !== i));
+  }
+  function add() {
+    setTasks((prev) => [...prev, { action: "", priority: "P3", deadline: "48h" }]);
+  }
+
+  async function saveDraft() {
+    setBusy(true);
+    try {
+      await apiFetch(`/api/reports/${report.id}/draft-tasks`, {
+        method: "PUT",
+        body: JSON.stringify({ suggested_tasks: tasks }),
+      });
+      toast.success("Đã lưu nháp");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Lỗi lưu nháp");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function approve() {
+    if (tasks.length === 0) {
+      toast.error("Chưa có hành động nào để triển khai");
+      return;
+    }
+    setBusy(true);
+    try {
+      const r = await apiFetch<{ tasks_created: number }>(
+        `/api/reports/${report.id}/approve-and-dispatch`,
+        { method: "POST", body: JSON.stringify({ suggested_tasks: tasks }) },
+      );
+      toast.success(`Đã duyệt, tạo ${r.tasks_created} task`);
+      onApproved();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Lỗi khi duyệt");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (report.approved) {
+    return (
+      <div className="mt-4 rounded-xl border border-green-300 bg-green-50 p-4 text-sm text-green-800">
+        Đã duyệt. Các task đã được tạo trên Task Board.
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="mt-4 rounded-xl border border-border bg-card p-4 space-y-3"
+      onMouseEnter={loadOpenTasks}
+    >
+      <h4 className="font-semibold text-sm text-xanh-deep">Dự thảo kế hoạch hành động</h4>
+      {openTasks.length > 0 && (
+        <p className="text-[11px] text-muted-foreground">
+          Phòng đang có {openTasks.length} task mở. Tránh tạo trùng:{" "}
+          {openTasks.slice(0, 5).map((t) => t.title).join("; ")}
+        </p>
+      )}
+      {tasks.length === 0 && (
+        <p className="text-xs text-muted-foreground">
+          Chưa có dự thảo hành động. Bấm "+ Thêm hành động" để tạo mới.
+        </p>
+      )}
+      {tasks.map((t, i) => (
+        <div key={i} className="flex flex-wrap gap-2 items-center border-b border-border pb-2">
+          <input
+            className="flex-1 min-w-[200px] px-2 py-1 text-xs border border-border rounded"
+            value={t.action}
+            placeholder="Hành động"
+            onChange={(e) => update(i, "action", e.target.value)}
+          />
+          <input
+            className="w-16 px-2 py-1 text-xs border border-border rounded"
+            value={t.priority ?? ""}
+            placeholder="P3"
+            onChange={(e) => update(i, "priority", e.target.value)}
+          />
+          <input
+            className="w-20 px-2 py-1 text-xs border border-border rounded"
+            value={t.deadline ?? ""}
+            placeholder="48h"
+            onChange={(e) => update(i, "deadline", e.target.value)}
+          />
+          <button type="button" className="text-xs text-red-600" onClick={() => remove(i)}>
+            Xóa
+          </button>
+        </div>
+      ))}
+      <button type="button" className="text-xs font-semibold text-xanh-deep" onClick={add}>
+        + Thêm hành động
+      </button>
+      <div className="flex gap-2 justify-end">
+        <button
+          type="button"
+          disabled={busy}
+          className="px-3 py-1.5 text-xs rounded border border-border disabled:opacity-50"
+          onClick={saveDraft}
+        >
+          Lưu nháp
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          className="px-3 py-1.5 text-xs rounded bg-xanh-deep text-white font-semibold disabled:opacity-50"
+          onClick={approve}
+        >
+          Duyệt và triển khai task
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function ReportsPage() {
   const [reports, setReports] = useState<Report[]>([]);
@@ -288,6 +444,7 @@ function ReportsPage() {
                 </div>
                 <div className="p-5 sm:p-7">
                   <MarkdownContent>{content}</MarkdownContent>
+                  <DraftTaskEditor report={report} onApproved={() => void loadData(selectedTeam)} />
                 </div>
               </div>
             );
