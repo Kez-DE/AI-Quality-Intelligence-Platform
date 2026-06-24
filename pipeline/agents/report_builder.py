@@ -179,7 +179,15 @@ def build_department_report_markdown(
     return "\n".join(lines).strip()
 
 
-def store_department_report(db, *, team: str, report_date: str, content: str) -> dict[str, Any]:
+def store_department_report(
+    db,
+    *,
+    team: str,
+    report_date: str,
+    content: str,
+    suggested_tasks: list | None = None,
+    root_cause_summary: str | None = None,
+) -> dict[str, Any]:
     """Store one daily report without overwriting a manager-approved snapshot."""
     existing = (
         db.table("department_reports")
@@ -201,6 +209,8 @@ def store_department_report(db, *, team: str, report_date: str, content: str) ->
         "approved": False,
         "approved_by": None,
         "approved_at": None,
+        "suggested_tasks": suggested_tasks or [],
+        "root_cause_summary": root_cause_summary,
     }
     result = db.table("department_reports").upsert(
         payload,

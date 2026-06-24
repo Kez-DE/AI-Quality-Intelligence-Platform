@@ -123,11 +123,16 @@ def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
 
                 md = build_department_report_markdown(team, insights, analysis_res)
                 try:
+                    _analysis = (analysis_res.get("analysis") or {}) if isinstance(analysis_res, dict) else {}
+                    _suggested = _analysis.get("action_items") or []
+                    _root_cause = _analysis.get("root_cause_summary") or None
                     store_result = store_department_report(
                         db,
                         team=team,
                         report_date=datetime.now(timezone.utc).date().isoformat(),
                         content=md,
+                        suggested_tasks=_suggested,
+                        root_cause_summary=_root_cause,
                     )
                     if not store_result.get("stored"):
                         pipeline_log.append(f"{team}: approved report retained")
