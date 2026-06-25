@@ -94,7 +94,11 @@ function CompletionReportsPage() {
           review_note: reviewNote[reportId] || null,
         }),
       });
-      toast.success(status === "approved" ? "Đã duyệt báo cáo." : "Đã trả lại báo cáo.");
+      toast.success(
+        status === "approved"
+          ? "Đã duyệt báo cáo — task chuyển sang Đã xong."
+          : "Đã trả lại báo cáo — task quay lại Đang xử lý.",
+      );
       setReports((prev) =>
         prev.map((r) => (r.id === reportId ? { ...r, status } : r)),
       );
