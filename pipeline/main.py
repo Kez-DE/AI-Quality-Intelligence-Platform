@@ -726,10 +726,11 @@ def submit_completion_report(
         raise HTTPException(status_code=400, detail="completion_level không hợp lệ")
     try:
         db = get_supabase()
-        rows = db.table("tasks").select("assigned_team").eq("id", task_id).limit(1).execute().data or []
+        rows = db.table("tasks").select("assigned_team,status").eq("id", task_id).limit(1).execute().data or []
         if not rows:
             raise HTTPException(status_code=404, detail="Task not found")
         task_team = rows[0].get("assigned_team")
+        cur_status = rows[0].get("status")
         if not can_view_team(user, task_team):
             raise HTTPException(status_code=403, detail="Bạn không thể báo cáo task của phòng ban khác.")
         record = {
@@ -741,17 +742,27 @@ def submit_completion_report(
             "note": payload.note,
             "status": "submitted",
         }
-        data = db.table("task_completion_reports").insert(record).execute().data or []
-        # Khi báo "completed", chuyển task sang resolved để phản ánh trạng thái.
+        inserted = db.table("task_completion_reports").insert(record).execute().data or []
+        if not inserted:
+            raise HTTPException(status_code=503, detail="Không tạo được báo cáo hoàn thành")
+        report = inserted[0]
+        # 'completed' -> chuyển task sang chờ duyệt (KHÔNG auto-resolve). partial/blocked giữ nguyên.
+        new_status = cur_status
         if payload.completion_level == "completed":
-            db.table("tasks").update({"status": "resolved", "updated_at": "now()"}).eq("id", task_id).execute()
+            _assert_transition(cur_status, "pending_review")
+            db.table("tasks").update({"status": "pending_review", "updated_at": "now()"}).eq("id", task_id).execute()
+            new_status = "pending_review"
+        _log_task_event(
+            db, task_id=task_id, actor=user, team=task_team, action="completion_submitted",
+            from_status=cur_status, to_status=new_status,
+            completion_report_id=report.get("id"),
+            note=f"{payload.completion_level}: {payload.note[:200]}",
+        )
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot submit completion report: {str(exc)[:300]}") from exc
-    if not data:
-        raise HTTPException(status_code=503, detail="Không tạo được báo cáo hoàn thành")
-    return {"status": "success", "data": data[0]}
+    return {"status": "success", "data": report}
 
 
 @app.get("/api/tasks/{task_id}/completion-reports")

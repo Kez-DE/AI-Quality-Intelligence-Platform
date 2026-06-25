@@ -106,3 +106,31 @@ def test_accept_open_task_invalid_transition():
         with pytest.raises(HTTPException) as exc:
             accept_task("t1", user=_user("staff", "IT", uid="s1"))
     assert exc.value.status_code == 400
+
+
+def test_submit_completed_sets_pending_review():
+    db = FakeDB(
+        tasks=[{"id": "t1", "assigned_team": "IT", "status": "in_progress", "owner_id": "s1"}],
+        task_completion_reports=[], task_events=[],
+    )
+    with patch("main.get_supabase", return_value=db):
+        submit_completion_report(
+            "t1", CompletionReportReq(note="đã xử lý xong", completion_level="completed"),
+            user=_user("staff", "IT", uid="s1"),
+        )
+    assert db.tables["tasks"][0]["status"] == "pending_review"
+    assert len(db.tables["task_completion_reports"]) == 1
+    assert any(e["action"] == "completion_submitted" for e in db.tables["task_events"])
+
+
+def test_submit_partial_keeps_in_progress():
+    db = FakeDB(
+        tasks=[{"id": "t1", "assigned_team": "IT", "status": "in_progress", "owner_id": "s1"}],
+        task_completion_reports=[], task_events=[],
+    )
+    with patch("main.get_supabase", return_value=db):
+        submit_completion_report(
+            "t1", CompletionReportReq(note="mới một phần", completion_level="partial"),
+            user=_user("staff", "IT", uid="s1"),
+        )
+    assert db.tables["tasks"][0]["status"] == "in_progress"
