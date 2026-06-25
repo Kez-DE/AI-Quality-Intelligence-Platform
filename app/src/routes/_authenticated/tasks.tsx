@@ -65,14 +65,24 @@ type AssignableUsersResponse = {
 };
 
 const TEAMS = ["All", ...ALL_TEAMS] as const;
-const STATUSES = ["All", "open", "in_progress", "resolved"] as const;
+const STATUSES = ["All", "open", "assigned", "in_progress", "pending_review", "resolved"] as const;
 const PRIORITIES = ["All", "P1", "P2", "P3", "P4", "P5"] as const;
 
 const STATUS_LABELS: Record<string, string> = {
   All: "Tất cả",
   open: "Đang mở",
+  assigned: "Đã giao",
   in_progress: "Đang xử lý",
+  pending_review: "Chờ duyệt",
   resolved: "Đã xong",
+};
+
+const STATUS_BADGE: Record<string, string> = {
+  open: "bg-amber-100 text-amber-800",
+  assigned: "bg-indigo-100 text-indigo-800",
+  in_progress: "bg-blue-100 text-blue-800",
+  pending_review: "bg-purple-100 text-purple-800",
+  resolved: "bg-green-100 text-green-800",
 };
 
 function isOverdue(task: Task): boolean {
@@ -116,6 +126,7 @@ function TasksPage() {
   const { data: me } = useMe();
   const isOps = me?.role === "admin" || me?.role === "manager" || me?.role === "staff";
   const isAdmin = me?.role === "admin";
+  const isManager = me?.role === "admin" || me?.role === "manager";
 
   // Phân bổ task theo phòng ban (cho admin xem toàn cảnh ticket được đẩy đi đâu).
   const deptCounts = useMemo(() => {
@@ -242,6 +253,18 @@ function TasksPage() {
     }
   }
 
+  async function acceptTask(taskId: string) {
+    try {
+      await apiFetch(`/api/tasks/${taskId}/accept`, { method: "POST" });
+      toast.success("Đã nhận việc.");
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, status: "in_progress" } : t)),
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lỗi khi nhận việc.");
+    }
+  }
+
   function updateAssignForm(taskId: string, field: "owner_id" | "due_at", value: string) {
     setAssignForm((prev) => ({
       ...prev,
@@ -303,10 +326,10 @@ function TasksPage() {
       });
       toast.success("Đã gửi báo cáo hoàn thành cho quản lý.");
       setReportForm((prev) => ({ ...prev, [taskId]: { note: "", level: "completed" } }));
-      // Nếu báo "completed", backend chuyển task -> resolved; cập nhật UI.
+      // Báo "completed" -> task chuyển sang chờ duyệt (manager sẽ duyệt).
       if ((form.level || "completed") === "completed") {
         setTasks((prev) =>
-          prev.map((t) => (t.id === taskId ? { ...t, status: "resolved" } : t)),
+          prev.map((t) => (t.id === taskId ? { ...t, status: "pending_review" } : t)),
         );
       }
     } catch (err) {
@@ -515,11 +538,7 @@ function TasksPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span
                         className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
-                          task.status === "open"
-                            ? "bg-amber-100 text-amber-800"
-                            : task.status === "in_progress"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-green-100 text-green-800"
+                          STATUS_BADGE[task.status] ?? "bg-muted text-muted-foreground"
                         }`}
                       >
                         {STATUS_LABELS[task.status] ?? task.status}
@@ -602,31 +621,28 @@ function TasksPage() {
                 {/* Expanded Body */}
                 {isExpanded && (
                   <div className="border-t border-border bg-muted/10 p-5 space-y-5 animate-in slide-in-from-top-2">
-                    {/* Status buttons */}
+                    {/* Hành động theo vai trò & trạng thái */}
                     <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          updateTaskStatus(task.id, "in_progress");
-                        }}
-                        disabled={task.status === "in_progress"}
-                        className="px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
-                      >
-                        Tiếp nhận xử lý
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          updateTaskStatus(task.id, "resolved");
-                        }}
-                        disabled={task.status === "resolved"}
-                        className="px-4 py-2 bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1"
-                      >
-                        <CheckCircle2 className="h-4 w-4" /> Đánh dấu hoàn thành
-                      </button>
+                      {mineTask && task.status === "assigned" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            acceptTask(task.id);
+                          }}
+                          className="px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-semibold transition-colors"
+                        >
+                          Nhận việc
+                        </button>
+                      )}
+                      {task.status === "pending_review" && (
+                        <span className="px-4 py-2 bg-purple-50 text-purple-700 border border-purple-200 rounded-lg text-xs font-semibold">
+                          Chờ quản lý duyệt
+                        </span>
+                      )}
                     </div>
 
-                    {/* Assignment Section */}
+                    {/* Assignment Section — chỉ manager/admin giao việc */}
+                    {isManager && (
                     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
                       <h4 className="font-semibold text-sm flex items-center gap-2 text-xanh-deep">
                         <UserPlus className="h-4 w-4" />
@@ -693,7 +709,7 @@ function TasksPage() {
                             {assignableUsers
                               .filter(
                                 (user) =>
-                                  user.role === "admin" ||
+                                  user.role === "staff" &&
                                   user.department === task.assigned_team,
                               )
                               .map((user) => (
@@ -734,9 +750,10 @@ function TasksPage() {
                         </button>
                       </div>
                     </div>
+                    )}
 
-                    {/* Báo cáo hoàn thành — chức năng RIÊNG, chỉ hiện cho nhân viên được giao */}
-                    {mineTask && (
+                    {/* Báo cáo hoàn thành — chỉ hiện cho nhân viên được giao khi đang xử lý */}
+                    {mineTask && task.status === "in_progress" && (
                       <div className="rounded-xl border border-xanh-green/40 bg-xanh-green/5 p-4 space-y-3">
                         <h4 className="font-semibold text-sm flex items-center gap-2 text-xanh-deep">
                           <ClipboardCheck className="h-4 w-4 text-xanh-green" />
