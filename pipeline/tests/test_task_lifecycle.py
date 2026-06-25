@@ -35,3 +35,40 @@ def test_assignable_returns_staff_only():
     with patch("main.get_supabase", return_value=db):
         out = list_assignable_users(team=None, user=_user("manager", "IT"))
     assert {u["role"] for u in out["data"]} == {"staff"}
+
+
+def _db_with_task(status="open", team="IT"):
+    return FakeDB(
+        tasks=[{"id": "t1", "assigned_team": team, "status": status, "owner_id": None}],
+        profiles=[
+            {"id": "s1", "email": "s@x", "role": "staff", "department": "IT", "full_name": "S"},
+            {"id": "m1", "email": "m@x", "role": "manager", "department": "IT", "full_name": "M"},
+        ],
+        task_events=[],
+    )
+
+
+def test_staff_cannot_assign():
+    db = _db_with_task()
+    with patch("main.get_supabase", return_value=db):
+        with pytest.raises(HTTPException) as exc:
+            assign_task("t1", AssignTaskReq(owner_id="s1"), user=_user("staff", "IT"))
+    assert exc.value.status_code == 403
+
+
+def test_assign_rejects_manager_owner():
+    db = _db_with_task()
+    with patch("main.get_supabase", return_value=db):
+        with pytest.raises(HTTPException) as exc:
+            assign_task("t1", AssignTaskReq(owner_id="m1"), user=_user("manager", "IT"))
+    assert exc.value.status_code == 400
+
+
+def test_assign_sets_status_and_logs_event():
+    db = _db_with_task()
+    with patch("main.get_supabase", return_value=db):
+        assign_task("t1", AssignTaskReq(owner_id="s1"), user=_user("manager", "IT"))
+    task = db.tables["tasks"][0]
+    assert task["status"] == "assigned"
+    assert task["owner_id"] == "s1"
+    assert any(e["action"] == "assigned" for e in db.tables["task_events"])

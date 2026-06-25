@@ -16,7 +16,7 @@ from ingest import ingest_dataset
 from ingest import get_supabase
 from agent import chat_completion, get_agent_status, run_chat_agent
 from agent.rag_engine import rag_chat
-from auth_guard import AuthUser, can_view_team, get_current_user, require_admin, require_ops_staff, scoped_team
+from auth_guard import AuthUser, can_view_team, get_current_user, require_admin, require_manager, require_ops_staff, scoped_team
 from dispatch_utils import parse_deadline
 from users_admin import router as users_router, audit_router
 from rate_limiter import RateLimiter, check_rate_limit
@@ -406,41 +406,48 @@ def update_task_status(task_id: str, payload: StatusUpdateReq, user: AuthUser = 
     return {"status": "success", "data": data[0]}
 
 @app.patch("/api/tasks/{task_id}/assign")
-def assign_task(task_id: str, payload: AssignTaskReq, user: AuthUser = Depends(require_ops_staff)):
+def assign_task(task_id: str, payload: AssignTaskReq, user: AuthUser = Depends(require_manager)):
+    if user.role not in {"manager", "admin"}:
+        raise HTTPException(status_code=403, detail="Chỉ manager hoặc admin được giao task.")
     update_fields: dict = {}
-    if payload.owner_id is not None:
-        update_fields["owner_id"] = payload.owner_id
     if payload.due_at is not None:
         update_fields["due_at"] = payload.due_at
-    if not update_fields:
+    if payload.owner_id is None and not update_fields:
         raise HTTPException(status_code=400, detail="Must provide owner_id or due_at")
-    update_fields["updated_at"] = "now()"
     try:
         db = get_supabase()
-        # Luôn đọc task để biết phòng ban đích (dùng cho RBAC + kiểm tra phòng người nhận).
-        rows = db.table("tasks").select("assigned_team").eq("id", task_id).limit(1).execute().data or []
+        rows = db.table("tasks").select("assigned_team,status").eq("id", task_id).limit(1).execute().data or []
         if not rows:
             raise HTTPException(status_code=404, detail="Task not found")
         task_team = rows[0].get("assigned_team")
+        cur_status = rows[0].get("status")
         if user.role != "admin" and not can_view_team(user, task_team):
             raise HTTPException(status_code=403, detail="Bạn không có quyền gán task của phòng ban khác.")
-        # Ép phân chia theo phòng ban: người nhận phải thuộc đúng phòng của task
-        # (admin được miễn để có thể điều phối xuyên phòng).
-        if payload.owner_id is not None and task_team:
+        new_status = cur_status
+        if payload.owner_id is not None:
             owners = db.table("profiles").select("role,department").eq("id", payload.owner_id).limit(1).execute().data or []
             if not owners:
                 raise HTTPException(status_code=404, detail="Không tìm thấy người nhận.")
             owner = owners[0]
-            if owner.get("role") != "admin" and owner.get("department") != task_team:
+            if owner.get("role") != "staff":
+                raise HTTPException(status_code=400, detail="Người nhận task phải là nhân viên (staff).")
+            if task_team and owner.get("department") != task_team:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Người nhận phải thuộc phòng ban '{task_team}' của task.",
                 )
-        data = db.table("tasks") \
-            .update(update_fields) \
-            .eq("id", task_id) \
-            .execute() \
-            .data or []
+            _assert_transition(cur_status, "assigned")
+            update_fields["owner_id"] = payload.owner_id
+            update_fields["status"] = "assigned"
+            new_status = "assigned"
+        update_fields["updated_at"] = "now()"
+        data = db.table("tasks").update(update_fields).eq("id", task_id).execute().data or []
+        if payload.owner_id is not None:
+            _log_task_event(
+                db, task_id=task_id, actor=user, team=task_team, action="assigned",
+                from_status=cur_status, to_status=new_status,
+                note=f"owner={payload.owner_id}",
+            )
     except HTTPException:
         raise
     except Exception as exc:
