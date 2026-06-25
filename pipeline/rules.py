@@ -113,6 +113,13 @@ DRIVER_NEGATIVE_KEYWORDS = [
     "mặc kệ khách", "nói chuyện riêng", "phớt lờ khách", "nghe điện thoại riêng",
 ]
 
+# Chủ ngữ chỉ tài xế — dùng để ưu tiên Driver Behavior khi câu vừa nhắc tài xế
+# vừa có tín hiệu tiêu cực, tránh để App/Payment cướp nhầm.
+DRIVER_SUBJECT_KEYWORDS = [
+    "tài xế", "tai xe", "bác tài", "bac tai", "lái xe", "lai xe",
+    "tài xe", "shipper", "tx ", " tx", "anh tài", "chú tài", "bác lái",
+]
+
 PRICING_KEYWORDS = [
     "giá đắt", "gia dat", "giá cao", "đắt quá", "dat qua", "chặt chém giá",
     "giá cước cao", "tăng giá", "tang gia", "phụ phí", "phu phi", "giá ảo",
@@ -236,6 +243,16 @@ def apply_rules(text: str, model_topic: str, model_sentiment: str,
     if kw and not _negated_near(t, kw):
         topic, sentiment, severity = "Driver Behavior", "positive", 1
         confidence = 0.88
+        return _finalize(topic, sentiment, severity, confidence, None)
+
+    # --- 2b. DRIVER tiêu cực ƯU TIÊN CAO ---
+    # Khi câu có chủ ngữ tài xế + tín hiệu tiêu cực tài xế rõ -> giữ Driver Behavior
+    # trước khi App/Payment cướp. Chống 324 ca Driver->App + 135 ca Driver->Payment.
+    drv_kw = _has(t, DRIVER_NEGATIVE_KEYWORDS)
+    if drv_kw and _has(t, DRIVER_SUBJECT_KEYWORDS):
+        topic, sentiment = "Driver Behavior", "negative"
+        severity = max(severity, 4)
+        confidence = 0.82
         return _finalize(topic, sentiment, severity, confidence, None)
 
     # --- 3. PAYMENT FRAUD / mất tiền ---
