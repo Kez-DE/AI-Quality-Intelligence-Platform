@@ -118,9 +118,9 @@ DRIVER_NEGATIVE_KEYWORDS = [
     # Unicode variant của 'tài xế hủy' (đã có) — 'huỷ' ≠ 'hủy' trong Python str:
     "tài xế huỷ",
     # Cụm chuyên biệt hành vi tài xế (0 false positive trong golden set):
-    "mắc dạy", "ngang ngược", "xàm sở", "hù doạ",
-    "chê chuyến", "chê xa", "không chịu đón", "bỏ khách", "ăn nói vô",
-    "vô văn hoá", "vô văn hóa",
+    "tài xế mắc dạy", "mắc dạy", "ngang ngược", "xàm sở", "hù doạ",
+    "chê chuyến", "chê xa", "không chịu đón", "bỏ khách", "ăn nói vô", "ăn nói vô lễ", "ăn nói vô văn hoá",
+    "tài xế vô văn hoá", "tài xế vô văn hóa", "vô văn hoá", "vô văn hóa",
 ]
 
 # Chủ ngữ chỉ tài xế — dùng để ưu tiên Driver Behavior khi câu vừa nhắc tài xế
