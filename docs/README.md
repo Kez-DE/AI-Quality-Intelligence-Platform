@@ -86,6 +86,7 @@ C2-App-116/
 | --- | --- |
 | `demo-script.md` | Kịch bản demo 5-7 phút |
 | `eval-evidence.md` | Bằng chứng đánh giá model (Gate G2) |
+| `roadmap.md` | Lộ trình mở rộng (6 phòng ban, Global Report) — định hướng tương lai, chưa triển khai |
 | `product/README.md` | Ghi chú sản phẩm |
 
 Lưu ý: nhóm "Cơ chế và kiến trúc" hiện có vài file chồng nội dung (`co_che.md`, `giai_thich.md`,

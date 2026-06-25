@@ -659,5 +659,5 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 ## Out of scope (tách spec sau)
 
-- Mở rộng 4 → 6 phòng ban (Tài chính, Sản phẩm, Rủi ro/Gian lận) và báo cáo tổng hợp chéo phòng (Global Report). Xem `IMPLEMENTATION_PLAN.md` mục 9.
+- Mở rộng 4 → 6 phòng ban (Tài chính, Sản phẩm, Rủi ro/Gian lận) và báo cáo tổng hợp chéo phòng (Global Report). Xem `docs/project/roadmap.md`.
 - Thay router heuristic bằng LLM.

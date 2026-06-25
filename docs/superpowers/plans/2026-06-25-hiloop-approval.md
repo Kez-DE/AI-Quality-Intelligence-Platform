@@ -724,4 +724,4 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 ## Out of scope (tách spec sau)
 
-Mở rộng 4 → 6 phòng ban (Tài chính, Sản phẩm, Rủi ro/Gian lận) và báo cáo tổng hợp chéo phòng ("Global Report") không nằm trong plan này. Xem mục 9 của `IMPLEMENTATION_PLAN.md` gốc và spec `docs/superpowers/specs/2026-06-25-hiloop-approval-design.md`.
+Mở rộng 4 → 6 phòng ban (Tài chính, Sản phẩm, Rủi ro/Gian lận) và báo cáo tổng hợp chéo phòng ("Global Report") không nằm trong plan này. Xem `docs/project/roadmap.md` và spec `docs/superpowers/specs/2026-06-25-hiloop-approval-design.md`.
