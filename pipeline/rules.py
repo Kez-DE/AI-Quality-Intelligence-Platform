@@ -253,7 +253,14 @@ def apply_rules(text: str, model_topic: str, model_sentiment: str,
         topic, sentiment = "Driver Behavior", "negative"
         severity = max(severity, 4)
         confidence = 0.82
-        return _finalize(topic, sentiment, severity, confidence, None)
+        # Hủy chuyến + chủ ngữ tài xế hay kèm tranh chấp hoàn tiền (Payment) —
+        # gắn cờ review để Human-in-the-Loop xử lý ranh giới Driver/Payment.
+        cancel_reason = (
+            f"Hủy chuyến có chủ ngữ tài xế: '{drv_kw}'"
+            if drv_kw in ("huỷ chuyến", "hủy chuyến", "huy chuyen")
+            else None
+        )
+        return _finalize(topic, sentiment, severity, confidence, cancel_reason)
 
     # --- 3. PAYMENT FRAUD / mất tiền ---
     kw = _has(t, PAYMENT_FRAUD_KEYWORDS)
