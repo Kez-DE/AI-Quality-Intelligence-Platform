@@ -820,10 +820,12 @@ def review_completion_report(
         raise HTTPException(status_code=403, detail="Chỉ quản lý hoặc admin được duyệt báo cáo.")
     try:
         db = get_supabase()
-        rows = db.table("task_completion_reports").select("team").eq("id", report_id).limit(1).execute().data or []
+        rows = db.table("task_completion_reports").select("team,task_id").eq("id", report_id).limit(1).execute().data or []
         if not rows:
             raise HTTPException(status_code=404, detail="Report not found")
-        if not can_view_team(user, rows[0].get("team")):
+        team = rows[0].get("team")
+        rep_task_id = rows[0].get("task_id")
+        if not can_view_team(user, team):
             raise HTTPException(status_code=403, detail="Không có quyền duyệt báo cáo phòng ban khác.")
         data = db.table("task_completion_reports").update({
             "status": payload.status,
@@ -832,6 +834,20 @@ def review_completion_report(
             "reviewed_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": "now()",
         }).eq("id", report_id).execute().data or []
+        # Lái trạng thái task theo kết quả duyệt.
+        task_rows = db.table("tasks").select("status").eq("id", rep_task_id).limit(1).execute().data or []
+        cur = task_rows[0].get("status") if task_rows else None
+        target = "resolved" if payload.status == "approved" else "in_progress"
+        action = "completion_approved" if payload.status == "approved" else "completion_rejected"
+        to_status = cur
+        if cur is not None and (cur, target) in ALLOWED_TASK_TRANSITIONS:
+            db.table("tasks").update({"status": target, "updated_at": "now()"}).eq("id", rep_task_id).execute()
+            to_status = target
+        _log_task_event(
+            db, task_id=rep_task_id, actor=user, team=team, action=action,
+            from_status=cur, to_status=to_status, completion_report_id=report_id,
+            note=payload.review_note,
+        )
     except HTTPException:
         raise
     except Exception as exc:

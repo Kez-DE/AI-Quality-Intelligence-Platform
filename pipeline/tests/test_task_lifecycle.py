@@ -134,3 +134,36 @@ def test_submit_partial_keeps_in_progress():
             user=_user("staff", "IT", uid="s1"),
         )
     assert db.tables["tasks"][0]["status"] == "in_progress"
+
+
+def _db_review():
+    return FakeDB(
+        tasks=[{"id": "t1", "assigned_team": "IT", "status": "pending_review", "owner_id": "s1"}],
+        task_completion_reports=[{"id": "r1", "task_id": "t1", "team": "IT", "status": "submitted"}],
+        task_events=[],
+    )
+
+
+def test_approve_resolves_task():
+    db = _db_review()
+    with patch("main.get_supabase", return_value=db):
+        review_completion_report("r1", ReviewReportReq(status="approved"), user=_user("manager", "IT"))
+    assert db.tables["tasks"][0]["status"] == "resolved"
+    assert db.tables["task_completion_reports"][0]["status"] == "approved"
+    assert any(e["action"] == "completion_approved" for e in db.tables["task_events"])
+
+
+def test_reject_reopens_task():
+    db = _db_review()
+    with patch("main.get_supabase", return_value=db):
+        review_completion_report("r1", ReviewReportReq(status="rejected", review_note="thiếu chi tiết"), user=_user("manager", "IT"))
+    assert db.tables["tasks"][0]["status"] == "in_progress"
+    assert any(e["action"] == "completion_rejected" for e in db.tables["task_events"])
+
+
+def test_staff_cannot_review():
+    db = _db_review()
+    with patch("main.get_supabase", return_value=db):
+        with pytest.raises(HTTPException) as exc:
+            review_completion_report("r1", ReviewReportReq(status="approved"), user=_user("staff", "IT"))
+    assert exc.value.status_code == 403
