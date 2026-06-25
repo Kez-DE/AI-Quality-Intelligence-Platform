@@ -785,6 +785,25 @@ def list_task_completion_reports(task_id: str, user: AuthUser = Depends(require_
     return {"status": "success", "data": data}
 
 
+@app.get("/api/tasks/{task_id}/events")
+def list_task_events(task_id: str, user: AuthUser = Depends(require_ops_staff)):
+    """Audit trail vòng đời của một task (scope theo phòng)."""
+    try:
+        db = get_supabase()
+        rows = db.table("tasks").select("assigned_team").eq("id", task_id).limit(1).execute().data or []
+        if not rows:
+            raise HTTPException(status_code=404, detail="Task not found")
+        if not can_view_team(user, rows[0].get("assigned_team")):
+            raise HTTPException(status_code=403, detail="Không có quyền xem nhật ký phòng ban khác.")
+        data = db.table("task_events").select("*").eq("task_id", task_id) \
+            .order("created_at", desc=True).execute().data or []
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Cannot read task events: {str(exc)[:300]}") from exc
+    return {"status": "success", "data": data}
+
+
 @app.get("/api/completion-reports")
 def list_completion_reports(
     status: str | None = Query(default=None),

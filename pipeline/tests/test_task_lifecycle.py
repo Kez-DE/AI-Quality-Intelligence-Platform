@@ -15,6 +15,7 @@ from main import (
     accept_task,
     submit_completion_report,
     review_completion_report,
+    list_task_events,
     AssignTaskReq,
     CompletionReportReq,
     ReviewReportReq,
@@ -166,4 +167,29 @@ def test_staff_cannot_review():
     with patch("main.get_supabase", return_value=db):
         with pytest.raises(HTTPException) as exc:
             review_completion_report("r1", ReviewReportReq(status="approved"), user=_user("staff", "IT"))
+    assert exc.value.status_code == 403
+
+
+def test_list_task_events_scoped():
+    db = FakeDB(
+        tasks=[{"id": "t1", "assigned_team": "IT", "status": "assigned"}],
+        task_events=[
+            {"id": "e1", "task_id": "t1", "team": "IT", "action": "assigned",
+             "created_at": "2026-06-25T00:00:00Z"},
+        ],
+    )
+    with patch("main.get_supabase", return_value=db):
+        out = list_task_events("t1", user=_user("manager", "IT"))
+    assert len(out["data"]) == 1
+    assert out["data"][0]["action"] == "assigned"
+
+
+def test_list_task_events_cross_team_forbidden():
+    db = FakeDB(
+        tasks=[{"id": "t1", "assigned_team": "IT", "status": "assigned"}],
+        task_events=[],
+    )
+    with patch("main.get_supabase", return_value=db):
+        with pytest.raises(HTTPException) as exc:
+            list_task_events("t1", user=_user("manager", "CSKH"))
     assert exc.value.status_code == 403
