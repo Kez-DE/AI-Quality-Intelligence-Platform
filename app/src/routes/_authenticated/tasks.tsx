@@ -204,19 +204,6 @@ function TasksPage() {
     }
   }
 
-  async function updateTaskStatus(taskId: string, newStatus: string) {
-    try {
-      await apiFetch(`/api/tasks/${taskId}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: newStatus }),
-      });
-      toast.success(`Đã chuyển trạng thái thành ${newStatus}`);
-      setTasks(tasks.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)));
-    } catch {
-      toast.error("Lỗi cập nhật trạng thái.");
-    }
-  }
-
   async function assignTask(taskId: string) {
     const form = assignForm[taskId];
     if (!form || !form.owner_id) {

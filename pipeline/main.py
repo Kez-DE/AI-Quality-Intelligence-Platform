@@ -380,29 +380,37 @@ def list_task_alerts(task_id: str, _: AuthUser = Depends(require_ops_staff)):
     return {"status": "success", "data": data}
 
 @app.patch("/api/tasks/{task_id}/status")
-def update_task_status(task_id: str, payload: StatusUpdateReq, user: AuthUser = Depends(require_ops_staff)):
+def update_task_status(task_id: str, payload: StatusUpdateReq, user: AuthUser = Depends(require_manager)):
+    if user.role not in {"manager", "admin"}:
+        raise HTTPException(status_code=403, detail="Chỉ manager hoặc admin được đổi trạng thái task.")
     new_status = payload.status
-    if new_status not in {"open", "in_progress", "resolved"}:
+    if new_status not in {"open", "assigned", "in_progress", "pending_review", "resolved"}:
         raise HTTPException(status_code=400, detail="Invalid task status")
     try:
         db = get_supabase()
-        if user.role != "admin":
-            rows = db.table("tasks").select("assigned_team").eq("id", task_id).limit(1).execute().data or []
-            if not rows:
-                raise HTTPException(status_code=404, detail="Task not found")
-            if not can_view_team(user, rows[0].get("assigned_team")):
-                raise HTTPException(status_code=403, detail="Bạn không có quyền cập nhật task của phòng ban khác.")
+        rows = db.table("tasks").select("assigned_team,status").eq("id", task_id).limit(1).execute().data or []
+        if not rows:
+            raise HTTPException(status_code=404, detail="Task not found")
+        task_team = rows[0].get("assigned_team")
+        cur_status = rows[0].get("status")
+        if not can_view_team(user, task_team):
+            raise HTTPException(status_code=403, detail="Bạn không có quyền cập nhật task của phòng ban khác.")
+        _assert_transition(cur_status, new_status)
         data = db.table("tasks") \
             .update({"status": new_status, "updated_at": "now()"}) \
             .eq("id", task_id) \
             .execute() \
             .data or []
+        if not data:
+            raise HTTPException(status_code=404, detail="Task not found")
+        _log_task_event(
+            db, task_id=task_id, actor=user, team=task_team, action="status_changed",
+            from_status=cur_status, to_status=new_status,
+        )
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot update task: {str(exc)[:300]}") from exc
-    if not data:
-        raise HTTPException(status_code=404, detail="Task not found")
     return {"status": "success", "data": data[0]}
 
 @app.patch("/api/tasks/{task_id}/assign")
@@ -442,6 +450,8 @@ def assign_task(task_id: str, payload: AssignTaskReq, user: AuthUser = Depends(r
             new_status = "assigned"
         update_fields["updated_at"] = "now()"
         data = db.table("tasks").update(update_fields).eq("id", task_id).execute().data or []
+        if not data:
+            raise HTTPException(status_code=404, detail="Task not found")
         if payload.owner_id is not None:
             _log_task_event(
                 db, task_id=task_id, actor=user, team=task_team, action="assigned",
@@ -452,8 +462,6 @@ def assign_task(task_id: str, payload: AssignTaskReq, user: AuthUser = Depends(r
         raise
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot assign task: {str(exc)[:300]}") from exc
-    if not data:
-        raise HTTPException(status_code=404, detail="Task not found")
     return {"status": "success", "data": data[0]}
 
 
@@ -846,6 +854,9 @@ def review_completion_report(
         rep_task_id = rows[0].get("task_id")
         if not can_view_team(user, team):
             raise HTTPException(status_code=403, detail="Không có quyền duyệt báo cáo phòng ban khác.")
+        # NOTE: report update and task transition below are intentionally non-atomic
+        # (Supabase REST has no transaction here; acceptable — partial failure is
+        # surfaced via audit log and retry is safe).
         data = db.table("task_completion_reports").update({
             "status": payload.status,
             "review_note": payload.review_note,
