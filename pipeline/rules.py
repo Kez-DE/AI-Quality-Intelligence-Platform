@@ -111,6 +111,23 @@ DRIVER_NEGATIVE_KEYWORDS = [
     "không thân thiện", "ko thân thiện", "khong than thien", "không lịch sự",
     "không nhiệt tình", "không chào hỏi", "mặt lạnh tanh", "thái độ kém",
     "mặc kệ khách", "nói chuyện riêng", "phớt lờ khách", "nghe điện thoại riêng",
+    # Bổ sung từ confusion mining (Driver->Other) — chỉ cụm rõ hành vi tài xế:
+    # Hợp từ 'tài xế + xúc phạm' (0 false positive trong golden set):
+    "tài xế mất dạy", "tài xế láo", "tài xế ngu", "tài xế tệ",
+    "tài xế hãm", "tài xế lười",
+    # Unicode variant của 'tài xế hủy' (đã có) — 'huỷ' ≠ 'hủy' trong Python str:
+    "tài xế huỷ",
+    # Cụm chuyên biệt hành vi tài xế (0 false positive trong golden set):
+    "tài xế mắc dạy", "mắc dạy", "ngang ngược", "xàm sở", "hù doạ",
+    "chê chuyến", "chê xa", "không chịu đón", "bỏ khách", "ăn nói vô", "ăn nói vô lễ", "ăn nói vô văn hoá",
+    "tài xế vô văn hoá", "tài xế vô văn hóa", "vô văn hoá", "vô văn hóa",
+]
+
+# Chủ ngữ chỉ tài xế — dùng để ưu tiên Driver Behavior khi câu vừa nhắc tài xế
+# vừa có tín hiệu tiêu cực, tránh để App/Payment cướp nhầm.
+DRIVER_SUBJECT_KEYWORDS = [
+    "tài xế", "tai xe", "bác tài", "bac tai", "lái xe", "lai xe",
+    "tài xe", "shipper", "tx ", " tx", "anh tài", "chú tài", "bác lái",
 ]
 
 PRICING_KEYWORDS = [
@@ -238,6 +255,23 @@ def apply_rules(text: str, model_topic: str, model_sentiment: str,
         confidence = 0.88
         return _finalize(topic, sentiment, severity, confidence, None)
 
+    # --- 2b. DRIVER tiêu cực ƯU TIÊN CAO ---
+    # Khi câu có chủ ngữ tài xế + tín hiệu tiêu cực tài xế rõ -> giữ Driver Behavior
+    # trước khi App/Payment cướp. Chống 324 ca Driver->App + 135 ca Driver->Payment.
+    drv_kw = _has(t, DRIVER_NEGATIVE_KEYWORDS)
+    if drv_kw and _has(t, DRIVER_SUBJECT_KEYWORDS):
+        topic, sentiment = "Driver Behavior", "negative"
+        severity = max(severity, 4)
+        confidence = 0.82
+        # Hủy chuyến + chủ ngữ tài xế hay kèm tranh chấp hoàn tiền (Payment) —
+        # gắn cờ review để Human-in-the-Loop xử lý ranh giới Driver/Payment.
+        cancel_reason = (
+            f"Hủy chuyến có chủ ngữ tài xế: '{drv_kw}'"
+            if drv_kw in ("huỷ chuyến", "hủy chuyến", "huy chuyen")
+            else None
+        )
+        return _finalize(topic, sentiment, severity, confidence, cancel_reason)
+
     # --- 3. PAYMENT FRAUD / mất tiền ---
     kw = _has(t, PAYMENT_FRAUD_KEYWORDS)
     if kw:
@@ -279,7 +313,7 @@ def apply_rules(text: str, model_topic: str, model_sentiment: str,
     if not matched_rule:
         kw = _has(t, SUPPLY_KEYWORDS)
         if kw:
-            topic, sentiment = "Other", "negative"  # không có Driver Supply trong model -> Other
+            topic, sentiment = "Delay", "negative"  # thiếu cuốc = điều phối -> Vận hành
             severity = max(severity, 3)
             confidence = 0.72
             matched_rule = True
@@ -306,6 +340,8 @@ def apply_rules(text: str, model_topic: str, model_sentiment: str,
             review_reason = "Để quên đồ / hỗ trợ CSKH"
 
     # --- 8b. TÌNH TRẠNG XE (điều hoà, vệ sinh) -> Other ---
+    # NOTE: trong golden set 2/2 texts có vehicle keywords có nhãn 'Other' (CSKH).
+    # Giữ 'Other' để không gây regression. Xem xét lại khi golden set mở rộng.
     if not matched_rule:
         kw = _has(t, VEHICLE_CONDITION_KEYWORDS)
         if kw:

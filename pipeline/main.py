@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+import logging
 import os
 import time
 from datetime import datetime, timezone, timedelta
@@ -15,7 +16,7 @@ from ingest import ingest_dataset
 from ingest import get_supabase
 from agent import chat_completion, get_agent_status, run_chat_agent
 from agent.rag_engine import rag_chat
-from auth_guard import AuthUser, can_view_team, get_current_user, require_admin, require_ops_staff, scoped_team
+from auth_guard import AuthUser, can_view_team, get_current_user, require_admin, require_manager, require_ops_staff, scoped_team
 from dispatch_utils import parse_deadline
 from users_admin import router as users_router, audit_router
 from rate_limiter import RateLimiter, check_rate_limit
@@ -83,6 +84,52 @@ def _parse_timestamp(value: str | None) -> datetime | None:
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+# Vòng đời task hợp lệ. Reassign (đổi owner) đưa task active về 'assigned' để nhận lại.
+ALLOWED_TASK_TRANSITIONS = {
+    ("open", "assigned"),
+    ("assigned", "assigned"),
+    ("in_progress", "assigned"),
+    ("assigned", "in_progress"),
+    ("in_progress", "pending_review"),
+    ("pending_review", "resolved"),
+    ("pending_review", "in_progress"),
+}
+
+
+def _assert_transition(from_status: str | None, to_status: str) -> None:
+    """Chặn chuyển trạng thái task không hợp lệ. No-op nếu giữ nguyên trạng thái."""
+    if from_status == to_status:
+        return
+    if (from_status, to_status) not in ALLOWED_TASK_TRANSITIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Chuyển trạng thái không hợp lệ: {from_status} -> {to_status}",
+        )
+
+
+def _log_task_event(
+    db, *, task_id, actor, team, action,
+    from_status=None, to_status=None, completion_report_id=None, note=None,
+):
+    """Ghi một mốc vòng đời task vào task_events. Audit là phụ trợ: lỗi ghi không
+    được làm hỏng thao tác chính (bọc try/except)."""
+    try:
+        db.table("task_events").insert({
+            "task_id": task_id,
+            "actor_id": getattr(actor, "id", None),
+            "actor_email": getattr(actor, "email", None),
+            "actor_role": getattr(actor, "role", None),
+            "team": team,
+            "action": action,
+            "from_status": from_status,
+            "to_status": to_status,
+            "completion_report_id": completion_report_id,
+            "note": note,
+        }).execute()
+    except Exception as exc:  # noqa: BLE001 — audit không chặn nghiệp vụ
+        logging.getLogger("task_events").warning("Không ghi được task_event: %s", str(exc)[:200])
 
 
 def _feedback_team(feedback: dict) -> str:
@@ -333,71 +380,113 @@ def list_task_alerts(task_id: str, _: AuthUser = Depends(require_ops_staff)):
     return {"status": "success", "data": data}
 
 @app.patch("/api/tasks/{task_id}/status")
-def update_task_status(task_id: str, payload: StatusUpdateReq, user: AuthUser = Depends(require_ops_staff)):
+def update_task_status(task_id: str, payload: StatusUpdateReq, user: AuthUser = Depends(require_manager)):
+    if user.role not in {"manager", "admin"}:
+        raise HTTPException(status_code=403, detail="Chỉ manager hoặc admin được đổi trạng thái task.")
     new_status = payload.status
-    if new_status not in {"open", "in_progress", "resolved"}:
+    if new_status not in {"open", "assigned", "in_progress", "pending_review", "resolved"}:
         raise HTTPException(status_code=400, detail="Invalid task status")
     try:
         db = get_supabase()
-        if user.role != "admin":
-            rows = db.table("tasks").select("assigned_team").eq("id", task_id).limit(1).execute().data or []
-            if not rows:
-                raise HTTPException(status_code=404, detail="Task not found")
-            if not can_view_team(user, rows[0].get("assigned_team")):
-                raise HTTPException(status_code=403, detail="Bạn không có quyền cập nhật task của phòng ban khác.")
+        rows = db.table("tasks").select("assigned_team,status").eq("id", task_id).limit(1).execute().data or []
+        if not rows:
+            raise HTTPException(status_code=404, detail="Task not found")
+        task_team = rows[0].get("assigned_team")
+        cur_status = rows[0].get("status")
+        if not can_view_team(user, task_team):
+            raise HTTPException(status_code=403, detail="Bạn không có quyền cập nhật task của phòng ban khác.")
+        _assert_transition(cur_status, new_status)
         data = db.table("tasks") \
             .update({"status": new_status, "updated_at": "now()"}) \
             .eq("id", task_id) \
             .execute() \
             .data or []
+        if not data:
+            raise HTTPException(status_code=404, detail="Task not found")
+        _log_task_event(
+            db, task_id=task_id, actor=user, team=task_team, action="status_changed",
+            from_status=cur_status, to_status=new_status,
+        )
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot update task: {str(exc)[:300]}") from exc
-    if not data:
-        raise HTTPException(status_code=404, detail="Task not found")
     return {"status": "success", "data": data[0]}
 
 @app.patch("/api/tasks/{task_id}/assign")
-def assign_task(task_id: str, payload: AssignTaskReq, user: AuthUser = Depends(require_ops_staff)):
+def assign_task(task_id: str, payload: AssignTaskReq, user: AuthUser = Depends(require_manager)):
+    if user.role not in {"manager", "admin"}:
+        raise HTTPException(status_code=403, detail="Chỉ manager hoặc admin được giao task.")
     update_fields: dict = {}
-    if payload.owner_id is not None:
-        update_fields["owner_id"] = payload.owner_id
     if payload.due_at is not None:
         update_fields["due_at"] = payload.due_at
-    if not update_fields:
+    if payload.owner_id is None and not update_fields:
         raise HTTPException(status_code=400, detail="Must provide owner_id or due_at")
-    update_fields["updated_at"] = "now()"
     try:
         db = get_supabase()
-        # Luôn đọc task để biết phòng ban đích (dùng cho RBAC + kiểm tra phòng người nhận).
-        rows = db.table("tasks").select("assigned_team").eq("id", task_id).limit(1).execute().data or []
+        rows = db.table("tasks").select("assigned_team,status").eq("id", task_id).limit(1).execute().data or []
         if not rows:
             raise HTTPException(status_code=404, detail="Task not found")
         task_team = rows[0].get("assigned_team")
+        cur_status = rows[0].get("status")
         if user.role != "admin" and not can_view_team(user, task_team):
             raise HTTPException(status_code=403, detail="Bạn không có quyền gán task của phòng ban khác.")
-        # Ép phân chia theo phòng ban: người nhận phải thuộc đúng phòng của task
-        # (admin được miễn để có thể điều phối xuyên phòng).
-        if payload.owner_id is not None and task_team:
+        new_status = cur_status
+        if payload.owner_id is not None:
             owners = db.table("profiles").select("role,department").eq("id", payload.owner_id).limit(1).execute().data or []
             if not owners:
                 raise HTTPException(status_code=404, detail="Không tìm thấy người nhận.")
             owner = owners[0]
-            if owner.get("role") != "admin" and owner.get("department") != task_team:
+            if owner.get("role") != "staff":
+                raise HTTPException(status_code=400, detail="Người nhận task phải là nhân viên (staff).")
+            if task_team and owner.get("department") != task_team:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Người nhận phải thuộc phòng ban '{task_team}' của task.",
                 )
-        data = db.table("tasks") \
-            .update(update_fields) \
-            .eq("id", task_id) \
-            .execute() \
-            .data or []
+            _assert_transition(cur_status, "assigned")
+            update_fields["owner_id"] = payload.owner_id
+            update_fields["status"] = "assigned"
+            new_status = "assigned"
+        update_fields["updated_at"] = "now()"
+        data = db.table("tasks").update(update_fields).eq("id", task_id).execute().data or []
+        if not data:
+            raise HTTPException(status_code=404, detail="Task not found")
+        if payload.owner_id is not None:
+            _log_task_event(
+                db, task_id=task_id, actor=user, team=task_team, action="assigned",
+                from_status=cur_status, to_status=new_status,
+                note=f"owner={payload.owner_id}",
+            )
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot assign task: {str(exc)[:300]}") from exc
+    return {"status": "success", "data": data[0]}
+
+
+@app.post("/api/tasks/{task_id}/accept")
+def accept_task(task_id: str, user: AuthUser = Depends(require_ops_staff)):
+    """Nhân viên được giao bấm nhận việc: assigned -> in_progress."""
+    try:
+        db = get_supabase()
+        rows = db.table("tasks").select("assigned_team,status,owner_id").eq("id", task_id).limit(1).execute().data or []
+        if not rows:
+            raise HTTPException(status_code=404, detail="Task not found")
+        task = rows[0]
+        if task.get("owner_id") != user.id:
+            raise HTTPException(status_code=403, detail="Chỉ người được giao mới nhận được task này.")
+        cur_status = task.get("status")
+        _assert_transition(cur_status, "in_progress")
+        data = db.table("tasks").update({"status": "in_progress", "updated_at": "now()"}).eq("id", task_id).execute().data or []
+        _log_task_event(
+            db, task_id=task_id, actor=user, team=task.get("assigned_team"),
+            action="accepted", from_status=cur_status, to_status="in_progress",
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Cannot accept task: {str(exc)[:300]}") from exc
     if not data:
         raise HTTPException(status_code=404, detail="Task not found")
     return {"status": "success", "data": data[0]}
@@ -555,10 +644,10 @@ def list_assignable_users(
     team: str | None = Query(default=None),
     user: AuthUser = Depends(require_ops_staff),
 ):
-    """Danh sách user có thể gán task (staff/manager/admin), ĐÃ scope theo phòng ban.
+    """Danh sách user có thể gán task (chỉ staff cùng phòng ban).
 
-    RBAC: manager/staff chỉ thấy người CÙNG phòng ban của mình (không thể gán task
-    cho người phòng khác). Admin thấy tất cả, hoặc lọc theo ?team nếu truyền.
+    RBAC: manager/staff chỉ thấy staff CÙNG phòng ban của mình (không thể gán task
+    cho người phòng khác). Admin thấy tất cả staff, hoặc lọc theo ?team nếu truyền.
     Ops chưa được gán phòng → 403 (qua scoped_team).
     """
     # scoped_team raise 403 cho ops chưa gán phòng; trả None cho admin (xem tất cả).
@@ -567,7 +656,7 @@ def list_assignable_users(
         db = get_supabase()
         q = db.table("profiles") \
             .select("id,email,role,full_name,department") \
-            .in_("role", ["staff", "manager", "admin"])
+            .eq("role", "staff")
         if effective_team:
             # Chỉ giữ người thuộc đúng phòng ban. Admin vẫn nằm trong phòng nào đó
             # nếu được gán; nếu cần admin xuyên phòng, không truyền ?team.
@@ -645,10 +734,11 @@ def submit_completion_report(
         raise HTTPException(status_code=400, detail="completion_level không hợp lệ")
     try:
         db = get_supabase()
-        rows = db.table("tasks").select("assigned_team").eq("id", task_id).limit(1).execute().data or []
+        rows = db.table("tasks").select("assigned_team,status").eq("id", task_id).limit(1).execute().data or []
         if not rows:
             raise HTTPException(status_code=404, detail="Task not found")
         task_team = rows[0].get("assigned_team")
+        cur_status = rows[0].get("status")
         if not can_view_team(user, task_team):
             raise HTTPException(status_code=403, detail="Bạn không thể báo cáo task của phòng ban khác.")
         record = {
@@ -660,17 +750,27 @@ def submit_completion_report(
             "note": payload.note,
             "status": "submitted",
         }
-        data = db.table("task_completion_reports").insert(record).execute().data or []
-        # Khi báo "completed", chuyển task sang resolved để phản ánh trạng thái.
+        inserted = db.table("task_completion_reports").insert(record).execute().data or []
+        if not inserted:
+            raise HTTPException(status_code=503, detail="Không tạo được báo cáo hoàn thành")
+        report = inserted[0]
+        # 'completed' -> chuyển task sang chờ duyệt (KHÔNG auto-resolve). partial/blocked giữ nguyên.
+        new_status = cur_status
         if payload.completion_level == "completed":
-            db.table("tasks").update({"status": "resolved", "updated_at": "now()"}).eq("id", task_id).execute()
+            _assert_transition(cur_status, "pending_review")
+            db.table("tasks").update({"status": "pending_review", "updated_at": "now()"}).eq("id", task_id).execute()
+            new_status = "pending_review"
+        _log_task_event(
+            db, task_id=task_id, actor=user, team=task_team, action="completion_submitted",
+            from_status=cur_status, to_status=new_status,
+            completion_report_id=report.get("id"),
+            note=f"{payload.completion_level}: {payload.note[:200]}",
+        )
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot submit completion report: {str(exc)[:300]}") from exc
-    if not data:
-        raise HTTPException(status_code=503, detail="Không tạo được báo cáo hoàn thành")
-    return {"status": "success", "data": data[0]}
+    return {"status": "success", "data": report}
 
 
 @app.get("/api/tasks/{task_id}/completion-reports")
@@ -690,6 +790,25 @@ def list_task_completion_reports(task_id: str, user: AuthUser = Depends(require_
         raise
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot read completion reports: {str(exc)[:300]}") from exc
+    return {"status": "success", "data": data}
+
+
+@app.get("/api/tasks/{task_id}/events")
+def list_task_events(task_id: str, user: AuthUser = Depends(require_ops_staff)):
+    """Audit trail vòng đời của một task (scope theo phòng)."""
+    try:
+        db = get_supabase()
+        rows = db.table("tasks").select("assigned_team").eq("id", task_id).limit(1).execute().data or []
+        if not rows:
+            raise HTTPException(status_code=404, detail="Task not found")
+        if not can_view_team(user, rows[0].get("assigned_team")):
+            raise HTTPException(status_code=403, detail="Không có quyền xem nhật ký phòng ban khác.")
+        data = db.table("task_events").select("*").eq("task_id", task_id) \
+            .order("created_at", desc=True).execute().data or []
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Cannot read task events: {str(exc)[:300]}") from exc
     return {"status": "success", "data": data}
 
 
@@ -728,11 +847,16 @@ def review_completion_report(
         raise HTTPException(status_code=403, detail="Chỉ quản lý hoặc admin được duyệt báo cáo.")
     try:
         db = get_supabase()
-        rows = db.table("task_completion_reports").select("team").eq("id", report_id).limit(1).execute().data or []
+        rows = db.table("task_completion_reports").select("team,task_id").eq("id", report_id).limit(1).execute().data or []
         if not rows:
             raise HTTPException(status_code=404, detail="Report not found")
-        if not can_view_team(user, rows[0].get("team")):
+        team = rows[0].get("team")
+        rep_task_id = rows[0].get("task_id")
+        if not can_view_team(user, team):
             raise HTTPException(status_code=403, detail="Không có quyền duyệt báo cáo phòng ban khác.")
+        # NOTE: report update and task transition below are intentionally non-atomic
+        # (Supabase REST has no transaction here; acceptable — partial failure is
+        # surfaced via audit log and retry is safe).
         data = db.table("task_completion_reports").update({
             "status": payload.status,
             "review_note": payload.review_note,
@@ -740,6 +864,20 @@ def review_completion_report(
             "reviewed_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": "now()",
         }).eq("id", report_id).execute().data or []
+        # Lái trạng thái task theo kết quả duyệt.
+        task_rows = db.table("tasks").select("status").eq("id", rep_task_id).limit(1).execute().data or []
+        cur = task_rows[0].get("status") if task_rows else None
+        target = "resolved" if payload.status == "approved" else "in_progress"
+        action = "completion_approved" if payload.status == "approved" else "completion_rejected"
+        to_status = cur
+        if cur is not None and (cur, target) in ALLOWED_TASK_TRANSITIONS:
+            db.table("tasks").update({"status": target, "updated_at": "now()"}).eq("id", rep_task_id).execute()
+            to_status = target
+        _log_task_event(
+            db, task_id=rep_task_id, actor=user, team=team, action=action,
+            from_status=cur, to_status=to_status, completion_report_id=report_id,
+            note=payload.review_note,
+        )
     except HTTPException:
         raise
     except Exception as exc:
