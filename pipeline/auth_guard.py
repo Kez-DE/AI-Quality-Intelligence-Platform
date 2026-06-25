@@ -74,6 +74,12 @@ def require_admin(user: AuthUser = Depends(get_current_user)) -> AuthUser:
     return user
 
 
+def require_manager(user: AuthUser = Depends(get_current_user)) -> AuthUser:
+    if user.role not in {"manager", "admin"}:
+        raise HTTPException(status_code=403, detail="Yêu cầu quyền manager hoặc admin")
+    return user
+
+
 def can_view_team(user: AuthUser, team: str) -> bool:
     """Kiểm tra user có quyền xem dữ liệu của một phòng ban cụ thể không.
 
