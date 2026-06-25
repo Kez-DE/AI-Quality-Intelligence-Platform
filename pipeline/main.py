@@ -85,6 +85,29 @@ def _parse_timestamp(value: str | None) -> datetime | None:
         return None
 
 
+# Vòng đời task hợp lệ. Reassign (đổi owner) đưa task active về 'assigned' để nhận lại.
+ALLOWED_TASK_TRANSITIONS = {
+    ("open", "assigned"),
+    ("assigned", "assigned"),
+    ("in_progress", "assigned"),
+    ("assigned", "in_progress"),
+    ("in_progress", "pending_review"),
+    ("pending_review", "resolved"),
+    ("pending_review", "in_progress"),
+}
+
+
+def _assert_transition(from_status: str | None, to_status: str) -> None:
+    """Chặn chuyển trạng thái task không hợp lệ. No-op nếu giữ nguyên trạng thái."""
+    if from_status == to_status:
+        return
+    if (from_status, to_status) not in ALLOWED_TASK_TRANSITIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Chuyển trạng thái không hợp lệ: {from_status} -> {to_status}",
+        )
+
+
 def _feedback_team(feedback: dict) -> str:
     """Resolve feedback ownership with the same rules used to create tickets."""
     severity = feedback.get("severity", "P3")
