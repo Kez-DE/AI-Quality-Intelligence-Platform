@@ -602,10 +602,10 @@ def list_assignable_users(
     team: str | None = Query(default=None),
     user: AuthUser = Depends(require_ops_staff),
 ):
-    """Danh sách user có thể gán task (staff/manager/admin), ĐÃ scope theo phòng ban.
+    """Danh sách user có thể gán task (chỉ staff cùng phòng ban).
 
-    RBAC: manager/staff chỉ thấy người CÙNG phòng ban của mình (không thể gán task
-    cho người phòng khác). Admin thấy tất cả, hoặc lọc theo ?team nếu truyền.
+    RBAC: manager/staff chỉ thấy staff CÙNG phòng ban của mình (không thể gán task
+    cho người phòng khác). Admin thấy tất cả staff, hoặc lọc theo ?team nếu truyền.
     Ops chưa được gán phòng → 403 (qua scoped_team).
     """
     # scoped_team raise 403 cho ops chưa gán phòng; trả None cho admin (xem tất cả).
@@ -614,7 +614,7 @@ def list_assignable_users(
         db = get_supabase()
         q = db.table("profiles") \
             .select("id,email,role,full_name,department") \
-            .in_("role", ["staff", "manager", "admin"])
+            .eq("role", "staff")
         if effective_team:
             # Chỉ giữ người thuộc đúng phòng ban. Admin vẫn nằm trong phòng nào đó
             # nếu được gán; nếu cần admin xuyên phòng, không truyền ?team.
