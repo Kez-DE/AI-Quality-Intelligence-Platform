@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+import logging
 import os
 import time
 from datetime import datetime, timezone, timedelta
@@ -106,6 +107,29 @@ def _assert_transition(from_status: str | None, to_status: str) -> None:
             status_code=400,
             detail=f"Chuyển trạng thái không hợp lệ: {from_status} -> {to_status}",
         )
+
+
+def _log_task_event(
+    db, *, task_id, actor, team, action,
+    from_status=None, to_status=None, completion_report_id=None, note=None,
+):
+    """Ghi một mốc vòng đời task vào task_events. Audit là phụ trợ: lỗi ghi không
+    được làm hỏng thao tác chính (bọc try/except)."""
+    try:
+        db.table("task_events").insert({
+            "task_id": task_id,
+            "actor_id": getattr(actor, "id", None),
+            "actor_email": getattr(actor, "email", None),
+            "actor_role": getattr(actor, "role", None),
+            "team": team,
+            "action": action,
+            "from_status": from_status,
+            "to_status": to_status,
+            "completion_report_id": completion_report_id,
+            "note": note,
+        }).execute()
+    except Exception as exc:  # noqa: BLE001 — audit không chặn nghiệp vụ
+        logging.getLogger("task_events").warning("Không ghi được task_event: %s", str(exc)[:200])
 
 
 def _feedback_team(feedback: dict) -> str:
