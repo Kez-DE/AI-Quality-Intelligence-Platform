@@ -495,6 +495,10 @@ Task 5 (UI: reports.tsx) ← sau Task 3 + Task 4
 
 ## 9. Hướng phát triển mở rộng (Future Direction)
 
+> **Định hướng tương lai — CHƯA triển khai.**
+> Hệ thống hiện chạy **4 phòng ban**: IT, CSKH, Vận hành, Marketing.
+> Nội dung mục 9 là lộ trình dự kiến, không phản ánh trạng thái hiện tại.
+
 ### 9.1 Định hướng mở rộng danh sách phòng ban
 Trong tương lai, hệ thống sẽ mở rộng quy mô định tuyến và xử lý để bao phủ toàn bộ các mảng nghiệp vụ của greenSM. Cụ thể sẽ bao gồm 6 phòng ban chính:
 

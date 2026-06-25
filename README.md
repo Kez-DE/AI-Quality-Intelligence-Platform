@@ -220,6 +220,8 @@ Kịch bản chi tiết: [`docs/project/demo-script.md`](docs/project/demo-scrip
 | [`docs/project/co_che.md`](docs/project/co_che.md) | Cơ chế tổng thể: luồng → ticket/alert/task/report, phân quyền, chia việc, lộ trình cải thiện (đọc trước khi build lại) |
 | [`docs/project/architecture.md`](docs/project/architecture.md) | Kiến trúc tổng thể, 3 tầng, cấu trúc data, 6 service |
 | [`docs/project/architecture-diagram.md`](docs/project/architecture-diagram.md) | Sơ đồ Mermaid các module |
+| [`docs/project/architecture/e2e-flow.md`](docs/project/architecture/e2e-flow.md) | Luồng xử lý phản hồi đầu cuối (E2E) — hiện trạng thực tế của code |
+| [`docs/project/architecture/routing-taxonomy.md`](docs/project/architecture/routing-taxonomy.md) | Taxonomy định tuyến: 4 phòng ban, bảng topic→phòng, quy tắc override, accuracy holdout (75.4% dept) |
 | [`docs/project/ai-systems.md`](docs/project/ai-systems.md) | 4 lớp AI, LLM router, luồng dữ liệu theo worker |
 | [`docs/project/agents-guide.md`](docs/project/agents-guide.md) | 8 agent + orchestrator: thứ tự thực thi, I/O, routing |
 | [`docs/project/rbac-departments.md`](docs/project/rbac-departments.md) | Phân quyền role + scope theo phòng ban |
