@@ -456,6 +456,33 @@ def assign_task(task_id: str, payload: AssignTaskReq, user: AuthUser = Depends(r
         raise HTTPException(status_code=404, detail="Task not found")
     return {"status": "success", "data": data[0]}
 
+
+@app.post("/api/tasks/{task_id}/accept")
+def accept_task(task_id: str, user: AuthUser = Depends(require_ops_staff)):
+    """Nhân viên được giao bấm nhận việc: assigned -> in_progress."""
+    try:
+        db = get_supabase()
+        rows = db.table("tasks").select("assigned_team,status,owner_id").eq("id", task_id).limit(1).execute().data or []
+        if not rows:
+            raise HTTPException(status_code=404, detail="Task not found")
+        task = rows[0]
+        if task.get("owner_id") != user.id:
+            raise HTTPException(status_code=403, detail="Chỉ người được giao mới nhận được task này.")
+        cur_status = task.get("status")
+        _assert_transition(cur_status, "in_progress")
+        data = db.table("tasks").update({"status": "in_progress", "updated_at": "now()"}).eq("id", task_id).execute().data or []
+        _log_task_event(
+            db, task_id=task_id, actor=user, team=task.get("assigned_team"),
+            action="accepted", from_status=cur_status, to_status="in_progress",
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Cannot accept task: {str(exc)[:300]}") from exc
+    if not data:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"status": "success", "data": data[0]}
+
 @app.get("/api/leaderboard")
 def get_leaderboard(_: AuthUser = Depends(require_ops_staff)):
     """Team leaderboard from resolved tasks."""

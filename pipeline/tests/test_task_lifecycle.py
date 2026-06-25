@@ -12,6 +12,7 @@ from auth_guard import AuthUser
 from main import (
     list_assignable_users,
     assign_task,
+    accept_task,
     submit_completion_report,
     review_completion_report,
     AssignTaskReq,
@@ -72,3 +73,36 @@ def test_assign_sets_status_and_logs_event():
     assert task["status"] == "assigned"
     assert task["owner_id"] == "s1"
     assert any(e["action"] == "assigned" for e in db.tables["task_events"])
+
+
+def test_accept_by_owner_moves_in_progress():
+    db = FakeDB(
+        tasks=[{"id": "t1", "assigned_team": "IT", "status": "assigned", "owner_id": "s1"}],
+        task_events=[],
+    )
+    with patch("main.get_supabase", return_value=db):
+        accept_task("t1", user=_user("staff", "IT", uid="s1"))
+    assert db.tables["tasks"][0]["status"] == "in_progress"
+    assert any(e["action"] == "accepted" for e in db.tables["task_events"])
+
+
+def test_accept_by_non_owner_forbidden():
+    db = FakeDB(
+        tasks=[{"id": "t1", "assigned_team": "IT", "status": "assigned", "owner_id": "s1"}],
+        task_events=[],
+    )
+    with patch("main.get_supabase", return_value=db):
+        with pytest.raises(HTTPException) as exc:
+            accept_task("t1", user=_user("staff", "IT", uid="s2"))
+    assert exc.value.status_code == 403
+
+
+def test_accept_open_task_invalid_transition():
+    db = FakeDB(
+        tasks=[{"id": "t1", "assigned_team": "IT", "status": "open", "owner_id": "s1"}],
+        task_events=[],
+    )
+    with patch("main.get_supabase", return_value=db):
+        with pytest.raises(HTTPException) as exc:
+            accept_task("t1", user=_user("staff", "IT", uid="s1"))
+    assert exc.value.status_code == 400
