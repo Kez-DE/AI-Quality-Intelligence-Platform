@@ -21,28 +21,49 @@ HOURS    = int(os.getenv("WORKER_AGENT_HOURS", "24"))
 ENABLED  = os.getenv("WORKER_AGENT_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
 
 
-def run_pipeline():
+def run_alert_pipeline():
     if not ENABLED:
-        print("[agent-worker] WORKER_AGENT_ENABLED=false — skipping pipeline run.", flush=True)
+        print("[agent-worker] WORKER_AGENT_ENABLED=false — skipping alert pipeline run.", flush=True)
         return
-    print(f"[agent-worker] Starting agent pipeline (last {HOURS}h)...", flush=True)
+    print(f"[agent-worker] Starting alert pipeline (last 1h)...", flush=True)
     try:
-        result = run_agent_pipeline(hours=HOURS)
-        print(f"[agent-worker] Pipeline done: {result.get('summary', result)}", flush=True)
+        result = run_agent_pipeline(hours=1, run_alert=True, run_report=False)
+        print(f"[agent-worker] Alert pipeline done: {result.get('summary', result)}", flush=True)
     except Exception as exc:
-        print(f"[agent-worker] Pipeline error: {exc}", file=sys.stderr, flush=True)
+        print(f"[agent-worker] Alert pipeline error: {exc}", file=sys.stderr, flush=True)
+
+
+def run_report_pipeline():
+    if not ENABLED:
+        print("[agent-worker] WORKER_AGENT_ENABLED=false — skipping report pipeline run.", flush=True)
+        return
+    print(f"[agent-worker] Starting report pipeline (last {HOURS}h)...", flush=True)
+    try:
+        result = run_agent_pipeline(hours=HOURS, run_alert=False, run_report=True)
+        print(f"[agent-worker] Report pipeline done: {result.get('summary', result)}", flush=True)
+    except Exception as exc:
+        print(f"[agent-worker] Report pipeline error: {exc}", file=sys.stderr, flush=True)
 
 
 def build_scheduler() -> BackgroundScheduler:
     scheduler = BackgroundScheduler()
     scheduler.add_job(
-        run_pipeline,
+        run_alert_pipeline,
         "interval",
         seconds=INTERVAL,
-        id="agent_pipeline",
+        id="alert_pipeline",
         max_instances=1,
         coalesce=True,
         next_run_time=datetime.now(timezone.utc),
+    )
+    scheduler.add_job(
+        run_report_pipeline,
+        "cron",
+        hour="9,14",
+        minute="0",
+        id="report_pipeline",
+        max_instances=1,
+        coalesce=True,
     )
     return scheduler
 
@@ -60,7 +81,7 @@ def main():
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
 
-    print(f"agent-worker started. Pipeline every {INTERVAL}s, window={HOURS}h.", flush=True)
+    print(f"agent-worker started. Alert every {INTERVAL}s (1h). Report at 09:00, 14:00 ({HOURS}h).", flush=True)
 
     try:
         while not should_stop:

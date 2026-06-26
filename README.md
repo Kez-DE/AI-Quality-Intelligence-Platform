@@ -25,7 +25,7 @@ Mục tiêu: giúp đội ngũ vận hành nắm bắt nhanh vấn đề chất 
 | 3 | Ma trận Rủi ro Sâu | Chấm điểm 5 chiều (safety, fraud, attitude, vehicle, compliance) qua LLM Scoring Agent |
 | 4 | Phát hiện Spike | Nhận diện điểm nóng → tự động tạo alert ticket |
 | 5 | Multi-Agent | 8 agent nghiệp vụ + Orchestrator |
-| 6 | Phân tích phòng ban | Insights 4 phòng ban với phân tích sâu bằng LLM |
+| 6 | Phân tích phòng ban | Báo cáo AI 4 phòng ban theo lịch (09:00 & 14:00, nhiều báo cáo/ngày), cấu trúc 3 khối Vấn đề → Phân tích → Đề xuất, phân tích sâu bằng LLM |
 | 7 | Human-in-the-Loop | Hàng đợi duyệt nhãn — nhân viên sửa nhãn AI, ghi correction log |
 | 8 | AI Chat & RAG (Tiered) | Hỏi đáp tích hợp Hybrid Search KB, tự động phân quyền truy cập (Guest: Public FAQ / Staff: Internal Ops Tools) |
 | 9 | Streaming Realtime | Ingest phản hồi theo luồng thời gian thực |

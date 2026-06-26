@@ -329,13 +329,28 @@ Frontend (`AppShell.tsx`) lọc nav theo role, `route.tsx` redirect guest khỏi
 
 Có hai loại báo cáo khác nhau, đừng lẫn:
 
-**department_reports — báo cáo phân tích của analyst_agent (máy sinh).** Orchestrator chạy `insight_agent` gom metric theo phòng, rồi nếu phòng có feedback và analyst bật thì gọi `analyst_agent.analyze_root_cause` để LLM viết `{root_cause_summary, risk_level, action_items}`. Orchestrator upsert vào `department_reports`, ghi đồng thời:
+**department_reports — báo cáo phân tích của analyst_agent (máy sinh).** Orchestrator chạy `insight_agent` gom metric theo phòng, rồi nếu phòng có feedback và analyst bật thì gọi `analyst_agent.analyze_root_cause` để LLM viết `{prominent_theme, feedback_summary, detailed_analysis, root_cause_summary, risk_level, action_items}`. Orchestrator **insert** vào `department_reports` (không còn upsert), ghi đồng thời:
 
 - `content` (Markdown báo cáo, để đọc),
 - `root_cause_summary` (TEXT, tách riêng để query/hiển thị),
 - `suggested_tasks` (JSONB, chính là `action_items` đã chuẩn hóa — danh sách hành động đề xuất để manager biên tập).
 
 Có trường duyệt: `approved`, `approved_by`, `approved_at`.
+
+**Nhiều báo cáo mỗi ngày + lịch sinh.** Đã bỏ ràng buộc unique `(team, report_date)` (migration `20260629000000_remove_unique_department_reports.sql`) nên mỗi phòng có thể có nhiều báo cáo trong cùng một ngày — mỗi lần sinh là một bản `insert` mới, không ghi đè bản cũ. Pipeline tách hai nhịp bằng cờ `run_alert`/`run_report` của `run_agent_pipeline` (`worker_agent.py` đăng ký hai job APScheduler):
+
+- **Alert** chạy mỗi chu kỳ ngắn (`WORKER_AGENT_INTERVAL_SECONDS`, mặc định 5 phút), cửa sổ dữ liệu 1 giờ — lo phát hiện spike, ticket, SLA.
+- **Báo cáo** chạy theo lịch cron **09:00 và 14:00** (cửa sổ 24 giờ) — lo `insight_agent` + `analyst_agent` + dựng báo cáo.
+
+Tách như vậy để cảnh báo luôn kịp thời mà không tốn quota LLM sinh báo cáo mỗi vài phút.
+
+**Cấu trúc nội dung báo cáo (nhìn là biết vấn đề gì, cần làm gì).** `build_department_report_markdown` dựng tiêu đề kèm chủ đề nổi bật `# Báo cáo Vận hành - Phòng {team}: {prominent_theme}` rồi ba khối chính:
+
+1. **Vấn đề ghi nhận** — `feedback_summary`: khách đang phàn nàn điều gì.
+2. **Phân tích & nguyên nhân** — `detailed_analysis` + `root_cause_summary` (cần xác minh) + mức rủi ro + bằng chứng từ dữ liệu.
+3. **Đề xuất giải quyết** — bảng `action_items` (ưu tiên, hành động, hạn).
+
+Phía dưới giữ nguyên các bảng số liệu (KPI, top topics, khu vực cần chú ý). Khi LLM/mock trả thiếu `feedback_summary`/`detailed_analysis`, báo cáo hiển thị câu fallback thay vì để khối trống.
 
 **Luồng HI-Loop Approval (báo cáo → task).** Đây là cầu nối biến báo cáo tĩnh thành việc thực thi:
 

@@ -60,19 +60,61 @@ def test_risk_level_is_derived_from_measured_severity():
     assert derive_risk_level({"severity_distribution": {"INFO": 2}}) == "LOW"
 
 
-def test_approved_report_is_not_overwritten():
+def test_store_uses_insert_not_upsert():
     db = MagicMock()
-    query = db.table.return_value.select.return_value
-    query.eq.return_value = query
-    query.limit.return_value = query
-    query.execute.return_value = MagicMock(data=[{"id": "r1", "approved": True}])
-
-    result = store_department_report(
-        db,
-        team="IT",
-        report_date="2026-06-20",
-        content="new report",
+    insert_mock = db.table.return_value.insert
+    insert_mock.return_value.execute.return_value.data = [{"id": "r1"}]
+    out = store_department_report(
+        db, team="IT", report_date="2026-06-26", content="# x",
+        suggested_tasks=[{"action": "a"}], root_cause_summary="rc",
     )
-
-    assert result == {"stored": False, "reason": "approved_report_locked", "id": "r1"}
+    assert out["stored"] is True
+    insert_mock.assert_called_once()
     db.table.return_value.upsert.assert_not_called()
+
+
+def test_analyst_analysis_optional_new_fields():
+    from agents.schemas import AnalystAnalysis
+    # Thiếu các trường mới vẫn parse được (default rỗng)
+    a = AnalystAnalysis(root_cause_summary="x", risk_level="LOW")
+    assert a.prominent_theme is None
+    assert a.feedback_summary == ""
+    assert a.detailed_analysis == ""
+    # Có trường mới thì giữ nguyên
+    b = AnalystAnalysis(
+        root_cause_summary="x", risk_level="LOW",
+        prominent_theme="Sự cố hiệu năng App", feedback_summary="App treo",
+        detailed_analysis="Phân tích chi tiết",
+    )
+    assert b.prominent_theme == "Sự cố hiệu năng App"
+
+
+def test_fallback_analysis_has_new_fields():
+    from agents.analyst_agent import _fallback_analysis
+    insights = {"top_topics": [{"topic": "App Issue", "count": 5}], "total_feedback": 5}
+    out = _fallback_analysis("IT", insights)
+    analysis = out["analysis"]
+    assert analysis["prominent_theme"]
+    assert analysis["feedback_summary"]
+    assert analysis["detailed_analysis"]
+    assert analysis["root_cause_summary"]
+
+
+def test_markdown_has_three_sections_and_title():
+    from agents.report_builder import build_department_report_markdown
+    analysis_result = {"status": "success", "analysis": {
+        "prominent_theme": "Sự cố hiệu năng App",
+        "feedback_summary": "Khách báo app treo khi đặt xe.",
+        "detailed_analysis": "Tần suất tăng ở khung giờ cao điểm.",
+        "root_cause_summary": "Nghi do tải máy chủ.",
+        "risk_level": "HIGH",
+        "action_items": [{"action": "Rà soát server", "priority": "P2", "deadline": "48h"}],
+        "evidence": ["App Issue: 12/20"],
+    }}
+    md = build_department_report_markdown("IT", _insights(), analysis_result)
+    assert md.startswith("# Báo cáo Vận hành - Phòng IT: Sự cố hiệu năng App")
+    assert "## Vấn đề ghi nhận" in md
+    assert "Khách báo app treo" in md
+    assert "## Phân tích & nguyên nhân" in md
+    assert "## Đề xuất giải quyết" in md
+    assert "Rà soát server" in md

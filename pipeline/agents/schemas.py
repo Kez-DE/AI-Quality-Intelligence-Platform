@@ -28,6 +28,9 @@ class ActionItem(BaseModel):
     priority: Optional[str] = None
 
 class AnalystAnalysis(BaseModel):
+    prominent_theme: Optional[str] = None
+    feedback_summary: str = ""
+    detailed_analysis: str = ""
     root_cause_summary: str
     risk_level: str
     action_items: List[ActionItem] = Field(default_factory=list)

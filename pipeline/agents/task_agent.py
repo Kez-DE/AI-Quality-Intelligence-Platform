@@ -153,11 +153,14 @@ def generate_daily_report(team: str) -> Dict[str, Any]:
             return {"status": "skipped", "message": f"No feedback for {team}"}
         analysis = analyze_root_cause(team, insights)
         content = build_department_report_markdown(team, insights, analysis)
+        analysis_dict = analysis.get("analysis") or {}
         stored = store_department_report(
             db,
             team=team,
             report_date=datetime.utcnow().date().isoformat(),
             content=content,
+            suggested_tasks=analysis_dict.get("action_items", []),
+            root_cause_summary=analysis_dict.get("root_cause_summary", ""),
         )
 
         log_agent_run(

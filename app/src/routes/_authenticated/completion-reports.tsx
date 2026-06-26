@@ -20,6 +20,7 @@ export const Route = createFileRoute("/_authenticated/completion-reports")({
 type CompletionReport = {
   id: string;
   task_id: string;
+  task_title?: string | null;
   staff_email: string | null;
   team: string;
   completion_level: "completed" | "partial" | "blocked";
@@ -186,6 +187,9 @@ function CompletionReportsPage() {
                 key={r.id}
                 className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] p-5 space-y-3"
               >
+                <h3 className="font-bold text-sm text-xanh-deep">
+                  {r.task_title || "Task không xác định"}
+                </h3>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span
                     className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${level.cls}`}
