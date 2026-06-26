@@ -41,7 +41,7 @@ def _agent_enabled(name: str) -> bool:
     return val.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
+def run_agent_pipeline(hours: int = 24, run_alert: bool = True, run_report: bool = True) -> Dict[str, Any]:
     """Quét tất cả phòng ban, sinh insight, chạy root-cause cho phòng có feedback.
 
     Pipeline 7 bước:
@@ -63,7 +63,9 @@ def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
 
     # ── Step 1-4: Alert detection + Ticket creation ──
     alerts_created_count = 0
-    if not _agent_enabled("alert"):
+    if not run_alert:
+        pipeline_log.append("Alert phase skipped (run_alert=False)")
+    elif not _agent_enabled("alert"):
         pipeline_log.append("Alert agent disabled (AGENT_ALERT_ENABLED=false) — skipped spike→ticket")
     else:
         try:
@@ -83,7 +85,9 @@ def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
             errors["alerts"] = error_msg
 
     # ── Step 5: Task Agent — gom cụm alerts thành tasks ──
-    if not _agent_enabled("task"):
+    if not run_alert:
+        pass
+    elif not _agent_enabled("task"):
         pipeline_log.append("Task agent disabled (AGENT_TASK_ENABLED=false) — skipped")
     else:
         try:
@@ -96,17 +100,20 @@ def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
 
     # ── Step 5.5: Kiểm tra ticket quá SLA ──
     overdue_tickets = []
-    try:
-        overdue_tickets = get_overdue_tickets(sla_hours=24)
-        if overdue_tickets:
-            pipeline_log.append(f"Phát hiện {len(overdue_tickets)} ticket quá SLA 24h")
-    except Exception as exc:
-        pipeline_log.append(f"Lỗi kiểm tra SLA: {str(exc)[:100]}")
+    if run_alert:
+        try:
+            overdue_tickets = get_overdue_tickets(sla_hours=24)
+            if overdue_tickets:
+                pipeline_log.append(f"Phát hiện {len(overdue_tickets)} ticket quá SLA 24h")
+        except Exception as exc:
+            pipeline_log.append(f"Lỗi kiểm tra SLA: {str(exc)[:100]}")
 
     # ── Step 6-7: Insight + Analyst cho từng phòng ban ──
-    insight_on = _agent_enabled("insight")
-    analyst_on = _agent_enabled("analyst")
-    if not insight_on:
+    insight_on = _agent_enabled("insight") and run_report
+    analyst_on = _agent_enabled("analyst") and run_report
+    if not run_report:
+        pipeline_log.append("Report phase skipped (run_report=False)")
+    elif not insight_on:
         pipeline_log.append("Insight agent disabled (AGENT_INSIGHT_ENABLED=false) — skipped Insight+Analyst")
     for team in (TEAMS if insight_on else []):
         try:
@@ -126,7 +133,7 @@ def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
                     _analysis = (analysis_res.get("analysis") or {}) if isinstance(analysis_res, dict) else {}
                     _suggested = _analysis.get("action_items") or []
                     _root_cause = _analysis.get("root_cause_summary") or None
-                    store_result = store_department_report(
+                    store_department_report(
                         db,
                         team=team,
                         report_date=datetime.now(timezone.utc).date().isoformat(),
@@ -134,8 +141,6 @@ def run_agent_pipeline(hours: int = 24) -> Dict[str, Any]:
                         suggested_tasks=_suggested,
                         root_cause_summary=_root_cause,
                     )
-                    if not store_result.get("stored"):
-                        pipeline_log.append(f"{team}: approved report retained")
                 except Exception as exc:
                     errors[f"report:{team}"] = str(exc)[:200]
                     pipeline_log.append(f"{team}: report storage error — {str(exc)[:100]}")
@@ -198,7 +203,7 @@ def run_full_cycle(hours: int = 24, max_feedback: int = 1000, max_spikes: int = 
 
     Dùng cho /api/agent/run khi muốn chạy toàn bộ pipeline từ đầu.
     """
-    pipeline_result = run_agent_pipeline(hours=hours)
+    pipeline_result = run_agent_pipeline(hours=hours, run_alert=True, run_report=True)
 
 
     return pipeline_result
