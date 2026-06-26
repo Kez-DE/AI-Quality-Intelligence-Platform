@@ -92,3 +92,14 @@ def test_analyst_analysis_optional_new_fields():
         detailed_analysis="Phân tích chi tiết",
     )
     assert b.prominent_theme == "Sự cố hiệu năng App"
+
+
+def test_fallback_analysis_has_new_fields():
+    from agents.analyst_agent import _fallback_analysis
+    insights = {"top_topics": [{"topic": "App Issue", "count": 5}], "total_feedback": 5}
+    out = _fallback_analysis("IT", insights)
+    analysis = out["analysis"]
+    assert analysis["prominent_theme"]
+    assert analysis["feedback_summary"]
+    assert analysis["detailed_analysis"]
+    assert analysis["root_cause_summary"]

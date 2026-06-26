@@ -95,6 +95,9 @@ def _fallback_analysis(team: str, insights: Dict[str, Any]) -> Dict[str, Any]:
         ]
 
     analysis = AnalystAnalysis(
+        prominent_theme=top_topic,
+        feedback_summary=f"Hệ thống ghi nhận các phản hồi chủ yếu xoay quanh chủ đề {top_topic}.",
+        detailed_analysis="Do hệ thống LLM gặp sự cố hoặc dữ liệu quá ít, phân tích chi tiết không khả dụng.",
         root_cause_summary=(
             f"Dữ liệu ghi nhận nhiều phản hồi liên quan đến {top_topic}; "
             "chưa đủ bằng chứng để khẳng định nguyên nhân gốc rễ và cần xác minh thêm."
@@ -140,8 +143,16 @@ Nhiệm vụ: đưa ra nhận định nguyên nhân cần xác minh và kế ho�
 Chỉ sử dụng số liệu và mẫu phản hồi được cung cấp. Không tự tạo số liệu, xu hướng,
 tác động tài chính hoặc nguyên nhân không có bằng chứng. Nếu chưa đủ bằng chứng, phải nói rõ.
 
+Trích xuất ĐÚNG BẢN CHẤT sự việc từ mẫu phản hồi để tạo một tiêu đề Báo cáo Quản trị chuyên nghiệp (Formal Noun Phrase).
+Tuyệt đối không dùng văn nói hay nguyên văn lời than phiền. Hãy dùng các từ ngữ quản trị như: "Sự cố", "Vấn đề", "Lỗi", "Tình trạng".
+Ví dụ XẤU (Văn nói): "App chậm, không hủy", "Tài xế chửi khách", "Không nhập được mã"
+Ví dụ TỐT (Văn viết): "Sự cố hiệu năng App & Lỗi hủy chuyến", "Vấn đề thái độ tài xế", "Lỗi áp dụng mã khuyến mãi"
+
 Trả về JSON đúng cấu trúc:
 {{
+  "prominent_theme": "Cụm danh từ trang trọng, làm tiêu đề phụ của báo cáo quản trị (vd: 'Sự cố hiệu năng App & Lỗi hủy chuyến')",
+  "feedback_summary": "Tóm tắt ngắn gọn các vấn đề cụ thể mà khách hàng đang gặp phải dựa trên mẫu phản hồi (vd: 'Khách hàng báo lỗi không áp dụng được mã SUMMER2026')",
+  "detailed_analysis": "Đoạn phân tích chi tiết của AI về tình hình, xu hướng và mức độ nghiêm trọng",
   "root_cause_summary": "1-2 câu, ghi rõ đây là nhận định cần xác minh nếu dữ liệu chưa đủ",
   "risk_level": "LOW | MEDIUM | HIGH | CRITICAL",
   "evidence": ["2-4 bằng chứng ngắn lấy từ số liệu được cung cấp"],
