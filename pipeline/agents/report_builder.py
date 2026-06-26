@@ -188,20 +188,7 @@ def store_department_report(
     suggested_tasks: list | None = None,
     root_cause_summary: str | None = None,
 ) -> dict[str, Any]:
-    """Store one daily report without overwriting a manager-approved snapshot."""
-    existing = (
-        db.table("department_reports")
-        .select("id,approved")
-        .eq("team", team)
-        .eq("report_date", report_date)
-        .limit(1)
-        .execute()
-        .data
-        or []
-    )
-    if existing and existing[0].get("approved"):
-        return {"stored": False, "reason": "approved_report_locked", "id": existing[0].get("id")}
-
+    """Lưu một báo cáo mới. Cho phép nhiều báo cáo/ngày (không chặn bản đã duyệt)."""
     payload = {
         "team": team,
         "report_date": report_date,
@@ -212,10 +199,7 @@ def store_department_report(
         "suggested_tasks": suggested_tasks or [],
         "root_cause_summary": root_cause_summary,
     }
-    result = db.table("department_reports").upsert(
-        payload,
-        on_conflict="team,report_date",
-    ).execute()
+    result = db.table("department_reports").insert(payload).execute()
     return {"stored": True, "data": result.data or []}
 
 

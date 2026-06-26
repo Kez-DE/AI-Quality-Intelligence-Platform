@@ -60,21 +60,16 @@ def test_risk_level_is_derived_from_measured_severity():
     assert derive_risk_level({"severity_distribution": {"INFO": 2}}) == "LOW"
 
 
-def test_approved_report_is_not_overwritten():
+def test_store_uses_insert_not_upsert():
     db = MagicMock()
-    query = db.table.return_value.select.return_value
-    query.eq.return_value = query
-    query.limit.return_value = query
-    query.execute.return_value = MagicMock(data=[{"id": "r1", "approved": True}])
-
-    result = store_department_report(
-        db,
-        team="IT",
-        report_date="2026-06-20",
-        content="new report",
+    insert_mock = db.table.return_value.insert
+    insert_mock.return_value.execute.return_value.data = [{"id": "r1"}]
+    out = store_department_report(
+        db, team="IT", report_date="2026-06-26", content="# x",
+        suggested_tasks=[{"action": "a"}], root_cause_summary="rc",
     )
-
-    assert result == {"stored": False, "reason": "approved_report_locked", "id": "r1"}
+    assert out["stored"] is True
+    insert_mock.assert_called_once()
     db.table.return_value.upsert.assert_not_called()
 
 
