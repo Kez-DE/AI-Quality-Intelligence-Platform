@@ -135,17 +135,17 @@ function SupportPage() {
     }
     setResolving(true);
     try {
-      // Đổi trạng thái task thành resolved
-      await apiFetch(`/api/tasks/${selectedTaskId}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: "resolved" }),
+      // Bàn CSKH đóng ticket khách trực tiếp + lưu câu phản hồi vào audit
+      await apiFetch(`/api/tasks/${selectedTaskId}/support-resolve`, {
+        method: "POST",
+        body: JSON.stringify({ reply: cannedReply }),
       });
       toast.success("Đã phản hồi & đóng Ticket thành công!");
       setTasks((prev) => prev.filter((t) => t.id !== selectedTaskId));
       setSelectedTaskId(null);
       setCannedReply("");
-    } catch {
-      toast.error("Lỗi khi xử lý Ticket.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Lỗi khi xử lý Ticket.");
     } finally {
       setResolving(false);
     }
