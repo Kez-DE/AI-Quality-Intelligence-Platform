@@ -63,8 +63,18 @@ def build_department_report_markdown(
     overdue_tasks = int(insights.get("overdue_tasks") or 0)
     negative_rate = round(negative * 100 / total, 1) if total else 0
 
+    top_topics = insights.get("top_topics") or []
+    prominent_theme = str(analysis.get("prominent_theme") or "").strip()
+    feedback_summary = str(analysis.get("feedback_summary") or "").strip()
+    detailed_analysis = str(analysis.get("detailed_analysis") or "").strip()
+    topic_suffix = ""
+    if prominent_theme:
+        topic_suffix = f": {prominent_theme}"
+    elif top_topics:
+        topic_suffix = f": {' / '.join(_cell(t.get('topic')) for t in top_topics[:2])}"
+
     lines = [
-        f"# Báo cáo vận hành - Phòng {_cell(team)}",
+        f"# Báo cáo Vận hành - Phòng {_cell(team)}{topic_suffix}",
         "",
         (
             f"> Kỳ dữ liệu: {period_hours} giờ gần nhất | "
@@ -83,14 +93,23 @@ def build_department_report_markdown(
         f"| Task đang mở/đang xử lý | {active_tasks} |",
         f"| Task quá hạn | {overdue_tasks} |",
         f"| Mức rủi ro hiện tại | **{_cell(risk_level)}** |",
+    ]
+
+    lines.extend([
+        "",
+        "## Vấn đề ghi nhận",
+        "",
+        _cell(feedback_summary) if feedback_summary else "Chưa có tóm tắt vấn đề từ AI.",
+    ])
+
+    lines.extend([
         "",
         "## Vấn đề nổi bật",
         "",
         "| Chủ đề | Số phản hồi | Tỷ trọng |",
         "| --- | ---: | ---: |",
-    ]
+    ])
 
-    top_topics = insights.get("top_topics") or []
     if top_topics:
         for item in top_topics:
             count = int(item.get("count") or 0)
@@ -118,9 +137,12 @@ def build_department_report_markdown(
     )
     lines.extend([
         "",
-        "## Nhận định AI cần xác minh",
+        "## Phân tích & nguyên nhân",
         "",
-        _cell(root_cause),
+        _cell(detailed_analysis) if detailed_analysis else "Chưa có phân tích chi tiết.",
+        "",
+        f"**Nguyên nhân (cần xác minh):** {_cell(root_cause)}",
+        f"**Mức rủi ro:** {_cell(risk_level)}",
         "",
         "### Bằng chứng từ dữ liệu",
         "",
@@ -139,7 +161,7 @@ def build_department_report_markdown(
 
     lines.extend([
         "",
-        "## Kế hoạch cải tiến",
+        "## Đề xuất giải quyết",
         "",
         "| Ưu tiên | Hành động | Phụ trách | Thời hạn | Tiêu chí hoàn thành |",
         "| --- | --- | --- | --- | --- |",

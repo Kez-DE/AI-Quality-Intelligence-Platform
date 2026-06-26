@@ -98,3 +98,23 @@ def test_fallback_analysis_has_new_fields():
     assert analysis["feedback_summary"]
     assert analysis["detailed_analysis"]
     assert analysis["root_cause_summary"]
+
+
+def test_markdown_has_three_sections_and_title():
+    from agents.report_builder import build_department_report_markdown
+    analysis_result = {"status": "success", "analysis": {
+        "prominent_theme": "Sự cố hiệu năng App",
+        "feedback_summary": "Khách báo app treo khi đặt xe.",
+        "detailed_analysis": "Tần suất tăng ở khung giờ cao điểm.",
+        "root_cause_summary": "Nghi do tải máy chủ.",
+        "risk_level": "HIGH",
+        "action_items": [{"action": "Rà soát server", "priority": "P2", "deadline": "48h"}],
+        "evidence": ["App Issue: 12/20"],
+    }}
+    md = build_department_report_markdown("IT", _insights(), analysis_result)
+    assert md.startswith("# Báo cáo Vận hành - Phòng IT: Sự cố hiệu năng App")
+    assert "## Vấn đề ghi nhận" in md
+    assert "Khách báo app treo" in md
+    assert "## Phân tích & nguyên nhân" in md
+    assert "## Đề xuất giải quyết" in md
+    assert "Rà soát server" in md
