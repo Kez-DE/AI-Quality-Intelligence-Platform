@@ -76,3 +76,19 @@ def test_approved_report_is_not_overwritten():
 
     assert result == {"stored": False, "reason": "approved_report_locked", "id": "r1"}
     db.table.return_value.upsert.assert_not_called()
+
+
+def test_analyst_analysis_optional_new_fields():
+    from agents.schemas import AnalystAnalysis
+    # Thiếu các trường mới vẫn parse được (default rỗng)
+    a = AnalystAnalysis(root_cause_summary="x", risk_level="LOW")
+    assert a.prominent_theme is None
+    assert a.feedback_summary == ""
+    assert a.detailed_analysis == ""
+    # Có trường mới thì giữ nguyên
+    b = AnalystAnalysis(
+        root_cause_summary="x", risk_level="LOW",
+        prominent_theme="Sự cố hiệu năng App", feedback_summary="App treo",
+        detailed_analysis="Phân tích chi tiết",
+    )
+    assert b.prominent_theme == "Sự cố hiệu năng App"
