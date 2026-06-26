@@ -773,6 +773,22 @@ def submit_completion_report(
     return {"status": "success", "data": report}
 
 
+def _attach_task_titles(rows: list[dict], titles: dict) -> list[dict]:
+    """Gắn task_title vào mỗi báo cáo dựa trên map {task_id: title}."""
+    for r in rows:
+        r["task_title"] = titles.get(r.get("task_id")) or None
+    return rows
+
+
+def _load_task_titles(db, rows: list[dict]) -> dict:
+    """Nạp map {task_id: title} cho danh sách báo cáo (batch theo task_id)."""
+    task_ids = list({r.get("task_id") for r in rows if r.get("task_id")})
+    if not task_ids:
+        return {}
+    trows = db.table("tasks").select("id,title").in_("id", task_ids).execute().data or []
+    return {t["id"]: t.get("title") for t in trows}
+
+
 @app.get("/api/tasks/{task_id}/completion-reports")
 def list_task_completion_reports(task_id: str, user: AuthUser = Depends(require_ops_staff)):
     """Danh sách báo cáo hoàn thành của một task (scope theo phòng)."""
@@ -786,6 +802,7 @@ def list_task_completion_reports(task_id: str, user: AuthUser = Depends(require_
         data = db.table("task_completion_reports") \
             .select("*").eq("task_id", task_id) \
             .order("created_at", desc=True).execute().data or []
+        data = _attach_task_titles(data, _load_task_titles(db, data))
     except HTTPException:
         raise
     except Exception as exc:
@@ -829,6 +846,7 @@ def list_completion_reports(
         if status:
             q = q.eq("status", status)
         data = q.order("created_at", desc=True).limit(limit).execute().data or []
+        data = _attach_task_titles(data, _load_task_titles(db, data))
     except HTTPException:
         raise
     except Exception as exc:
