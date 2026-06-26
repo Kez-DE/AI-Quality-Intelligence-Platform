@@ -369,6 +369,11 @@ function ReportsPage() {
             const hasCritical = content.includes("**CRITICAL**");
             const hasWarning = content.includes("**WARNING**") || content.includes("**HIGH**");
 
+            const firstLine = content.split("\n")[0] || "";
+            const reportTitle = firstLine.startsWith("# ")
+              ? firstLine.substring(2)
+              : `Báo cáo Vận hành - Phòng ${team}`;
+
             return (
               <div
                 key={report.id}
@@ -387,13 +392,13 @@ function ReportsPage() {
                       <h3
                         className={`font-bold ${hasCritical ? "text-red-900" : hasWarning ? "text-amber-900" : "text-xanh-deep"}`}
                       >
-                        Báo cáo Vận hành - Phòng {team}
+                        {reportTitle}
                       </h3>
                       <p
                         className={`text-xs flex items-center gap-1 mt-0.5 ${hasCritical ? "text-red-700" : hasWarning ? "text-amber-700" : "text-muted-foreground"}`}
                       >
                         <Calendar className="h-3 w-3" />{" "}
-                        {new Date(report.report_date).toLocaleDateString("vi-VN")}
+                        {new Date(report.created_at).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}
                       </p>
                     </div>
                   </div>
