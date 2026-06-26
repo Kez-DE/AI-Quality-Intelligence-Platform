@@ -55,6 +55,10 @@ class CompletionReportReq(BaseModel):
     completion_level: str = "completed"  # completed | partial | blocked
 
 
+class SupportResolveReq(BaseModel):
+    reply: str = Field(..., min_length=1, max_length=5000)
+
+
 class ReviewReportReq(BaseModel):
     status: str  # approved | rejected
     review_note: Optional[str] = Field(default=None, max_length=2000)
@@ -411,6 +415,39 @@ def update_task_status(task_id: str, payload: StatusUpdateReq, user: AuthUser = 
         raise
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot update task: {str(exc)[:300]}") from exc
+    return {"status": "success", "data": data[0]}
+
+@app.post("/api/tasks/{task_id}/support-resolve")
+def support_resolve(task_id: str, payload: SupportResolveReq, user: AuthUser = Depends(require_ops_staff)):
+    """Bàn CSKH đóng ticket khách trực tiếp (staff/manager/admin trong phòng).
+
+    Tách khỏi vòng duyệt nội bộ update_task_status: đây là quy trình khách-hàng-đối-mặt,
+    nhân viên CSKH được đóng ticket khách trực tiếp, không qua bước manager duyệt.
+    """
+    try:
+        db = get_supabase()
+        rows = db.table("tasks").select("assigned_team,status").eq("id", task_id).limit(1).execute().data or []
+        if not rows:
+            raise HTTPException(status_code=404, detail="Task not found")
+        task_team = rows[0].get("assigned_team")
+        cur_status = rows[0].get("status")
+        if not can_view_team(user, task_team):
+            raise HTTPException(status_code=403, detail="Bạn không thể đóng ticket của phòng ban khác.")
+        if cur_status == "resolved":
+            raise HTTPException(status_code=409, detail="Ticket đã được đóng.")
+        if cur_status not in {"open", "assigned", "in_progress", "pending_review"}:
+            raise HTTPException(status_code=400, detail=f"Không thể đóng ticket ở trạng thái {cur_status}.")
+        data = db.table("tasks").update({"status": "resolved", "updated_at": "now()"}).eq("id", task_id).execute().data or []
+        if not data:
+            raise HTTPException(status_code=404, detail="Task not found")
+        _log_task_event(
+            db, task_id=task_id, actor=user, team=task_team, action="support_resolved",
+            from_status=cur_status, to_status="resolved", note=payload.reply[:500],
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Cannot resolve ticket: {str(exc)[:300]}") from exc
     return {"status": "success", "data": data[0]}
 
 @app.patch("/api/tasks/{task_id}/assign")
