@@ -1219,9 +1219,14 @@ def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
     _append_safe_client_history(normalized, payload.messages)
     # Log theo phòng: ops -> phòng của mình; admin -> "admin" (toàn hệ thống).
     log_team = scope_team or ("admin" if user.role == "admin" else "unassigned")
+    # Phân tầng tool theo vai trò: staff (SOP + task phòng mình) < manager (+ báo cáo/phân tích) < admin (full).
+    # scope_team vẫn ép mọi tool về đúng phòng (chống rò rỉ chéo phòng).
+    from agent.chat_tools import tools_for_role
     _t0 = time.time()
     try:
-        result = run_chat_agent(normalized, temperature=0.4, scope_team=scope_team)
+        result = run_chat_agent(
+            normalized, temperature=0.4, scope_team=scope_team, tools_override=tools_for_role(user.role)
+        )
     except Exception as exc:
         _log_chat_event(log_team, "error", int((time.time() - _t0) * 1000), error=str(exc)[:200])
         raise HTTPException(status_code=502, detail=f"Agent model error: {str(exc)[:300]}") from exc

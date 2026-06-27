@@ -360,3 +360,31 @@ def execute_guest_tool(name: str, args: dict, user_id: str | None = None) -> str
             user_id=user_id,
         )
     return f"Error: Guest tool '{name}' not found"
+
+
+# ── Phân tầng tool theo VAI TRÒ (role) ────────────────────────────────────────
+# Lưu ý: scope_team (phòng ban) đã được ép riêng trong execute_tool, nên các tool
+# dưới đây luôn bị giới hạn về đúng phòng của ops (admin = toàn hệ thống). Phần này
+# giới hạn THÊM theo vai trò — quyết định mỗi role được "nhìn thấy" những tool nào.
+#   • staff   : chỉ tra cứu SOP/quy trình (cách làm) + task ưu tiên của phòng mình
+#               (hướng giải quyết) — không xem tổng hợp/phân tích cấp điều hành.
+#   • manager : thêm tổng hợp feedback, khu vực nóng, ticket sắp vi phạm SLA (báo cáo),
+#               vẫn bị scope_team giới hạn trong phòng mình — không "full" như admin.
+#   • admin   : toàn bộ tool, toàn hệ thống.
+_TOOL_BY_NAME = {t["function"]["name"]: t for t in TOOLS_DEFINITIONS}
+_STAFF_TOOL_NAMES = ["search_knowledge_base", "get_team_priority_tasks"]
+_MANAGER_TOOL_NAMES = _STAFF_TOOL_NAMES + [
+    "get_feedback_summary",
+    "get_hot_areas",
+    "get_sla_tickets",
+]
+
+
+def tools_for_role(role: str | None) -> list:
+    """Bộ tool OPS theo vai trò. scope_team (phòng ban) vẫn ép riêng ở execute_tool."""
+    if role == "staff":
+        return [_TOOL_BY_NAME[n] for n in _STAFF_TOOL_NAMES if n in _TOOL_BY_NAME]
+    if role == "manager":
+        return [_TOOL_BY_NAME[n] for n in _MANAGER_TOOL_NAMES if n in _TOOL_BY_NAME]
+    # admin (hoặc mặc định): toàn bộ tool.
+    return TOOLS_DEFINITIONS
