@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sys
 
 # Ensure pipeline dir is in sys.path for clean.py
@@ -10,6 +11,17 @@ if PIPELINE_DIR not in sys.path:
 from clean import mask_pii
 from .model_router import chat_completion, ChatMessage
 from .chat_tools import TOOLS_DEFINITIONS, execute_tool
+
+
+def _fill_contact_placeholders(text: str) -> str:
+    """Lưới an toàn: nếu model tự che kênh liên hệ công khai bằng ký hiệu thay thế
+    ([EMAIL], [SĐT], [PHONE], [HOTLINE]...), thay lại bằng giá trị công khai thật."""
+    if not text:
+        return text
+    text = re.sub(r"\[\s*e-?mail\s*\]", "support.vn@greensm.com", text, flags=re.IGNORECASE)
+    text = re.sub(r"\[\s*(?:sđt|sdt|phone|hotline|số điện thoại)\s*\]", "1555", text, flags=re.IGNORECASE)
+    return text
+
 
 def run_chat_agent(
     messages: list[ChatMessage],
@@ -73,9 +85,9 @@ def run_chat_agent(
             # LLM không gọi tool nào, trả về kết quả ngay (trả lời text)
             # Lọc PII từ kết quả trả về trước khi đưa ra ngoài
             if result.get("content"):
-                result["content"] = mask_pii(result["content"])
+                result["content"] = _fill_contact_placeholders(mask_pii(result["content"]))
             if "message" in result and result["message"].get("content"):
-                result["message"]["content"] = mask_pii(result["message"]["content"])
+                result["message"]["content"] = _fill_contact_placeholders(mask_pii(result["message"]["content"]))
             if collected_sources:
                 result["sources"] = collected_sources
             return result
