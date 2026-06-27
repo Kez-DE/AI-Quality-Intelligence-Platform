@@ -2,6 +2,7 @@
 // Chỉ số công khai hiển thị tĩnh (đại diện); form gửi phản hồi gọi API thật /api/feedback/submit.
 import { useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { AREAS, regionLabel } from "@/lib/regions";
 import { toast } from "sonner";
 import {
   Activity, BarChart3, Bot, CheckCircle2, ChevronRight, Clock, Compass, Cpu,
@@ -139,7 +140,7 @@ export default function GuestDashboard() {
   const [rating, setRating] = useState(5);
   const [text, setText] = useState("");
   const [channel, setChannel] = useState("Ứng dụng");
-  const [region, setRegion] = useState("Hà Nội");
+  const [region, setRegion] = useState(AREAS[0].code);
   const [submitting, setSubmitting] = useState(false);
   const pieData = useMemo(() => topicData.map((t) => ({ name: t.topic, value: t.value, color: t.color })), []);
 
@@ -257,7 +258,7 @@ export default function GuestDashboard() {
                 <Select value={region} onValueChange={setRegion}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {["Hà Nội", "TP. HCM", "Đà Nẵng", "Hải Phòng", "Cần Thơ"].map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    {AREAS.map((a) => <SelectItem key={a.code} value={a.code}>{a.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -303,7 +304,7 @@ export default function GuestDashboard() {
                   <div className="flex flex-wrap items-center gap-2 text-[11px]">
                     <Badge variant="outline" className={`gap-1 ${s.cls}`}><s.icon className="h-3 w-3" />{s.label}</Badge>
                     <Badge variant="secondary" className="gap-1"><Tag className="h-3 w-3" />{r.topic}</Badge>
-                    <Badge variant="secondary" className="gap-1"><MapPin className="h-3 w-3" />{r.region}</Badge>
+                    <Badge variant="secondary" className="gap-1"><MapPin className="h-3 w-3" />{regionLabel(r.region)}</Badge>
                   </div>
                 </div>
               );
