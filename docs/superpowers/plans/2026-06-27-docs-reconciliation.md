@@ -17,7 +17,15 @@ Các giá trị dưới đây là **canonical facts** đã xác minh từ code (
 - **RAG**: hybrid — Cohere `embed-multilingual-v3.0` + pgvector + BM25-lite keyword, hợp nhất bằng Reciprocal Rank Fusion (RRF, hằng số k=60) tại `pipeline/agent/rag_engine.py`. KHÔNG mô tả "chỉ keyword".
 - **Worker topology**: 4 worker chuyên trách `worker_ticket.py`, `worker_ingest.py`, `worker_ml.py`, `worker_agent.py` (+ `worker.py` base/dispatcher); API `main.py` chỉ giữ scheduler on-demand, job định kỳ chạy trong worker.
 - **RBAC**: 4 vai trò `admin`, `manager` (quản lý), `staff` (nhân viên), `guest` (khách).
-- **Ghi chú thay đổi**: mỗi file doc được sửa phải có dòng/khối: `> **Cập nhật 2026-06-27** — <tóm tắt cái đã sửa>` đặt ngay dưới tiêu đề H1.
+- **Ghi chú thay đổi**: mỗi file doc được sửa phải có dòng/khối: `> **Cập nhật 2026-06-27:** <tóm tắt cái đã sửa>` đặt ngay dưới tiêu đề H1.
+- **Văn phong (humanizer)** — áp cho mọi prose viết/sửa trong các task này:
+  - KHÔNG dùng gạch ngang dài `—` hay `–`. Thay bằng dấu chấm, phẩy, hai chấm, hoặc ngoặc đơn. Trước khi commit, quét file để chắc không còn `—`/`–`.
+  - KHÔNG ngôn ngữ quảng cáo/thổi phồng ("vibrant", "testament", "pivotal", "groundbreaking", "đóng vai trò then chốt", "minh chứng cho"). Giữ giọng trung tính, chính xác.
+  - KHÔNG câu "-ing"/"việc... nhằm..." độn để giả chiều sâu; KHÔNG ép rule-of-three; KHÔNG header phân mảnh (heading rồi 1 câu lặp lại heading).
+  - Dùng "là/có/dùng" trực tiếp thay vì "đóng vai trò là/sở hữu/cung cấp".
+  - KHÔNG bôi đậm máy móc từng cụm; chỉ in đậm khi thật cần.
+  - Đây là tài liệu tham chiếu kỹ thuật: KHÔNG chèn ngôi thứ nhất, cảm xúc, hay quan điểm cá nhân. Trung tính, plain là đúng.
+  - Tránh diff-anchored ("trước đây dùng X, nay đổi"). Mô tả hệ thống ở trạng thái hiện tại. Ngoại lệ duy nhất: dòng "Cập nhật 2026-06-27" (ghi chú version-scoped, được phép).
 - **Phạm vi**: chỉ sửa tài liệu; KHÔNG sửa code nguồn, schema, migration, contract. KHÔNG đụng `docs/harness/*` và `docs/superpowers/*` (trừ plan/spec này).
 - **Nhánh**: tất cả commit trên nhánh `docs/reconcile-project-docs` (đã tạo).
 
@@ -63,7 +71,7 @@ Expected: build thành công (hoặc ghi lỗi thật). Nếu không có `bun`, 
 Thêm dưới tiêu đề H1 của `docs/project/eval-evidence.md`:
 
 ```markdown
-> **Cập nhật 2026-06-27** — Bổ sung bằng chứng e2e thật (pytest, eval router/model, health, pipeline smoke, frontend build).
+> **Cập nhật 2026-06-27:** Bổ sung bằng chứng e2e thật (pytest, eval router/model, health, pipeline smoke, frontend build).
 
 ## Bằng chứng e2e — 2026-06-27
 
@@ -119,7 +127,7 @@ Sửa từng dòng stale tìm được: phòng ban → 6 phòng (Global Constrai
 
 - [ ] **Step 4: Thêm ghi chú "Cập nhật 2026-06-27" vào mỗi file đã sửa**
 
-Đặt ngay dưới H1 mỗi file: `> **Cập nhật 2026-06-27** — đồng bộ 6 phòng ban, RAG hybrid, roster agent, cấu trúc pipeline với code.`
+Đặt ngay dưới H1 mỗi file: `> **Cập nhật 2026-06-27:** đồng bộ 6 phòng ban, RAG hybrid, roster agent, cấu trúc pipeline với code.`
 
 - [ ] **Step 5: Xác minh grep sạch**
 
@@ -156,7 +164,7 @@ Với mỗi luồng được hai doc mô tả (đặc biệt: scoring 5 chiều,
 
 - [ ] **Step 3: Sửa theo ground truth + thêm ghi chú**
 
-Sửa các dòng stale; thêm dưới H1 mỗi file: `> **Cập nhật 2026-06-27** — đồng bộ 6 phòng ban, RAG hybrid, roster agent với code hoàn thiện.`
+Sửa các dòng stale; thêm dưới H1 mỗi file: `> **Cập nhật 2026-06-27:** đồng bộ 6 phòng ban, RAG hybrid, roster agent với code hoàn thiện.`
 
 - [ ] **Step 4: Xác minh grep sạch**
 
@@ -194,7 +202,7 @@ Expected: liệt kê dòng cần sửa.
 
 - [ ] **Step 3: Sửa theo ground truth + ghi chú**
 
-Đảm bảo: liệt kê đúng 8 agent nghiệp vụ + Orchestrator + report_builder; mô tả RAG hybrid (Cohere+BM25+RRF); model router phân tầng. Thêm dưới H1: `> **Cập nhật 2026-06-27** — đồng bộ roster agent & RAG hybrid với code.`
+Đảm bảo: liệt kê đúng 8 agent nghiệp vụ + Orchestrator + report_builder; mô tả RAG hybrid (Cohere+BM25+RRF); model router phân tầng. Thêm dưới H1: `> **Cập nhật 2026-06-27:** đồng bộ roster agent & RAG hybrid với code.`
 
 - [ ] **Step 4: Xác minh**
 
@@ -230,7 +238,7 @@ Expected: danh sách bảng/cột thật (gồm các bảng task/report/correcti
 
 - [ ] **Step 3: Sửa data-model theo schema thật + ghi chú**
 
-Cập nhật bảng/cột/enum (đặc biệt enum phòng ban 6 giá trị, bảng task-completion-loop & report-approval & correction-log). Thêm dưới H1: `> **Cập nhật 2026-06-27** — đồng bộ với migrations Supabase (6 phòng, task/report/correction).`
+Cập nhật bảng/cột/enum (đặc biệt enum phòng ban 6 giá trị, bảng task-completion-loop & report-approval & correction-log). Thêm dưới H1: `> **Cập nhật 2026-06-27:** đồng bộ với migrations Supabase (6 phòng, task/report/correction).`
 
 - [ ] **Step 4: Xác minh enum phòng ban & bảng mới**
 
@@ -267,7 +275,7 @@ Expected: liệt kê dòng stale phòng ban.
 
 - [ ] **Step 3: Sửa + ghi chú**
 
-Cập nhật danh sách 6 phòng ban & phân tầng chat. Thêm dưới H1 mỗi file: `> **Cập nhật 2026-06-27** — đồng bộ 6 phòng ban & phân tầng quyền chat.`
+Cập nhật danh sách 6 phòng ban & phân tầng chat. Thêm dưới H1 mỗi file: `> **Cập nhật 2026-06-27:** đồng bộ 6 phòng ban & phân tầng quyền chat.`
 
 - [ ] **Step 4: Xác minh**
 
@@ -306,7 +314,7 @@ Expected: danh sách key thật (gồm COHERE_API_KEY, OPENROUTER_*, LIVE_STREAM
 
 - [ ] **Step 3: Sửa + ghi chú**
 
-Cập nhật env-var/lệnh; thêm key thiếu (đặc biệt COHERE_API_KEY cho RAG). Thêm dưới H1 mỗi file: `> **Cập nhật 2026-06-27** — đồng bộ env-var (.env.example) & luồng deploy.`
+Cập nhật env-var/lệnh; thêm key thiếu (đặc biệt COHERE_API_KEY cho RAG). Thêm dưới H1 mỗi file: `> **Cập nhật 2026-06-27:** đồng bộ env-var (.env.example) & luồng deploy.`
 
 - [ ] **Step 4: Xác minh không thiếu key RAG/Cohere**
 
@@ -344,7 +352,7 @@ So với bảng "Tính năng" trong `README.md` (11 tính năng). Chuyển các 
 
 - [ ] **Step 3: Sửa + ghi chú**
 
-Thêm dưới H1 mỗi file: `> **Cập nhật 2026-06-27** — phản ánh trạng thái hoàn thành (task loop, HI-loop, hybrid RAG, 6 phòng).`
+Thêm dưới H1 mỗi file: `> **Cập nhật 2026-06-27:** phản ánh trạng thái hoàn thành (task loop, HI-loop, hybrid RAG, 6 phòng).`
 
 - [ ] **Step 4: Xác minh**
 
@@ -378,11 +386,11 @@ Expected: nếu có dòng nào → sửa cho khớp Global Constraints; nếu s�
 
 - [ ] **Step 2: Sửa app/flow.md (optional)**
 
-Đọc `app/flow.md`. Thay khối cấu trúc `pipeline/ingest|clean|ml|analytics|agent/` (sai) bằng cấu trúc thật: file phẳng (`ingest.py`, `clean.py`, `classifier.py`, `rules.py`, `spike_detector.py`, `llm_agent.py`, `main.py`, `worker_*.py`) + thư mục `agent/` (chat+RAG) + `agents/` (orchestrator + 8 agent + report_builder). Thêm ghi chú `> **Cập nhật 2026-06-27** — sửa cấu trúc pipeline cho khớp code.` Nếu quyết định bỏ qua, ghi 1 dòng lý do trong commit message thay vì sửa.
+Đọc `app/flow.md`. Thay khối cấu trúc `pipeline/ingest|clean|ml|analytics|agent/` (sai) bằng cấu trúc thật: file phẳng (`ingest.py`, `clean.py`, `classifier.py`, `rules.py`, `spike_detector.py`, `llm_agent.py`, `main.py`, `worker_*.py`) + thư mục `agent/` (chat+RAG) + `agents/` (orchestrator + 8 agent + report_builder). Thêm ghi chú `> **Cập nhật 2026-06-27:** sửa cấu trúc pipeline cho khớp code.` Nếu quyết định bỏ qua, ghi 1 dòng lý do trong commit message thay vì sửa.
 
 - [ ] **Step 3: Tạo/cập nhật chỉ mục docs/project/README.md**
 
-Viết/cập nhật chỉ mục liệt kê & mô tả 1 dòng cho mỗi doc trong `docs/project`, nhóm theo: Kiến trúc & Luồng / Cơ chế & AI / Dữ liệu & RBAC / Setup & Deploy / Product. Thêm dưới H1: `> **Cập nhật 2026-06-27** — chỉ mục điều hướng sau đối soát toàn bộ docs/project.`
+Viết/cập nhật chỉ mục liệt kê & mô tả 1 dòng cho mỗi doc trong `docs/project`, nhóm theo: Kiến trúc & Luồng / Cơ chế & AI / Dữ liệu & RBAC / Setup & Deploy / Product. Thêm dưới H1: `> **Cập nhật 2026-06-27:** chỉ mục điều hướng sau đối soát toàn bộ docs/project.`
 
 - [ ] **Step 4: Xác minh toàn cục — không còn stale chéo**
 
