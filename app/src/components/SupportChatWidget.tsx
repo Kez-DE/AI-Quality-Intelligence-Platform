@@ -44,7 +44,7 @@ function suggestionsFor(me?: { role?: string | null; department?: string | null 
 
 const greeting = (): Msg => ({
   role: "assistant",
-  content: `Xin chào 👋 Mình là **trợ lý đồng hành** của xanhSM. Mình hỗ trợ thông tin khách hàng và hướng dẫn xử lý công việc theo quyền của bạn. Hotline ${HOTLINE} · ${EMAIL_CSKH}.`,
+  content: "Xin chào 👋 Mình là **trợ lý đồng hành** của xanhSM. Bạn cần hỗ trợ gì?",
 });
 
 // Tư vấn rule-based (chưa đăng nhập). Markdown-friendly. Chỉ thông tin khách hàng + liên hệ công khai.
@@ -87,6 +87,44 @@ function cannedReply(q: string): string {
 
 const MD_CLS =
   "text-sm leading-relaxed break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:my-1.5 [&_ul]:my-1.5 [&_ol]:my-1.5 [&_li]:my-0.5 [&_h2]:mt-2 [&_h2]:mb-1 [&_h2]:border-0 [&_h2]:pb-0 [&_h2]:text-sm [&_h3]:mt-2 [&_h3]:text-sm [&_table]:my-2";
+
+// Biến trích dẫn nội tuyến [Nguồn 1] hoặc [1] trong câu trả lời thành link 'src:N' để bấm mở tài liệu.
+function linkifyCitations(text: string, sources?: Source[]): string {
+  if (!sources || sources.length === 0) return text;
+  const valid = new Set(sources.map((s) => String(s.index)));
+  return text
+    .replace(/\[\s*Nguồn\s*(\d+)\s*\]/gi, (m, n) => (valid.has(n) ? `[Nguồn ${n}](src:${n})` : m))
+    .replace(/\[(\d+)\](?!\()/g, (m, n) => (valid.has(n) ? `[${n}](src:${n})` : m));
+}
+
+// Renderer thẻ <a>: href 'src:N' → nút bấm mở tài liệu nguồn; còn lại là link thường.
+function makeCitationComponents(sources: Source[] | undefined, onOpen: (s: Source) => void) {
+  return {
+    a: (props: any) => {
+      const href: unknown = props?.href;
+      const match = typeof href === "string" ? href.match(/^src:(\d+)$/) : null;
+      if (match && sources) {
+        const src = sources.find((s) => s.index === Number(match[1]));
+        if (src) {
+          return (
+            <button
+              type="button"
+              onClick={() => onOpen(src)}
+              className="mx-0.5 inline-flex items-center rounded border border-primary/40 bg-primary/10 px-1 align-baseline text-[11px] font-semibold text-primary transition-colors hover:bg-primary/20"
+            >
+              {props.children}
+            </button>
+          );
+        }
+      }
+      return (
+        <a href={typeof href === "string" ? href : undefined} target="_blank" rel="noreferrer" className="text-primary underline">
+          {props.children}
+        </a>
+      );
+    },
+  };
+}
 
 export default function SupportChatWidget() {
   const [open, setOpen] = useState(false);
@@ -191,7 +229,12 @@ export default function SupportChatWidget() {
                       m.content
                     ) : (
                       <>
-                        <MarkdownContent className={MD_CLS}>{m.content}</MarkdownContent>
+                        <MarkdownContent
+                          className={MD_CLS}
+                          components={makeCitationComponents(m.sources, setActiveSource) as any}
+                        >
+                          {linkifyCitations(m.content, m.sources)}
+                        </MarkdownContent>
                         {m.sources && m.sources.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1.5 border-t border-border/60 pt-2">
                             {m.sources.map((src) => (
