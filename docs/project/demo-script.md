@@ -1,6 +1,8 @@
 # Kịch bản demo — 5–7 phút
 
-Mục tiêu: cho hội đồng thấy luồng khép kín từ review thô → phân loại → spike → alert định tuyến phòng ban, có cả vòng người duyệt/sửa nhãn (Human-in-the-Loop).
+> **Cập nhật 2026-06-27:** phản ánh trạng thái hoàn thành (task loop, HI-loop, hybrid RAG, 6 phòng).
+
+Mục tiêu: cho hội đồng thấy luồng từ review thô qua phân loại, spike, alert định tuyến 6 phòng ban, vòng duyệt nhãn (Human-in-the-Loop), vòng khép kín báo cáo → task (HI-Loop Approval), và AI Chat tiered RBAC.
 
 ## Chuẩn bị trước (không tính giờ)
 
@@ -24,7 +26,7 @@ curl -X POST "http://localhost:8000/api/live-stream/start?batch_size=50&interval
 
 Dashboard và danh sách phản hồi đổ dữ liệu liên tục theo thời gian thực (realtime, không reload).
 
-**Phút 3–4 — Spike → Alert → Ticket.** Khi vùng nào dồn P4/P5 vượt ngưỡng → spike detector bắt → LLM thật phân tích → sinh alert. Mở tab Alerts, click một alert đỏ: đọc root cause + action + phòng ban được giao (Safety/Vận hành/IT). Ticket tự chuyển trạng thái open→in_progress→resolved.
+**Phút 3-4 (Spike → Alert → Ticket).** Khi vùng nào dồn P4/P5 vượt ngưỡng → spike detector bắt → LLM thật phân tích → sinh alert. Mở tab Alerts, click một alert đỏ: đọc root cause + action + phòng ban được giao (Vận hành/IT/CSKH tùy topic). Ticket tự chuyển trạng thái open→in_progress→resolved.
 
 **Phút 4–5 — Review Queue + Safety.** Trên trang Phản hồi, chỉ vào 2 section: **Cần duyệt** (P5/safety/confidence thấp) và **Luồng phản hồi**. Review "tai nạn/say xỉn" tự vào Review Queue với badge lý do. Nhấn mạnh: rule Safety ép P5 dù model nghĩ khác — an toàn không nhường xác suất.
 
@@ -33,10 +35,14 @@ Dashboard và danh sách phản hồi đổ dữ liệu liên tục theo thời 
 **Phút 6–7 — Multi-agent (tuỳ chọn).** Mở insight theo phòng ban:
 
 ```bash
-curl "http://localhost:8000/api/insights/departments/Safety?with_analysis=true" -H "Authorization: Bearer <admin_token>"
+curl "http://localhost:8000/api/insights/departments/IT?with_analysis=true" -H "Authorization: Bearer <admin_token>"
 ```
 
 Mỗi phòng ban có một "trợ lý AI" tổng hợp vấn đề cốt lõi + đề xuất hành động.
+
+**Phút 7-8 (tùy chọn): Báo cáo AI → Task (HI-Loop Approval).** Vào trang Báo cáo AI. Chọn một báo cáo có đề xuất hành động. Nhấn "Sửa Draft Task" để biên tập nội dung task (phạm vi, ưu tiên). Nhấn "Duyệt và triển khai task". Chuyển sang Task Board: task mới xuất hiện với badge "Từ báo cáo" và liên kết ngược về báo cáo gốc. Nhấn mạnh: luồng khép kín từ phản hồi → phân tích → hành động được phê duyệt.
+
+**Phút 8-9 (tùy chọn): AI Chat tiered RBAC.** Mở trang AI Chat dưới tài khoản admin/manager. Hỏi "khu vực nào đang nóng?" hoặc "tuần này Vận hành có vấn đề gì?". Chat truy vấn Knowledge Base nội bộ qua Hybrid Search (Cohere embed-multilingual-v3.0 + BM25-lite + RRF k=60). Sau đó thử đăng nhập tài khoản guest và hỏi cùng câu hỏi: guest chỉ nhận FAQ công khai, không thấy dữ liệu nội bộ. Nhấn mạnh: cùng giao diện chat, phân quyền tự động theo role.
 
 ## Câu hỏi hay gặp
 

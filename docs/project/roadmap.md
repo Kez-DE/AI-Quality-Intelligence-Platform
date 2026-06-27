@@ -1,6 +1,8 @@
 # Lộ trình mở rộng
 
-> Lộ trình mở rộng. Mục **"Mở rộng danh sách phòng ban (4 lên 6)"** đã **triển khai (2026-06-27)**:
+> **Cập nhật 2026-06-27:** phản ánh trạng thái hoàn thành (task loop, HI-loop, hybrid RAG, 6 phòng).
+
+> Mục **"Mở rộng danh sách phòng ban (4 lên 6)"** đã **triển khai (2026-06-27)**:
 > hệ thống hiện chạy **6 phòng ban** — IT, CSKH, Vận hành, Tài chính & Thanh toán, Sản phẩm,
 > Quản lý Rủi ro & Gian lận. Các mục còn lại (Global Report chéo phòng và Các hướng khác) vẫn là
 > định hướng tương lai, **chưa triển khai**. Nội dung được tách ra từ kế hoạch HI-Loop gốc của team.
@@ -60,4 +62,4 @@ cáo đã có, để triển khai đồng bộ.
 - Đẩy thông báo tới Slack, email, hoặc app tài xế thay vì chỉ hiển thị trên dashboard.
 - Container hoá đầy đủ, CI/CD, monitoring cho môi trường production thật.
 - Thay router heuristic bằng LLM khi cần độ chính xác định tuyến cao hơn.
-</content>
+
