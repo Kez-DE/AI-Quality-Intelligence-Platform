@@ -46,8 +46,9 @@ export const Route = createFileRoute("/_authenticated")({
       throw redirect({ to: "/dashboard" });
     }
 
-    // Báo cáo hoàn thành: chỉ quản lý/admin (staff gửi báo cáo ở Task Manager).
-    if (role === "staff" && location.pathname.startsWith("/completion-reports")) {
+    // Phân tích & báo cáo là việc của quản lý/admin. Nhân viên tập trung xử lý phản hồi + task.
+    const managerOnlyForStaff = ["/insights", "/reports", "/completion-reports"];
+    if (role === "staff" && managerOnlyForStaff.some((p) => location.pathname.startsWith(p))) {
       throw redirect({ to: "/dashboard" });
     }
 

@@ -65,7 +65,7 @@ const NAV: NavItem[] = [
   { to: "/support", label: "Hỗ trợ CSKH", icon: Headphones, roles: AUTHENTICATED_ROLES, group: "operations" },
 
   // 3. Phân tích & Báo cáo — đầu ra của luồng.
-  { to: "/insights", label: "Phân tích phòng ban", icon: Building2, roles: AUTHENTICATED_ROLES, group: "analytics" },
+  { to: "/insights", label: "Phân tích phòng ban", icon: Building2, roles: ["admin", "manager"], group: "analytics" },
   { to: "/reports", label: "Báo cáo AI", icon: FileText, roles: ["admin", "manager"], group: "analytics" },
   { to: "/completion-reports", label: "Báo cáo hoàn thành", icon: ClipboardCheck, roles: ["admin", "manager"], group: "analytics" },
 
