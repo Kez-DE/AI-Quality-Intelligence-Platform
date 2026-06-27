@@ -1,5 +1,7 @@
 # Cơ chế hoạt động hệ thống — AI Quality Intelligence Platform (xanhSM)
 
+> **Cập nhật 2026-06-27:** đồng bộ 6 phòng ban, RAG hybrid, roster agent với code hoàn thiện.
+
 Tài liệu này có hai mục đích trong một file:
 
 1. **Phần A — Cơ chế đúng**: mô tả hệ thống vận hành chuẩn từ lúc một review đi vào cho tới khi phòng ban xử lý xong và sinh báo cáo. Đủ chi tiết để dựng lại đúng (luồng, bảng dữ liệu, quyền, phòng ban, cách chia việc top-down).
@@ -427,7 +429,7 @@ Step 6-7   for team in DEPARTMENTS:  # 6 phòng ban
              insight_agent.generate_department_insights(team)   [RULE]
              nếu có feedback và analyst bật:
                analyst_agent.analyze_root_cause(team, insights) [LLM]
-               upsert vào department_reports (content + root_cause_summary + suggested_tasks)
+               insert vào department_reports (content + root_cause_summary + suggested_tasks)
 ```
 
 Cờ bật/tắt (mặc định True): `AGENT_ALERT_ENABLED`, `AGENT_TASK_ENABLED`, `AGENT_INSIGHT_ENABLED`, `AGENT_ANALYST_ENABLED`. Cấp worker: `WORKER_AGENT_ENABLED`, `WORKER_AGENT_INTERVAL_SECONDS` (300), `WORKER_AGENT_HOURS` (24).
@@ -498,7 +500,7 @@ Làm P0 trước tiên và trọn vẹn (đây là điều kiện để chạm d
 | `feedback` | ingestion_agent, ingest.py | orchestrator, insight_agent, scoring_agent | review đã phân loại |
 | `alerts` | ticket_agent | alert_agent (dedup), task_agent | ticket sự cố, có routing fields |
 | `tasks` | task_agent, RPC approve_report_and_dispatch | task_agent, API tasks | đầu việc; `source` = agent (gom theo team/area) hoặc report (từ duyệt báo cáo), `report_id` trỏ về báo cáo gốc |
-| `department_reports` | orchestrator (upsert), API draft-tasks/approve | API reports | báo cáo phân tích máy sinh; có `content`, `root_cause_summary`, `suggested_tasks` (JSONB), approval fields |
+| `department_reports` | orchestrator (insert), API draft-tasks/approve | API reports | báo cáo phân tích máy sinh; có `content`, `root_cause_summary`, `suggested_tasks` (JSONB), approval fields |
 | `task_completion_reports` | API (staff gửi) | manager duyệt | báo cáo hoàn thành người gửi |
 | `correction_logs` | API label | retrain tương lai | audit + dữ liệu học khép vòng |
 | `audit_logs` | users_admin | admin | log đổi role và department |

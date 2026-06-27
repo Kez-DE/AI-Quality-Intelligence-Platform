@@ -1,5 +1,7 @@
 # Giải thích hệ thống: từ một review đến lúc phòng ban xử lý xong
 
+> **Cập nhật 2026-06-27:** đồng bộ 6 phòng ban, RAG hybrid, roster agent với code hoàn thiện.
+
 Tài liệu này mô tả toàn bộ cách hệ thống vận hành: một phản hồi của khách đi vào, được phân loại, định tuyến về phòng ban, rồi xử lý ra sao. Phần sau giải thích các loại tài khoản, các bộ máy chạy nền, các lớp AI, và đi qua từng màn hình của ứng dụng kèm các nút bấm chính.
 
 Hệ thống tên là AI Quality Intelligence Platform (Quality Operation Cockpit của xanhSM). Bài toán nó giải: mỗi ngày có hàng nghìn phản hồi khách hàng về dịch vụ gọi xe, con người không đọc xuể. Hệ thống đọc thay, gán nhãn, phát hiện cụm vấn đề bất thường, sinh cảnh báo và ticket theo SLA, rồi giao đúng phòng ban để xử lý trước khi sự cố lan rộng.
@@ -215,7 +217,7 @@ Mỗi phòng ban là một thẻ hiện phân bố mức độ, chủ đề nổ
 
 ### Báo cáo AI (Reports)
 
-Màn `/reports` chỉ dành cho manager và admin. Admin chọn phòng ban qua dropdown, manager xem phòng mình. Nút "Tạo báo cáo mới" gọi `POST /api/agent/generate-report` để Analyst Agent sinh báo cáo vận hành cho phòng đó. Nếu báo cáo hôm nay đã được duyệt thì không ghi đè được.
+Màn `/reports` chỉ dành cho manager và admin. Admin chọn phòng ban qua dropdown, manager xem phòng mình. Nút "Tạo báo cáo mới" gọi `POST /api/agent/generate-report` để Analyst Agent sinh báo cáo vận hành cho phòng đó. Mỗi lần tạo là một bản insert mới, không ghi đè bản cũ (không còn ràng buộc unique theo ngày).
 
 Mỗi báo cáo hiện dưới dạng thẻ, viền đổi màu theo mức độ (đỏ nếu có CRITICAL, vàng nếu có WARNING). Nội dung render từ Markdown. Nút copy để sao chép nội dung Markdown.
 
