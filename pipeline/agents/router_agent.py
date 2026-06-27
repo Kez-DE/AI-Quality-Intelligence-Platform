@@ -38,9 +38,10 @@ def route_ticket(
 
     Thứ tự ưu tiên:
       1. Severity override — P5 ép về Vận hành (đội phản ứng nhanh), thắng tất cả.
-      2. Sentiment override — feedback positive về Marketing, NHƯNG chỉ với các topic
-         được liệt kê trong override["topics"] (vd "Other"). Positive về app/tài xế/
-         thanh toán không khớp danh sách này nên rơi xuống topic match (đúng phòng chuyên môn).
+      2. Sentiment override — feedback positive về Sản phẩm để nâng cấp UX, NHƯNG chỉ với
+         các topic được liệt kê trong override["topics"] (vd "Other", "App Issue"). Positive
+         gắn chủ đề chuyên môn khác không khớp danh sách này nên rơi xuống topic match
+         (đúng phòng chuyên môn).
       3. Topic match — theo bảng routes.
       4. Default team.
     """
@@ -76,9 +77,9 @@ def route_ticket(
                 )
             return output.model_dump()
 
-    # 2. Sentiment override (positive -> Marketing), chỉ áp cho các topic trong override["topics"].
+    # 2. Sentiment override (positive -> Sản phẩm để nâng cấp UX), chỉ áp cho các topic trong override["topics"].
     #    BẮT BUỘC khai báo "topics" rõ ràng: override thiếu/rỗng "topics" bị bỏ qua,
-    #    để tránh tái sinh bug cũ (positive ép MỌI topic về Marketing).
+    #    để tránh tái sinh bug cũ (positive ép MỌI topic về một phòng).
     if sentiment:
         str_sentiment = str(sentiment).strip().lower()
         for override in routing_config.get("sentiment_overrides", []):
@@ -88,7 +89,7 @@ def route_ticket(
             if not allowed_topics or topic not in allowed_topics:
                 continue
             output = RouterOutput(
-                team=normalize_department(override.get("team"), "Marketing"),
+                team=normalize_department(override.get("team"), "Sản phẩm"),
                 sla_hours=override.get("sla_hours", 48),
                 routed_by=f"router_agent ({str_sentiment} Sentiment)",
                 is_override=True,
@@ -151,4 +152,4 @@ def route_ticket(
 if __name__ == "__main__":
     print(route_ticket("App Issue", 3))
     print(route_ticket("General Inquiry", 5))  # -> Vận hành override
-    print(route_ticket("Other", 2, sentiment="positive"))  # -> Marketing
+    print(route_ticket("Other", 2, sentiment="positive"))  # -> Sản phẩm
