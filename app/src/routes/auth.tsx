@@ -1,14 +1,34 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Car, Loader2, Mail, Lock, User, ArrowRight, CircleCheck, Eye, EyeOff } from "lucide-react";
+import {
+  Car,
+  Loader2,
+  Mail,
+  Lock,
+  User,
+  ArrowRight,
+  CircleCheck,
+  Eye,
+  EyeOff,
+  Sparkles,
+  Activity,
+  BarChart3,
+  ShieldCheck,
+  Clock,
+  CheckCircle2,
+} from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Đăng nhập · AI Quality Intelligence" },
-      { name: "description", content: "Đăng nhập vào Quality Operation Cockpit của xanhSM." },
+      { title: "Đăng nhập · xanhSM Cockpit" },
+      {
+        name: "description",
+        content:
+          "Đăng nhập vào AI Quality Intelligence Cockpit của xanhSM — phân loại phản hồi, theo dõi SLA và ra quyết định nhanh.",
+      },
     ],
   }),
   component: AuthPage,
@@ -64,157 +84,222 @@ function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2">
-      {/* Left brand panel */}
+    <main className="relative min-h-screen overflow-hidden">
+      {/* Ambient background */}
       <div
-        className="hidden lg:flex flex-col justify-between p-10 text-white relative overflow-hidden"
-        style={{ background: "var(--gradient-hero)" }}
-      >
-        <div className="flex items-center gap-2 relative z-10">
-          <div className="h-10 w-10 rounded-xl bg-white/15 grid place-items-center backdrop-blur">
-            <Car className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="font-display font-bold">xanhSM</div>
-            <div className="text-[11px] opacity-80 font-mono">Quality Operation Cockpit</div>
-          </div>
-        </div>
-        <div className="relative z-10">
-          <h1 className="font-display text-4xl font-bold leading-tight">
-            Biến hàng nghìn phản hồi mỗi ngày thành{" "}
-            <span className="opacity-90">hành động vận hành</span>.
-          </h1>
-          <p className="mt-4 opacity-90 max-w-md">
-            AI Quality Intelligence Platform — phát hiện sớm sự cố chất lượng dịch vụ smart mobility
-            trước khi chúng thành khủng hoảng.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-2">
-            {["Real-time", "Alert · SLA", "Human-in-the-loop", "AI Chat"].map((k) => (
-              <span
-                key={k}
-                className="text-xs font-mono px-2.5 py-1 rounded-md bg-white/15 border border-white/25"
-              >
-                {k}
-              </span>
-            ))}
-          </div>
-        </div>
-        <div className="text-[11px] font-mono opacity-70 relative z-10">
-          © xanhSM · Smart Mobility Feedback Analytics
-        </div>
-        {/* decorative blobs */}
-        <div className="absolute -bottom-20 -right-20 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute top-1/3 -left-20 h-60 w-60 rounded-full bg-xanh-cyan/30 blur-3xl" />
-      </div>
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10"
+        style={{ background: "var(--gradient-mesh)" }}
+      />
 
-      {/* Right form panel */}
-      <div className="flex items-center justify-center p-6 sm:p-10">
-        <div className="w-full max-w-md">
-          <div className="lg:hidden flex items-center gap-2 mb-6">
-            <div
-              className="h-9 w-9 rounded-xl grid place-items-center text-white"
-              style={{ background: "var(--gradient-green)" }}
-            >
+      <div className="mx-auto grid min-h-screen w-full max-w-7xl grid-cols-1 lg:grid-cols-[1.05fr_1fr]">
+        {/* LEFT — brand panel */}
+        <section
+          className="relative hidden flex-col justify-between overflow-hidden p-10 text-white lg:flex"
+          style={{ background: "var(--gradient-hero)" }}
+        >
+          <Link to="/" className="relative z-10 flex items-center gap-3">
+            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/15 backdrop-blur">
               <Car className="h-5 w-5" />
+            </span>
+            <span className="leading-tight">
+              <span className="block font-display text-base font-bold">AI Quality Intelligence</span>
+              <span className="block font-mono text-xs opacity-80">xanhSM · Cockpit</span>
+            </span>
+          </Link>
+
+          <div className="relative z-10 max-w-md">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-medium backdrop-blur">
+              <Sparkles className="h-3.5 w-3.5" />
+              Smart Mobility · Feedback Analytics
+            </span>
+            <h1 className="mt-5 font-display text-4xl font-bold leading-[1.12] tracking-tight">
+              Biến hàng nghìn phản hồi mỗi ngày thành{" "}
+              <span className="opacity-90">hành động vận hành</span>.
+            </h1>
+            <p className="mt-4 text-base opacity-90">
+              Truy cập khoang lái AI: phân loại phản hồi tự động, phát hiện spike, sinh alert &
+              ticket theo SLA.
+            </p>
+
+            <div className="mt-8 grid grid-cols-2 gap-3">
+              <PreviewStat icon={<Activity className="h-4 w-4" />} label="Feedback/ngày" value="12,480" />
+              <PreviewStat icon={<BarChart3 className="h-4 w-4" />} label="Auto-classified" value="97.4%" />
+              <PreviewStat icon={<ShieldCheck className="h-4 w-4" />} label="SLA on-time" value="94%" />
+              <PreviewStat icon={<Clock className="h-4 w-4" />} label="MTTD sự cố" value="4.2′" />
             </div>
-            <div className="font-display font-bold">xanhSM Cockpit</div>
           </div>
 
-          <h2 className="font-display text-3xl font-bold">
-            {mode === "signin" ? "Đăng nhập" : "Tạo tài khoản"}
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {mode === "signin"
-              ? "Truy cập khoang lái điều hành chất lượng dịch vụ."
-              : "Đăng ký để bắt đầu thu thập & phân tích phản hồi."}
-          </p>
+          <ul className="relative z-10 space-y-2 text-sm opacity-90">
+            {[
+              "Bảo mật cấp doanh nghiệp · mã hoá đầu cuối",
+              "Phân quyền theo vai trò · audit log đầy đủ",
+              "Đồng bộ realtime với hệ thống vận hành",
+            ].map((t) => (
+              <li key={t} className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4" />
+                {t}
+              </li>
+            ))}
+          </ul>
 
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-            {confirmationEmail && (
-              <div className="rounded-xl border border-xanh-green/30 bg-xanh-mint p-4 text-sm text-xanh-deep">
-                <div className="flex items-center gap-2 font-semibold">
-                  <CircleCheck className="h-4 w-4" />
-                  Kiểm tra email để hoàn tất đăng ký
-                </div>
-                <p className="mt-1 text-xs leading-relaxed">
-                  Supabase đã gửi liên kết xác nhận tới {confirmationEmail}. Sau khi xác nhận, quay
-                  lại đây để đăng nhập.
-                </p>
+          {/* decorative blobs */}
+          <div className="pointer-events-none absolute -bottom-24 -right-24 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
+          <div className="pointer-events-none absolute top-1/4 -left-24 h-60 w-60 rounded-full bg-white/10 blur-3xl" />
+        </section>
+
+        {/* RIGHT — form */}
+        <section className="flex items-center justify-center px-5 py-10 sm:px-10">
+          <div className="w-full max-w-md">
+            {/* Mobile brand */}
+            <Link to="/" className="mb-8 flex items-center gap-3 lg:hidden">
+              <span
+                className="grid h-10 w-10 place-items-center rounded-xl text-white"
+                style={{ background: "var(--gradient-green)" }}
+              >
+                <Car className="h-5 w-5" />
+              </span>
+              <span className="font-display text-sm font-bold">xanhSM · Cockpit</span>
+            </Link>
+
+            <div className="rounded-3xl border border-border/70 bg-card/80 p-7 shadow-[var(--shadow-card)] backdrop-blur-xl sm:p-9">
+              {/* Tabs */}
+              <div className="mb-7 grid grid-cols-2 rounded-xl bg-muted p-1 text-sm">
+                {(
+                  [
+                    ["signin", "Đăng nhập"],
+                    ["signup", "Tạo tài khoản"],
+                  ] as const
+                ).map(([m, lbl]) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => {
+                      setMode(m);
+                      setConfirmationEmail("");
+                    }}
+                    className={`rounded-lg px-3 py-2 font-medium transition ${
+                      mode === m
+                        ? "bg-card text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {lbl}
+                  </button>
+                ))}
               </div>
-            )}
-            {mode === "signup" && (
-              <Field icon={User} placeholder="Họ và tên" value={fullName} onChange={setFullName} />
-            )}
-            <Field
-              icon={Mail}
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={setEmail}
-              required
-            />
-            <Field
-              icon={Lock}
-              type="password"
-              placeholder={mode === "signin" ? "Mật khẩu" : "Mật khẩu mạnh (tối thiểu 8 ký tự)"}
-              value={password}
-              onChange={setPassword}
-              required
-              minLength={mode === "signup" ? 8 : undefined}
-            />
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full h-11 rounded-xl text-white font-semibold flex items-center justify-center gap-2 shadow-[var(--shadow-green)] transition-transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60"
-              style={{ background: "var(--gradient-green)" }}
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <>
-                  {mode === "signin" ? "Đăng nhập" : "Đăng ký"}
-                  <ArrowRight className="h-4 w-4" />
-                </>
-              )}
-            </button>
-          </form>
+              <h2 className="font-display text-2xl font-bold tracking-tight">
+                {mode === "signin" ? "Chào mừng trở lại 👋" : "Tạo tài khoản"}
+              </h2>
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                {mode === "signin"
+                  ? "Đăng nhập để mở khoang lái điều hành chất lượng."
+                  : "Đăng ký để bắt đầu thu thập & phân tích phản hồi."}
+              </p>
 
-          <div className="mt-6 text-sm text-center text-muted-foreground">
-            {mode === "signin" ? (
-              <>
-                Chưa có tài khoản?{" "}
+              <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+                {confirmationEmail && (
+                  <div className="rounded-xl border border-success/30 bg-success/10 p-4 text-sm text-foreground">
+                    <div className="flex items-center gap-2 font-semibold">
+                      <CircleCheck className="h-4 w-4 text-success" />
+                      Kiểm tra email để hoàn tất đăng ký
+                    </div>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                      Supabase đã gửi liên kết xác nhận tới {confirmationEmail}. Sau khi xác nhận,
+                      quay lại đây để đăng nhập.
+                    </p>
+                  </div>
+                )}
+
+                {mode === "signup" && (
+                  <Field
+                    icon={User}
+                    label="Họ và tên"
+                    placeholder="Nguyễn Văn A"
+                    value={fullName}
+                    onChange={setFullName}
+                  />
+                )}
+                <Field
+                  icon={Mail}
+                  type="email"
+                  label="Email"
+                  placeholder="ban@xanhsm.com"
+                  value={email}
+                  onChange={setEmail}
+                  required
+                />
+                <Field
+                  icon={Lock}
+                  type="password"
+                  label="Mật khẩu"
+                  placeholder={mode === "signin" ? "••••••••" : "Tối thiểu 8 ký tự"}
+                  value={password}
+                  onChange={setPassword}
+                  required
+                  minLength={mode === "signup" ? 8 : undefined}
+                />
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="group relative mt-2 flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-[var(--shadow-green)] transition hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60"
+                  style={{ background: "var(--gradient-green)" }}
+                >
+                  {loading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      {mode === "signin" ? "Đăng nhập" : "Đăng ký"}
+                      <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+                    </>
+                  )}
+                </button>
+              </form>
+
+              <p className="mt-7 text-center text-sm text-muted-foreground">
+                {mode === "signin" ? "Chưa có tài khoản?" : "Đã có tài khoản?"}{" "}
                 <button
                   onClick={() => {
-                    setMode("signup");
+                    setMode(mode === "signin" ? "signup" : "signin");
                     setConfirmationEmail("");
                   }}
-                  className="text-xanh-deep font-semibold hover:underline"
+                  className="font-semibold text-primary hover:underline"
                 >
-                  Đăng ký
+                  {mode === "signin" ? "Tạo tài khoản" : "Đăng nhập"}
                 </button>
-              </>
-            ) : (
-              <>
-                Đã có tài khoản?{" "}
-                <button
-                  onClick={() => setMode("signin")}
-                  className="text-xanh-deep font-semibold hover:underline"
-                >
-                  Đăng nhập
-                </button>
-              </>
-            )}
-          </div>
+              </p>
+            </div>
 
-          <div className="mt-8 text-center">
-            <Link to="/" className="text-xs font-mono text-muted-foreground hover:text-foreground">
-              ← Về trang chủ
-            </Link>
+            <p className="mt-6 text-center">
+              <Link to="/" className="font-mono text-xs text-muted-foreground hover:text-foreground">
+                ← Về trang chủ
+              </Link>
+            </p>
           </div>
-        </div>
+        </section>
       </div>
-    </div>
+
+      <style>{`
+        .auth-input {
+          width: 100%;
+          border-radius: 0.75rem;
+          border: 1px solid var(--border);
+          background: var(--card);
+          padding: 0.7rem 0.875rem 0.7rem 2.5rem;
+          font-size: 0.9rem;
+          color: var(--foreground);
+          outline: none;
+          transition: box-shadow .15s, border-color .15s;
+        }
+        .auth-input::placeholder { color: var(--muted-foreground); }
+        .auth-input:focus {
+          border-color: var(--primary);
+          box-shadow: 0 0 0 4px color-mix(in oklab, var(--primary) 18%, transparent);
+        }
+      `}</style>
+    </main>
   );
 }
 
@@ -238,6 +323,7 @@ function getAuthErrorMessage(error: { code?: string; message?: string }) {
 function Field({
   icon: Icon,
   type = "text",
+  label,
   placeholder,
   value,
   onChange,
@@ -246,6 +332,7 @@ function Field({
 }: {
   icon: React.ComponentType<{ className?: string }>;
   type?: string;
+  label: string;
   placeholder: string;
   value: string;
   onChange: (v: string) => void;
@@ -257,28 +344,54 @@ function Field({
   const inputType = isPassword ? (showPassword ? "text" : "password") : type;
 
   return (
-    <label className="relative block">
-      <Icon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-      <input
-        type={inputType}
-        required={required}
-        minLength={minLength}
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={`w-full h-11 pl-10 ${isPassword ? "pr-10" : "pr-3"} rounded-xl border border-border bg-card focus:outline-none focus:ring-2 focus:ring-xanh-green/40 focus:border-xanh-green/40 transition-all`}
-      />
-      {isPassword && (
-        <button
-          type="button"
-          tabIndex={-1}
-          onClick={() => setShowPassword((v) => !v)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-          aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-        >
-          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </button>
-      )}
-    </label>
+    <div>
+      <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </label>
+      <div className="relative">
+        <Icon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          type={inputType}
+          required={required}
+          minLength={minLength}
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="auth-input"
+          style={isPassword ? { paddingRight: "2.5rem" } : undefined}
+        />
+        {isPassword && (
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={() => setShowPassword((v) => !v)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PreviewStat({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur">
+      <div className="flex items-center gap-2 text-xs opacity-90">
+        <span className="grid h-6 w-6 place-items-center rounded-md bg-white/20">{icon}</span>
+        {label}
+      </div>
+      <div className="mt-2 font-display text-2xl font-bold tracking-tight">{value}</div>
+    </div>
   );
 }
