@@ -14,6 +14,29 @@ import { ALL_TEAMS, useMe, apiFetch, isUnassignedOps } from "@/lib/api";
 import { NoDepartmentNotice } from "@/components/NoDepartmentNotice";
 import { MarkdownContent } from "@/components/MarkdownContent";
 
+// Đổi dòng metadata blockquote '> Label: V | Label: V | …' (báo cáo cũ) thành bảng Markdown.
+// Báo cáo mới đã sinh sẵn dạng bảng nên không bị ảnh hưởng (dòng không bắt đầu bằng '>').
+function reportMetadataToTable(md: string): string {
+  return md
+    .split("\n")
+    .map((line) => {
+      const bq = line.match(/^>\s*(.+\|.+)$/);
+      if (!bq) return line;
+      const segs = bq[1].split("|").map((s) => s.trim()).filter(Boolean);
+      const pairs: ([string, string] | null)[] = segs.map((s) => {
+        const i = s.indexOf(":");
+        return i === -1 ? null : [s.slice(0, i).trim(), s.slice(i + 1).trim()];
+      });
+      if (pairs.length < 2 || pairs.some((p) => !p)) return line;
+      const ok = pairs as [string, string][];
+      const header = "| " + ok.map((p) => p[0]).join(" | ") + " |";
+      const sep = "| " + ok.map(() => "---").join(" | ") + " |";
+      const row = "| " + ok.map((p) => p[1]).join(" | ") + " |";
+      return header + "\n" + sep + "\n" + row;
+    })
+    .join("\n");
+}
+
 export const Route = createFileRoute("/_authenticated/reports")({
   component: ReportsPage,
 });
@@ -448,7 +471,7 @@ function ReportsPage() {
                   </div>
                 </div>
                 <div className="p-5 sm:p-7">
-                  <MarkdownContent>{content}</MarkdownContent>
+                  <MarkdownContent>{reportMetadataToTable(content)}</MarkdownContent>
                   <DraftTaskEditor report={report} onApproved={() => void loadData(selectedTeam)} />
                 </div>
               </div>

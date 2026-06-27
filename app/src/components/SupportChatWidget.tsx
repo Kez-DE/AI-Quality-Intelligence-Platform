@@ -4,10 +4,10 @@
 // - Trang chủ (chưa đăng nhập): tư vấn rule-based + liên hệ công khai.
 // Bong bóng trả lời render Markdown (in đậm, danh sách, bảng). Trích dẫn [Nguồn N] bấm được
 // để mở chi tiết tài liệu ngay trong widget.
-import { useEffect, useRef, useState } from "react";
-import { Bot, X, Send, Sparkles, Phone, Mail, ArrowLeft, FileText } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Bot, X, Send, Sparkles, Phone, Mail, ArrowLeft, FileText, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, useMe } from "@/lib/api";
 import { MarkdownContent } from "@/components/MarkdownContent";
 
 // Liên hệ CÔNG KHAI — lấy từ data/public_kb. Hiển thị đầy đủ, không che.
@@ -19,12 +19,33 @@ const DPO_PHONE = "1900 2097";
 type Source = { index: number; title: string; heading: string; department: string; content: string };
 type Msg = { role: "user" | "assistant"; content: string; sources?: Source[] };
 
-const SUGGESTIONS = [
-  "Cách gửi phản hồi?",
-  "Liên hệ CSKH",
-  "Báo sự cố / cần giúp đỡ",
-  "Yêu cầu hoàn tiền",
-];
+// Gợi ý theo VAI TRÒ + NGHIỆP VỤ (role/department). Backend đã phân tầng tool + scope phòng ban.
+function suggestionsFor(me?: { role?: string | null; department?: string | null }): string[] {
+  const role = me?.role;
+  const dept = me?.department;
+  if (role === "admin")
+    return ["Tổng quan toàn hệ thống hôm nay", "Khu vực nóng nhất", "Ticket tồn đọng sắp trễ SLA", "So sánh hiệu suất các phòng"];
+  if (role === "manager")
+    return [
+      dept ? `Báo cáo phòng ${dept} tuần này` : "Báo cáo phòng tuần này",
+      "Khu vực nóng nhất của phòng",
+      "Ticket sắp vi phạm SLA",
+      "Vấn đề nổi cộm cần ưu tiên",
+    ];
+  if (role === "staff")
+    return [
+      dept ? `Quy trình xử lý sự cố phòng ${dept}?` : "Quy trình xử lý sự cố?",
+      "SOP cho task tôi đang làm",
+      "Task ưu tiên của phòng tôi",
+      "Cách xử lý khiếu nại đúng SLA",
+    ];
+  return ["Cách gửi phản hồi?", "Liên hệ CSKH", "Báo sự cố / cần giúp đỡ", "Yêu cầu hoàn tiền"];
+}
+
+const greeting = (): Msg => ({
+  role: "assistant",
+  content: `Xin chào 👋 Mình là **trợ lý đồng hành** của xanhSM. Mình hỗ trợ thông tin khách hàng và hướng dẫn xử lý công việc theo quyền của bạn. Hotline ${HOTLINE} · ${EMAIL_CSKH}.`,
+});
 
 // Tư vấn rule-based (chưa đăng nhập). Markdown-friendly. Chỉ thông tin khách hàng + liên hệ công khai.
 function cannedReply(q: string): string {
@@ -75,13 +96,17 @@ export default function SupportChatWidget() {
   const [activeSource, setActiveSource] = useState<Source | null>(null);
   // Chips gợi ý chỉ hiện TRƯỚC khi user gửi tin nhắn đầu tiên; gửi xong ẩn vĩnh viễn trong phiên.
   const [showSuggestions, setShowSuggestions] = useState(true);
-  const [msgs, setMsgs] = useState<Msg[]>([
-    {
-      role: "assistant",
-      content: `Xin chào 👋 Mình là **trợ lý đồng hành** của xanhSM. Mình hỗ trợ thông tin khách hàng và hướng dẫn xử lý công việc theo quyền của bạn. Hotline ${HOTLINE} · ${EMAIL_CSKH}.`,
-    },
-  ]);
+  const [msgs, setMsgs] = useState<Msg[]>([greeting()]);
+  const { data: me } = useMe();
+  const suggestions = useMemo(() => suggestionsFor(authed ? me : undefined), [authed, me]);
   const endRef = useRef<HTMLDivElement>(null);
+
+  function resetChat() {
+    setMsgs([greeting()]);
+    setShowSuggestions(true);
+    setActiveSource(null);
+    setInput("");
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setAuthed(!!data.session));
@@ -144,6 +169,14 @@ export default function SupportChatWidget() {
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300" /> Online · trả lời theo quyền của bạn
               </div>
             </div>
+            <button
+              onClick={resetChat}
+              title="Mới cuộc trò chuyện"
+              aria-label="Mới cuộc trò chuyện"
+              className="flex h-8 shrink-0 items-center gap-1 rounded-lg bg-white/15 px-2 text-xs font-medium text-white transition-colors hover:bg-white/25"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> Mới
+            </button>
           </div>
 
           {/* Khu vực hội thoại + overlay chi tiết nguồn */}
@@ -211,7 +244,7 @@ export default function SupportChatWidget() {
 
           {showSuggestions && (
             <div className="flex flex-wrap gap-1.5 px-3 pb-2 pt-2">
-              {SUGGESTIONS.map((s) => (
+              {suggestions.map((s) => (
                 <button key={s} onClick={() => send(s)} disabled={busy}
                   className="rounded-full bg-secondary px-2.5 py-1 text-xs text-secondary-foreground transition-colors hover:bg-accent disabled:opacity-50">
                   {s}
