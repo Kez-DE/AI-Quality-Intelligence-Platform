@@ -3,7 +3,14 @@
 from typing import Optional
 
 
-DEPARTMENTS = ("IT", "CSKH", "Vận hành", "Marketing")
+DEPARTMENTS = (
+    "IT",
+    "CSKH",
+    "Vận hành",
+    "Tài chính & Thanh toán",
+    "Sản phẩm",
+    "Quản lý Rủi ro & Gian lận",
+)
 
 _DEPARTMENT_ALIASES = {
     "it": "IT",
@@ -12,12 +19,20 @@ _DEPARTMENT_ALIASES = {
     "vận hành & đào tạo": "Vận hành",
     "van hanh": "Vận hành",
     "driver mgmt": "Vận hành",
-    "marketing": "Marketing",
+    "tài chính": "Tài chính & Thanh toán",
+    "thanh toán": "Tài chính & Thanh toán",
+    "finance": "Tài chính & Thanh toán",
+    "sản phẩm": "Sản phẩm",
+    "product": "Sản phẩm",
+    "rủi ro": "Quản lý Rủi ro & Gian lận",
+    "gian lận": "Quản lý Rủi ro & Gian lận",
+    "risk": "Quản lý Rủi ro & Gian lận",
+    "fraud": "Quản lý Rủi ro & Gian lận",
 }
 
 
 def normalize_department(value: object, default: Optional[str] = None) -> Optional[str]:
-    """Map legacy/free-text team names to one of the four RBAC departments."""
+    """Map legacy/free-text team names to one of the six RBAC departments."""
     raw = str(value or "").strip()
     if not raw:
         return default
