@@ -11,7 +11,9 @@ import {
   MapPin,
   RefreshCw,
   Siren,
-  Megaphone,
+  Wallet,
+  Package,
+  ShieldAlert,
   Wrench,
   Zap,
 } from "lucide-react";
@@ -81,11 +83,23 @@ const TEAM_CONFIG: Record<
     bg: "bg-purple-50 border-purple-200",
   },
   IT: { label: "IT", icon: Zap, color: "text-yellow-700", bg: "bg-yellow-50 border-yellow-200" },
-  Marketing: {
-    label: "Marketing",
-    icon: Megaphone,
+  "Tài chính & Thanh toán": {
+    label: "Tài chính & Thanh toán",
+    icon: Wallet,
+    color: "text-emerald-700",
+    bg: "bg-emerald-50 border-emerald-200",
+  },
+  "Sản phẩm": {
+    label: "Sản phẩm",
+    icon: Package,
     color: "text-orange-700",
     bg: "bg-orange-50 border-orange-200",
+  },
+  "Quản lý Rủi ro & Gian lận": {
+    label: "Rủi ro & Gian lận",
+    icon: ShieldAlert,
+    color: "text-red-700",
+    bg: "bg-red-50 border-red-200",
   },
 };
 
@@ -473,7 +487,7 @@ function AlertsPage() {
                         )}
                         {alert.ticket_type === "opportunity" && (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-orange-50 border-orange-200 text-orange-700">
-                            Cơ hội Marketing
+                            Cơ hội Sản phẩm
                           </span>
                         )}
                         {alert.topic && (
