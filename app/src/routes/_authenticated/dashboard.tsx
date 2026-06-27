@@ -1,15 +1,32 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Gauge, Sparkles } from "lucide-react";
+import { useMe } from "@/lib/api";
 import { CockpitFilterProvider } from "@/components/cockpit/CockpitFilterContext";
 import { CockpitView } from "@/components/cockpit/CockpitView";
+import GuestDashboard from "@/components/GuestDashboard";
+import EmployeesPanel from "@/components/EmployeesPanel";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
 });
 
 function DashboardPage() {
+  const { data: me, isLoading } = useMe();
+
+  if (isLoading) {
+    return <div className="py-20 text-center text-sm text-muted-foreground">Đang tải bảng điều khiển…</div>;
+  }
+
+  // Khách (guest): trang khách hàng đầy đủ panel — chỉ số công khai, gửi phản hồi, quyền lợi.
+  if (me?.role === "guest") {
+    return <GuestDashboard />;
+  }
+
+  const showEmployees = me?.role === "admin" || me?.role === "manager";
+
+  // Ops (admin/manager/staff): hero + cockpit; admin/manager thấy thêm nhân viên đang hoạt động.
   return (
-    <div>
+    <div className="space-y-6">
       {/* Hero header — bố cục nổi bật; Cockpit (KPI + widgets) giữ nguyên bên dưới */}
       <section className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/10 via-card to-card p-6 sm:p-8">
         <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
@@ -45,6 +62,8 @@ function DashboardPage() {
       <CockpitFilterProvider>
         <CockpitView />
       </CockpitFilterProvider>
+
+      {showEmployees && me && <EmployeesPanel me={me} />}
     </div>
   );
 }
