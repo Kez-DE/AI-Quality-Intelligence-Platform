@@ -1,5 +1,7 @@
 # RBAC theo phòng ban
 
+> **Cập nhật 2026-06-27:** đồng bộ 6 phòng ban & phân tầng quyền chat.
+
 Hệ thống có hai trục phân quyền: **role** (cấp độ quyền) và **department** (phòng ban, quyết định thấy dữ liệu của ai). Backend chạy bằng `SUPABASE_SERVICE_ROLE_KEY` nên bypass RLS của Postgres, vì vậy mọi kiểm tra quyền phải làm ở tầng API trong `pipeline/auth_guard.py`.
 
 ## 4 role

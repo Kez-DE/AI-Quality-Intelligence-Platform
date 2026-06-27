@@ -1,4 +1,6 @@
-# Tài khoản khách (Guest Account) — Cơ chế & giới hạn
+# Tài khoản khách (Guest Account): Cơ chế & giới hạn
+
+> **Cập nhật 2026-06-27:** đồng bộ 6 phòng ban & phân tầng quyền chat.
 
 > Tài khoản khách là vai trò có quyền thấp nhất trong hệ thống. Mục tiêu: cho phép người ngoài xem dashboard tổng quan và gửi feedback mà không truy cập được dữ liệu nội bộ.
 
@@ -14,7 +16,8 @@
 | Sửa nhãn AI (HITL) | ✅ | ✅ | ✅ | ❌ |
 | Alerts / Ticket Triage | ✅ | ✅ | ✅ | ❌ |
 | Phân tích phòng ban | ✅ | ✅ | ✅ | ❌ |
-| AI Chat | ✅ | ✅ | ✅ | ❌ |
+| AI Chat nội bộ | ✅ | ✅ | ✅ | ❌ |
+| Chat hỗ trợ công khai | ✅ | ✅ | ✅ | ✅ |
 | Agent Logs | ✅ | ✅ | ✅ | ❌ |
 | Quản lý người dùng | ✅ | ❌ | ❌ | ❌ |
 | Trigger demo/stream | ✅ | ❌ | ❌ | ❌ |
@@ -58,13 +61,13 @@ OPS_ROLES = {"admin", "manager", "staff"}  # guest KHÔNG nằm trong đây
 - `POST /api/feedback/submit` — gửi feedback mới
 - `GET /api/live-stream/status` — xem trạng thái stream
 - `GET /health` — health check
+- `POST /api/agent/chat`: chat hỗ trợ công khai (GUEST_SYSTEM_PROMPT, chỉ dùng public KB + submit_feedback)
 
 **Endpoint guest BỊ CHẶN:**
 - `POST /api/live-stream/start|stop` — trigger stream
 - `POST /api/ingest-real-dataset` — nạp data
 - `POST /api/trigger-spike-detect` — spike detect
 - `POST /api/agent/run` — chạy agent pipeline
-- `POST /api/agent/chat` — chat AI
 - `PATCH /api/feedback/*/label` — sửa nhãn
 - `PATCH /api/feedback/*/review` — duyệt feedback
 - `GET /api/insights/departments` — insight phòng ban
@@ -105,7 +108,7 @@ CREATE POLICY "ops_read_feedback" ON feedback
 ### Cách 2: Tự đăng ký
 
 1. User đăng ký qua trang `/auth`
-2. Mặc định tài khoản mới = staff (hoặc guest tùy config)
+2. Mặc định tài khoản mới = guest
 3. Admin vào Admin page đổi role nếu cần
 
 ### Cách 3: Qua Supabase Dashboard
@@ -144,7 +147,6 @@ Guest login
         ❌ Guest KHÔNG thể:
         - Xem feedback raw của người khác
         - Vào trang Alerts/Tickets
-        - Chat với AI
         - Xem phân tích phòng ban
         - Sửa nhãn AI
         - Trigger demo/stream
@@ -194,10 +196,10 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN_GUEST" \
   http://127.0.0.1:8000/api/agent/run
 # → 403 Forbidden
 
-# 6. Test chat AI (PHẢI bị chặn)
+# 6. Test chat công khai (PHẢI được, giới hạn public KB + submit_feedback)
 curl -s -X POST -H "Authorization: Bearer $TOKEN_GUEST" \
   -H "Content-Type: application/json" \
   -d '{"messages":[{"role":"user","content":"test"}]}' \
   http://127.0.0.1:8000/api/agent/chat
-# → 403 Forbidden
+# → 200 OK (GUEST_SYSTEM_PROMPT, không có dữ liệu nội bộ)
 ```
