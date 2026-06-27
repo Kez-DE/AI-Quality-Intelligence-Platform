@@ -1,4 +1,10 @@
+from agents.analyst_agent import DEPARTMENT_PERSONAS
 from departments import DEPARTMENTS, alert_department, normalize_department
+
+
+def test_every_department_has_a_persona():
+    # Guard against drift between the canonical department list and analyst personas.
+    assert set(DEPARTMENT_PERSONAS) == set(DEPARTMENTS)
 
 
 def test_departments_are_distinct_and_canonical():
