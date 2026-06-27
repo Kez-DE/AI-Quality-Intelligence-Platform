@@ -76,10 +76,12 @@ def build_department_report_markdown(
     lines = [
         f"# Báo cáo Vận hành - Phòng {_cell(team)}{topic_suffix}",
         "",
+        "| Kỳ dữ liệu | Cập nhật | Phân tích AI |",
+        "| --- | --- | --- |",
         (
-            f"> Kỳ dữ liệu: {period_hours} giờ gần nhất | "
-            f"Cập nhật: {generated_at.astimezone(REPORT_TIMEZONE).strftime('%d/%m/%Y %H:%M GMT+7')} | "
-            f"Phân tích AI: {_cell(analysis_status_label)}"
+            f"| {period_hours} giờ gần nhất "
+            f"| {generated_at.astimezone(REPORT_TIMEZONE).strftime('%d/%m/%Y %H:%M GMT+7')} "
+            f"| {_cell(analysis_status_label)} |"
         ),
         "",
         "## Tóm tắt điều hành",
