@@ -44,14 +44,31 @@ DEPARTMENT_PERSONAS: Dict[str, Dict[str, Any]] = {
             ("Đề xuất cải thiện quy trình điều phối/khuyến khích tài xế", "1w"),
         ],
     },
-    "Marketing": {
-        "persona": "Bạn là chuyên gia thương hiệu & truyền thông.",
-        "priorities": "Nhìn vấn đề dưới góc nhận diện thương hiệu và cảm nhận thị trường. "
-                      "Đánh giá rủi ro danh tiếng và cơ hội truyền thông tích cực.",
+    "Tài chính & Thanh toán": {
+        "persona": "Bạn là chuyên gia tài chính và đối soát thanh toán.",
+        "priorities": "Tập trung giải quyết các khiếu nại về trừ tiền sai, lỗi đối soát, và yêu cầu hoàn tiền. Đảm bảo luồng tiền minh bạch.",
         "fallback_actions": [
-            ("Đánh giá ảnh hưởng tới nhận diện thương hiệu", "48h"),
-            ("Theo dõi cảm nhận thị trường trên các kênh truyền thông", "48h"),
-            ("Đề xuất thông điệp truyền thông phù hợp", "1w"),
+            ("Rà soát các giao dịch thanh toán lỗi trong ngày", "24h"),
+            ("Thực hiện hoàn tiền cho các khách hàng bị trừ lặp", "48h"),
+            ("Kiểm tra và làm việc với đối tác cổng thanh toán", "1w"),
+        ],
+    },
+    "Sản phẩm": {
+        "persona": "Bạn là chuyên gia Quản lý Sản phẩm (Product Manager).",
+        "priorities": "Tập trung vào trải nghiệm người dùng (UX/UI), tính năng bị lỗi hoặc gây bối rối, và đề xuất cải tiến sản phẩm.",
+        "fallback_actions": [
+            ("Thiết kế lại luồng UX/UI dựa trên phản hồi khách hàng", "1w"),
+            ("Phối hợp với IT để sửa lỗi tính năng (bugs) khẩn cấp", "48h"),
+            ("Khảo sát sâu người dùng về tính năng gây bối rối", "1w"),
+        ],
+    },
+    "Quản lý Rủi ro & Gian lận": {
+        "persona": "Bạn là chuyên gia phân tích dữ liệu rủi ro và gian lận.",
+        "priorities": "Phát hiện lạm dụng khuyến mãi, cuốc xe ảo, và các tài khoản có hành vi bất thường. Đảm bảo an toàn hệ thống và giảm thất thoát.",
+        "fallback_actions": [
+            ("Rà soát và tạm khóa hàng loạt tài khoản lạm dụng khuyến mãi", "24h"),
+            ("Tạo tập luật mới để phát hiện cuốc xe ảo tự động", "1w"),
+            ("Điều tra sâu các cụm tài khoản có dấu hiệu thông đồng", "48h"),
         ],
     },
 }
