@@ -9,10 +9,24 @@ export const API_BASE = import.meta.env.VITE_BACKEND_API_URL ?? "http://127.0.0.
 
 export type Role = "admin" | "manager" | "staff" | "guest";
 
-export type Department = "IT" | "CSKH" | "Vận hành" | "Marketing" | null;
+export type Department =
+  | "IT"
+  | "CSKH"
+  | "Vận hành"
+  | "Tài chính & Thanh toán"
+  | "Sản phẩm"
+  | "Quản lý Rủi ro & Gian lận"
+  | null;
 
-/** 4 phòng ban — khớp backend TEAMS / profiles.department. */
-export const ALL_TEAMS = ["IT", "CSKH", "Vận hành", "Marketing"] as const;
+/** 6 phòng ban — khớp backend DEPARTMENTS / profiles.department. */
+export const ALL_TEAMS = [
+  "IT",
+  "CSKH",
+  "Vận hành",
+  "Tài chính & Thanh toán",
+  "Sản phẩm",
+  "Quản lý Rủi ro & Gian lận",
+] as const;
 
 export type Me = {
   id: string;
@@ -22,7 +36,7 @@ export type Me = {
 };
 
 /** Danh sách phòng ban user được phép xem.
- *  - admin: cả 4 phòng.
+ *  - admin: cả 6 phòng.
  *  - ops đã gán phòng: chỉ phòng của mình.
  *  - ops chưa gán phòng: rỗng (không thấy gì → render thông báo liên hệ admin). */
 export function visibleTeams(me: Me | null | undefined): string[] {
