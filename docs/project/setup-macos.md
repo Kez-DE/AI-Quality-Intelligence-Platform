@@ -2,6 +2,8 @@
 
 > Dành cho thành viên mới join dự án. Sau khi hoàn tất, bạn sẽ chạy được cả backend (FastAPI) và frontend (React/Vite) trên máy Mac.
 
+> **Cập nhật 2026-06-27:** đồng bộ env-var (.env.example) và thêm COHERE_API_KEY (bắt buộc cho RAG hybrid embedding).
+
 ## Yêu cầu hệ thống
 
 | Phần mềm | Phiên bản tối thiểu | Kiểm tra |
@@ -64,6 +66,7 @@ BACKEND_API_URL=http://127.0.0.1:8000
 VITE_BACKEND_API_URL=http://127.0.0.1:8000
 LLM_PROVIDER=auto
 OPENROUTER_API_KEY=sk-or-...   # Tuỳ chọn, nên có để agent chạy thật
+COHERE_API_KEY=...             # Bắt buộc cho RAG hybrid embedding (lấy tại dashboard.cohere.com)
 ```
 
 > Lấy key Supabase: vào [supabase.com](https://supabase.com) → project → Settings → API.
@@ -95,9 +98,8 @@ python -c "import sklearn; print('Scikit-learn OK')"
 ```bash
 cd ../app
 
-# Cài dependencies
-npm install
-# Hoặc dùng bun: bun install
+# Cài dependencies (bun là công cụ chính; npm install cũng được)
+bun install
 ```
 
 ## 5. Chạy hệ thống
@@ -203,5 +205,5 @@ git pull origin main
 cd pipeline && source .venv/bin/activate && pip install -r requirements.txt
 
 # Frontend: cài lại nếu có package mới
-cd ../app && npm install
+cd ../app && bun install   # hoặc npm install
 ```

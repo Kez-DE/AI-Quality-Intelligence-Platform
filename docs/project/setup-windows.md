@@ -2,6 +2,8 @@
 
 > Dành cho thành viên mới join dự án. Sau khi hoàn tất, bạn sẽ chạy được cả backend (FastAPI) và frontend (React/Vite) trên máy Windows.
 
+> **Cập nhật 2026-06-27:** đồng bộ env-var (.env.example) và thêm COHERE_API_KEY (bắt buộc cho RAG hybrid embedding).
+
 ## Yêu cầu hệ thống
 
 | Phần mềm | Phiên bản tối thiểu | Kiểm tra (PowerShell) |
@@ -74,6 +76,7 @@ BACKEND_API_URL=http://127.0.0.1:8000
 VITE_BACKEND_API_URL=http://127.0.0.1:8000
 LLM_PROVIDER=auto
 OPENROUTER_API_KEY=sk-or-...   # Tuỳ chọn, nên có để agent chạy thật
+COHERE_API_KEY=...             # Bắt buộc cho RAG hybrid embedding (lấy tại dashboard.cohere.com)
 ```
 
 > Lấy key Supabase: vào [supabase.com](https://supabase.com) → project → Settings → API.
@@ -116,7 +119,9 @@ python -c "import sklearn; print('Scikit-learn OK')"
 
 ```powershell
 cd ..\app
-npm install
+# Cài bun nếu chưa có: npm install -g bun
+bun install
+# Hoặc dùng npm: npm install
 ```
 
 ## 5. Chạy hệ thống
@@ -294,7 +299,7 @@ pip install -r requirements.txt
 
 # Frontend
 cd ..\app
-npm install
+bun install   # hoặc npm install
 ```
 
 ## Ghi chú: WSL2 (tuỳ chọn nâng cao)

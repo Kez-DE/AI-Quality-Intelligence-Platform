@@ -3,6 +3,8 @@
 > Dự án sử dụng **Supabase Cloud** (remote project) làm database chính.
 > Supabase Local (Docker) là tuỳ chọn cho dev offline.
 
+> **Cập nhật 2026-06-27:** đồng bộ env-var (.env.example) và luồng deploy.
+
 ---
 
 ## 1. Tạo project trên Supabase Cloud

@@ -1,5 +1,7 @@
 # Deploy lên Railway
 
+> **Cập nhật 2026-06-27:** đồng bộ env-var (.env.example) và luồng deploy. Push lên `main` là đường deploy chính (GitHub Actions tự kích hoạt).
+
 Hệ thống chạy trên Railway dưới dạng **6 service riêng**, build từ Docker, deploy tự động qua GitHub Actions khi push lên `main`. Supabase là dịch vụ ngoài (cloud), không nằm trong Railway.
 
 ## Kiến trúc 6 service
@@ -76,6 +78,7 @@ SUPABASE_URL=https://xxx.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=...
 LLM_PROVIDER=auto
 OPENROUTER_API_KEY=sk-or-...
+COHERE_API_KEY=...             # Bắt buộc cho RAG hybrid embedding
 ```
 
 Backend đọc Supabase theo chuỗi fallback: `SUPABASE_SERVICE_ROLE_KEY` > `SUPABASE_KEY` > `SUPABASE_PUBLISHABLE_KEY`. Dùng service role key để bypass RLS (RBAC kiểm ở tầng API, xem [rbac-departments.md](rbac-departments.md)).
