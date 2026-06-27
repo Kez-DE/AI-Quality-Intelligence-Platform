@@ -1,5 +1,7 @@
 # Architecture Diagram — AI Quality Intelligence Platform
 
+> **Cập nhật 2026-06-27:** Cập nhật nhãn multi-agent trong component diagram (8 agent nghiệp vụ + Orchestrator, thay tên rút gọn cũ).
+
 Sơ đồ components + data flow cho Gate G2. GitHub render trực tiếp các khối Mermaid bên dưới.
 Bản mô tả chữ chi tiết: [`docs/project/architecture.md`](architecture.md).
 
@@ -18,7 +20,7 @@ flowchart TB
     subgraph BE["Backend — pipeline/ (FastAPI)"]
         API["main.py — REST API + auth_guard (RBAC)"]
         PIPE["Pipeline: clean -> classifier -> rules -> ingest -> spike_detector"]
-        AG["Multi-agent: orchestrator · router · insight · analyst · alert"]
+        AG["agents/: orchestrator + 8 agent nghiệp vụ<br/>(alert · analyst · ingestion · insight · router · scoring · task · ticket)"]
         ROUTER["agent/model_router.py — LLM failover"]
     end
 

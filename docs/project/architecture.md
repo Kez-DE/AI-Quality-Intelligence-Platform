@@ -1,5 +1,7 @@
 # Kiến trúc — AI Quality Intelligence Platform
 
+> **Cập nhật 2026-06-27:** Cập nhật mô tả KB nội bộ: xóa claim phủ số phòng ban cố định; ghi rõ KB dùng nhãn legacy (Safety, CSKH, Vận hành, IT) vì soạn trước khi chuyển 6 phòng ban chuẩn.
+
 Dự án AI20K-223. Phân tích phản hồi khách hàng smart mobility (xanhSM) và định tuyến sự cố tới đúng phòng ban.
 
 ## Một repo, ba tầng
@@ -33,7 +35,7 @@ data/
 └── auxiliary/data2/      Dataset phụ trợ/thí nghiệm, không thay runtime
 ```
 
-Mỗi file trong `knowledge_base/` có YAML frontmatter `department` để RAG lọc theo phòng. KB nội bộ chỉ phủ 4 phòng (Safety, CSKH, Vận hành, IT); `public_kb/` gắn `topic_group` theo phòng nhưng mở cho mọi khách. `data/taxonomy/` không chứa `safety_keywords.json`; file keyword này chỉ nằm trong `data/auxiliary/data2/taxonomy/` để thí nghiệm Data_2. Xem [agents-guide.md](agents-guide.md), [rbac-departments.md](rbac-departments.md), và [`../data/README.md`](../data/README.md).
+Mỗi file trong `knowledge_base/` có YAML frontmatter `department` để RAG lọc theo phòng. KB nội bộ hiện dùng nhãn legacy (`Safety`, `CSKH`, `Vận hành`, `IT`) vì được soạn trước khi chuyển sang 6 phòng ban chuẩn; các phòng Tài chính & Thanh toán, Sản phẩm, Quản lý Rủi ro & Gian lận chưa có tài liệu KB riêng. `public_kb/` gắn `topic_group` theo phòng nhưng mở cho mọi khách. `data/taxonomy/` không chứa `safety_keywords.json`; file keyword này chỉ nằm trong `data/auxiliary/data2/taxonomy/` để thí nghiệm Data_2. Xem [agents-guide.md](agents-guide.md), [rbac-departments.md](rbac-departments.md), và [`../data/README.md`](../data/README.md).
 
 ## Hạ tầng: 6 Railway service
 
