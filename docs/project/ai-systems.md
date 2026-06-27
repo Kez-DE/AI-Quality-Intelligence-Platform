@@ -73,7 +73,7 @@ Step 6   for team in TEAMS: insight_agent.generate(...)      [RULE]  metric theo
 Step 7   analyst_agent.analyze_root_cause(team, insights)    [LLM]   → department_reports (content + root_cause_summary + suggested_tasks)
 ```
 
-`TEAMS = [IT, CSKH, Vận hành, Marketing]`
+`TEAMS = list(DEPARTMENTS)` → IT, CSKH, Vận hành, Tài chính & Thanh toán, Sản phẩm, Quản lý Rủi ro & Gian lận
 
 Báo cáo sinh ra ở Step 7 lưu kèm `suggested_tasks` (JSONB) — manager biên tập rồi duyệt thành task `source=report` qua RPC `approve_report_and_dispatch` (luồng HI-Loop Approval, xem `co_che.md` mục 8).
 
@@ -116,7 +116,7 @@ sklearn `Pipeline(TfidfVectorizer(ngram 1-2, max_features=30000, sublinear_tf) +
 ## D. Rule-based Components
 
 - `**rules.py**` — lớp rule chính sau ML. Ưu tiên Safety > PaymentFraud > App > Map > Payment > Supply > DriverNeg > Pricing > Delay > Positive. Có **negation guard tiếng Việt** (`không/ko/chẳng`), gibberish detector, set `needs_review` khi confidence < 0.55 hoặc P5 hoặc safety override.
-- `**spike_detector.py`** — gom theo `(area, topic, team)`: P5 tạo ngay, P4 cần cụm 3, P2/P3 tiêu cực cần volume 10, tích cực đủ 5 tạo Marketing opportunity. Router quyết định phòng; LLM không được tự gán team.
+- `**spike_detector.py`** — gom theo `(area, topic, team)`: P5 tạo ngay, P4 cần cụm 3, P2/P3 tiêu cực cần volume 10, tích cực đủ 5 tạo Sản phẩm opportunity. Router quyết định phòng; LLM không được tự gán team.
 - `**scoring_agent.calculate_overall_risk()**` — waterfall max-pooling 5 chiều → thang 1-5.
 - `**services/ticket_workflow.py**` — vòng đời ticket theo thời gian: open → in_progress (10s) → resolved (30s).
 - `**services/live_stream.py**` — scheduler nạp dataset theo batch, cứ N batch chạy auto spike detection.

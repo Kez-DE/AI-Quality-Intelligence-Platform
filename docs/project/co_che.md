@@ -151,7 +151,7 @@ Chống trùng: `is_duplicate_alert` đọc bảng `alerts` tìm alert cùng are
 `route_ticket(topic, severity, sentiment)` đọc `data/taxonomy/routing_table.json`. Thứ tự ưu tiên, cái trên thắng cái dưới:
 
 1. `severity_overrides`: P5 → Vận hành (thắng mọi thứ).
-2. `sentiment_overrides`: positive chung chưa gắn chủ đề chuyên môn → Marketing.
+2. `sentiment_overrides`: positive chung hoặc góp ý tính năng (Other, App Issue) → Sản phẩm.
 3. `routes`: match theo topic.
 4. `default_team`: CSKH.
 
@@ -162,12 +162,12 @@ Bảng routing thật:
 | Safety | Vận hành | 1h | P5 |
 | Driver Behavior | Vận hành | 8h | P3 |
 | App Issue | IT | 12h | P3 |
-| Payment | CSKH | 12h | P3 |
-| Pricing | CSKH | 12h | P3 |
+| Payment | Tài chính & Thanh toán | 12h | P3 |
+| Pricing | Quản lý Rủi ro & Gian lận | 12h | P3 |
 | Delay | Vận hành | 8h | P3 |
 | Other | CSKH | 24h | P4 |
 
-Hai luật ghi đè quan trọng: mọi ticket P5 ép về Vận hành (đội phản ứng nhanh) bất kể topic; positive chung (positive + Other) chuyển Marketing để khai thác truyền thông, còn positive về app hoặc tài xế vẫn về đúng phòng chuyên môn theo topic.
+Hai luật ghi đè quan trọng: mọi ticket P5 ép về Vận hành (đội phản ứng nhanh) bất kể topic; phản hồi tích cực chung hoặc góp ý tính năng (positive + Other/App Issue) chuyển Sản phẩm để khai thác nâng cấp UX/UI, còn positive gắn chủ đề chuyên môn khác (Payment, Driver Behavior, Pricing...) vẫn về đúng phòng theo topic.
 
 Đúng phải thế nào: đổi routing chỉ sửa JSON, không sửa code. Nếu phải sửa code để đổi một tuyến, thiết kế đã sai chỗ config-driven.
 
@@ -215,7 +215,7 @@ Phân quyền top-down trong việc chia việc:
 
 ## 6. Phòng ban
 
-Bốn phòng ban hợp lệ hiện tại: **IT, CSKH, Vận hành, Marketing**. Trước đây có Safety và Pricing, đã bỏ làm phòng ban (migration `20260625`): topic Safety route về Vận hành, topic Pricing về CSKH. Lưu ý phân biệt: Safety và Pricing vẫn tồn tại như *topic* và như *persona* của analyst_agent, nhưng không còn là *phòng ban* để gán user.
+Sáu phòng ban hợp lệ hiện tại: **IT, CSKH, Vận hành, Tài chính & Thanh toán, Sản phẩm, Quản lý Rủi ro & Gian lận**. Trước đây có Safety và Pricing đã bỏ làm phòng ban (migration `20260625`), và Marketing đã bỏ (migration `20260630`, reassign user + dữ liệu lịch sử về Sản phẩm). Các topic vẫn được định tuyến: topic Safety về Vận hành, topic Pricing về Quản lý Rủi ro & Gian lận, topic Payment về Tài chính & Thanh toán. Lưu ý phân biệt: Safety và Pricing vẫn tồn tại như *topic* định tuyến, nhưng không còn là *phòng ban* để gán user.
 
 Định nghĩa phòng ban nằm ở ba chỗ phải khớp nhau: `DEPARTMENTS` (`departments.py`), `DEPARTMENT_PERSONAS` (`analyst_agent.py`), `valid_departments` (`users_admin.py`). Một ops user có thể chưa được gán phòng (`department = null`), khi đó chưa xem được dữ liệu phòng nào cho tới khi admin gán.
 
@@ -237,12 +237,14 @@ flowchart LR
         IT[IT]
         CSKH[CSKH]
         VH[Vận hành]
-        MKT[Marketing]
+        FIN["Tài chính & Thanh toán"]
+        SP[Sản phẩm]
+        RR["Quản lý Rủi ro & Gian lận"]
         none[null - chưa gán]
     end
     admin -.->|xem mọi phòng| Depts
-    manager --> IT & CSKH & VH & MKT
-    staff --> IT & CSKH & VH & MKT
+    manager --> IT & CSKH & VH & FIN & SP & RR
+    staff --> IT & CSKH & VH & FIN & SP & RR
     guest -.->|không gắn phòng| none
 ```
 
@@ -323,7 +325,7 @@ Frontend (`AppShell.tsx`) lọc nav theo role, `route.tsx` redirect guest khỏi
 
 ### Quản lý user và bootstrap
 
-`PATCH /api/users/{id}/role` đổi role, chặn admin tự đổi quyền chính mình, ghi `audit_logs` action `role_change`. `PATCH /api/users/{id}/department` gán phòng, `valid_departments = [null, IT, CSKH, Vận hành, Marketing]`, ghi audit. Bootstrap: user đăng ký đầu tiên thành admin, các user sau mặc định guest, chờ admin duyệt lên staff hoặc manager.
+`PATCH /api/users/{id}/role` đổi role, chặn admin tự đổi quyền chính mình, ghi `audit_logs` action `role_change`. `PATCH /api/users/{id}/department` gán phòng, `valid_departments = [null, IT, CSKH, Vận hành, Tài chính & Thanh toán, Sản phẩm, Quản lý Rủi ro & Gian lận]`, ghi audit. Bootstrap: user đăng ký đầu tiên thành admin, các user sau mặc định guest, chờ admin duyệt lên staff hoặc manager.
 
 ## 8. Cơ chế sinh báo cáo
 
@@ -421,7 +423,7 @@ Step 1-4   spike_detector gom (area, topic, team), áp ngưỡng,
            router_agent quyết team/SLA/priority, LLM viết title/desc/action
 Step 5     task_agent.cluster_alerts_into_tasks()        [RULE + LLM cho cụm mới]
 Step 5.5   ticket_agent.get_overdue_tickets(sla=24h)     [RULE]
-Step 6-7   for team in [IT, CSKH, Vận hành, Marketing]:
+Step 6-7   for team in DEPARTMENTS:  # 6 phòng ban
              insight_agent.generate_department_insights(team)   [RULE]
              nếu có feedback và analyst bật:
                analyst_agent.analyze_root_cause(team, insights) [LLM]

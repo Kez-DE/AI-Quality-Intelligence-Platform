@@ -38,7 +38,7 @@ Step 6-7  for team in TEAMS:
               upsert vào department_reports
 ```
 
-`TEAMS = [IT, CSKH, Vận hành, Marketing]`.
+`TEAMS = list(DEPARTMENTS)` → IT, CSKH, Vận hành, Tài chính & Thanh toán, Sản phẩm, Quản lý Rủi ro & Gian lận.
 
 Một chi tiết dễ nhầm: `insight_agent` bên trong tự gọi `router_agent.route_ticket` cho từng feedback để lọc đúng phòng, nên `router_agent` được dùng ở cả Step 3 lẫn Step 6.
 
@@ -57,7 +57,7 @@ Helper chung trong `agents/common.py`: `get_db()` (Supabase client singleton), `
 `route_ticket(topic, severity, sentiment=None)` đọc `data/taxonomy/routing_table.json`. Thứ tự ưu tiên:
 
 1. `severity_overrides`: P5 → Vận hành (thắng tất cả).
-2. `sentiment_overrides`: positive → Marketing.
+2. `sentiment_overrides`: positive (Other/App Issue) → Sản phẩm.
 3. `routes`: match theo topic.
 4. `default_team`: CSKH.
 
@@ -68,12 +68,12 @@ Bảng route thật:
 | Safety | Vận hành | 1h | P5 |
 | Driver Behavior | Vận hành | 8h | P3 |
 | App Issue | IT | 12h | P3 |
-| Payment | CSKH | 12h | P3 |
-| Pricing | CSKH | 12h | P3 |
+| Payment | Tài chính & Thanh toán | 12h | P3 |
+| Pricing | Quản lý Rủi ro & Gian lận | 12h | P3 |
 | Delay | Vận hành | 8h | P3 |
 | Other | CSKH | 24h | P4 |
 
-Override: P5 → Vận hành (1h); sentiment positive → Marketing (48h). Agent chỉ đọc JSON, đổi routing không cần sửa code.
+Override: P5 → Vận hành (1h); sentiment positive (Other/App Issue) → Sản phẩm (48h). Agent chỉ đọc JSON, đổi routing không cần sửa code.
 
 ### ticket_agent — tạo ticket
 
@@ -91,7 +91,7 @@ Override: P5 → Vận hành (1h); sentiment positive → Marketing (48h). Agent
 
 `analyze_root_cause(team, insights)` lấy recent samples, build system prompt theo persona phòng ban, gọi LLM trả JSON `{root_cause_summary, risk_level, action_items}`. Fallback `_fallback_analysis` dùng `fallback_actions` của persona khi LLM lỗi. Agent không tự ghi DB; orchestrator mới upsert kết quả vào `department_reports`, trong đó `action_items` được lưu thành cột `suggested_tasks` (JSONB) và `root_cause_summary` lưu thành cột riêng — đây là dữ liệu manager biên tập rồi duyệt thành task ở luồng HI-Loop Approval (xem `co_che.md` mục 8).
 
-Persona theo phòng ban hardcode trong dict `DEPARTMENT_PERSONAS` ngay trong `analyst_agent.py` (không đọc file/DB ngoài). Mỗi key (Safety, Pricing, IT, CSKH, Vận hành, Marketing) có persona, priorities (chèn vào system prompt) và `fallback_actions`. Phòng không có trong dict thì dùng persona rỗng + action generic.
+Persona theo phòng ban hardcode trong dict `DEPARTMENT_PERSONAS` ngay trong `analyst_agent.py` (không đọc file/DB ngoài). Mỗi key (IT, CSKH, Vận hành, Tài chính & Thanh toán, Sản phẩm, Quản lý Rủi ro & Gian lận) có persona, priorities (chèn vào system prompt) và `fallback_actions`. Phòng không có trong dict thì dùng persona rỗng + action generic.
 
 ### llm_agent — phân tích spike
 

@@ -23,7 +23,7 @@ Phản hồi khách hàng (text)
     agents/router_agent.route_ticket()
       - Đọc data/taxonomy/routing_table.json
       - Thứ tự ưu tiên: P5 override > sentiment override > topic match > default
-    --> phòng ban (IT / CSKH / Vận hành / Marketing), SLA, priority
+    --> phòng ban (IT / CSKH / Vận hành / Tài chính & Thanh toán / Sản phẩm / Quản lý Rủi ro & Gian lận), SLA, priority
         |
         v
 [3] PHÁT HIỆN SPIKE & SINH TICKET
@@ -90,7 +90,7 @@ Kết quả trả về: `{ topic, sentiment, severity ('P1'..'P5'), confidence, 
 Hàm `route_ticket(topic, severity, sentiment)` đọc `data/taxonomy/routing_table.json` và chạy theo thứ tự ưu tiên cứng:
 
 1. **Severity override:** P5 ép về Vận hành, SLA 1 giờ, bất kể topic hay sentiment.
-2. **Sentiment override:** Positive + topic thuộc danh sách `["Other"]` ép về Marketing. Positive về App Issue, Payment, Driver Behavior không khớp danh sách, nên rơi xuống topic match (đúng phòng chuyên môn).
+2. **Sentiment override:** Positive + topic thuộc danh sách `["Other", "App Issue"]` ép về Sản phẩm. Positive về Payment, Driver Behavior không khớp danh sách, nên rơi xuống topic match (đúng phòng chuyên môn).
 3. **Topic match:** Tra bảng routes theo topic.
 4. **Default:** CSKH nếu không khớp gì.
 
@@ -130,5 +130,5 @@ Nhân viên xem task trên `tasks.tsx`. Mỗi task từ báo cáo hiển thị b
 
 - Tất cả 6 chặng trên đang hoạt động trong production.
 - HI-Loop Approval đã được triển khai đầy đủ (xem commit lịch sử gần nhất).
-- Có 4 phòng ban: IT, CSKH, Vận hành, Marketing. Không có phòng ban thứ 5 hay thứ 6 nào trong hệ thống hiện tại.
+- Có 6 phòng ban: IT, CSKH, Vận hành, Tài chính & Thanh toán, Sản phẩm, Quản lý Rủi ro & Gian lận.
 - Accuracy định tuyến và cách đo trung thực: xem `docs/project/architecture/routing-taxonomy.md`.

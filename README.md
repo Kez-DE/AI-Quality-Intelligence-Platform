@@ -25,7 +25,7 @@ Mục tiêu: giúp đội ngũ vận hành nắm bắt nhanh vấn đề chất 
 | 3 | Ma trận Rủi ro Sâu | Chấm điểm 5 chiều (safety, fraud, attitude, vehicle, compliance) qua LLM Scoring Agent |
 | 4 | Phát hiện Spike | Nhận diện điểm nóng → tự động tạo alert ticket |
 | 5 | Multi-Agent | 8 agent nghiệp vụ + Orchestrator |
-| 6 | Phân tích phòng ban | Báo cáo AI 4 phòng ban theo lịch (09:00 & 14:00, nhiều báo cáo/ngày), cấu trúc 3 khối Vấn đề → Phân tích → Đề xuất, phân tích sâu bằng LLM |
+| 6 | Phân tích phòng ban | Báo cáo AI 6 phòng ban theo lịch (09:00 & 14:00, nhiều báo cáo/ngày), cấu trúc 3 khối Vấn đề → Phân tích → Đề xuất, phân tích sâu bằng LLM |
 | 7 | Human-in-the-Loop | Hàng đợi duyệt nhãn — nhân viên sửa nhãn AI, ghi correction log |
 | 8 | AI Chat & RAG (Tiered) | Hỏi đáp tích hợp Hybrid Search KB, tự động phân quyền truy cập (Guest: Public FAQ / Staff: Internal Ops Tools) |
 | 9 | Streaming Realtime | Ingest phản hồi theo luồng thời gian thực |
@@ -182,7 +182,7 @@ C2-App-116/
 - **Staff**: công việc hàng ngày phòng mình — feedback, tasks, chat
 - **Guest**: dashboard, feedback, chat hỗ trợ CSKH
 
-Ngoài role, mỗi ops user gắn một **phòng ban** (IT/CSKH/Vận hành/Marketing) quyết định họ thấy dữ liệu của ai. Manager/staff chỉ xem và thao tác trong phòng mình; admin xem tất cả. Chi tiết cơ chế scope: [`docs/project/rbac-departments.md`](docs/project/rbac-departments.md).
+Ngoài role, mỗi ops user gắn một **phòng ban** (IT/CSKH/Vận hành/Tài chính & Thanh toán/Sản phẩm/Quản lý Rủi ro & Gian lận) quyết định họ thấy dữ liệu của ai. Manager/staff chỉ xem và thao tác trong phòng mình; admin xem tất cả. Chi tiết cơ chế scope: [`docs/project/rbac-departments.md`](docs/project/rbac-departments.md).
 
 ---
 
@@ -221,7 +221,7 @@ Kịch bản chi tiết: [`docs/project/demo-script.md`](docs/project/demo-scrip
 | [`docs/project/architecture.md`](docs/project/architecture.md) | Kiến trúc tổng thể, 3 tầng, cấu trúc data, 6 service |
 | [`docs/project/architecture-diagram.md`](docs/project/architecture-diagram.md) | Sơ đồ Mermaid các module |
 | [`docs/project/architecture/e2e-flow.md`](docs/project/architecture/e2e-flow.md) | Luồng xử lý phản hồi đầu cuối (E2E) — hiện trạng thực tế của code |
-| [`docs/project/architecture/routing-taxonomy.md`](docs/project/architecture/routing-taxonomy.md) | Taxonomy định tuyến: 4 phòng ban, bảng topic→phòng, quy tắc override, accuracy holdout (75.4% dept) |
+| [`docs/project/architecture/routing-taxonomy.md`](docs/project/architecture/routing-taxonomy.md) | Taxonomy định tuyến: 6 phòng ban, bảng topic→phòng, quy tắc override, accuracy holdout (71.1% dept) |
 | [`docs/project/ai-systems.md`](docs/project/ai-systems.md) | 4 lớp AI, LLM router, luồng dữ liệu theo worker |
 | [`docs/project/agents-guide.md`](docs/project/agents-guide.md) | 8 agent + orchestrator: thứ tự thực thi, I/O, routing |
 | [`docs/project/rbac-departments.md`](docs/project/rbac-departments.md) | Phân quyền role + scope theo phòng ban |

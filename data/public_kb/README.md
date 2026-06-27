@@ -23,7 +23,7 @@ không tìm thấy mục phù hợp, chatbot phải hướng khách về kênh h
 | `an_toan.md` | Safety | Tai nạn, chuyến xe không an toàn, thông tin xe/tài xế không khớp |
 | `dat_xe_dich_vu.md` | Vận hành | Đặt xe, chọn dịch vụ, hủy/chỉnh chuyến |
 | `cuoc_phi_thanh_toan.md` | CSKH | Phương thức thanh toán, cước phí, hóa đơn, trừ tiền |
-| `khuyen_mai_uu_dai.md` | Marketing | Mã khuyến mãi, ưu đãi, điểm/hạng thành viên |
+| `khuyen_mai_uu_dai.md` | Sản phẩm | Mã khuyến mãi, ưu đãi, điểm/hạng thành viên |
 | `tai_khoan.md` | CSKH | Đăng ký, đăng nhập, đổi thông tin tài khoản |
 | `ho_tro_phan_hoi.md` | CSKH | Lỗi app, gửi yêu cầu hỗ trợ, góp ý |
 | `ho_tro_khieu_nai.md` | CSKH | Kênh khiếu nại, hỗ trợ khách hàng, quyền dữ liệu cá nhân |

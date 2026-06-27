@@ -2,7 +2,7 @@
 document_title: Hỏi đáp khách hàng — Khuyến mãi & ưu đãi (Green SM/xanhSM)
 category: faq
 audience: public
-topic_group: Marketing
+topic_group: Sản phẩm
 source_url: https://www.greensm.com/vn-vi/helps
 source: greensm_help_center
 source_checked_at: 2026-06-19

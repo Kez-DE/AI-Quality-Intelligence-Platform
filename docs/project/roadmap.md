@@ -1,13 +1,14 @@
 # Lộ trình mở rộng
 
-> Định hướng tương lai, **chưa triển khai**. Hệ thống hiện chạy **4 phòng ban**: IT, CSKH,
-> Vận hành, Marketing. Tài liệu này ghi lại hướng mở rộng để tham khảo khi cần, không phản ánh
-> trạng thái hiện tại. Nội dung được tách ra từ kế hoạch HI-Loop gốc của team.
+> Lộ trình mở rộng. Mục **"Mở rộng danh sách phòng ban (4 lên 6)"** đã **triển khai (2026-06-27)**:
+> hệ thống hiện chạy **6 phòng ban** — IT, CSKH, Vận hành, Tài chính & Thanh toán, Sản phẩm,
+> Quản lý Rủi ro & Gian lận. Các mục còn lại (Global Report chéo phòng và Các hướng khác) vẫn là
+> định hướng tương lai, **chưa triển khai**. Nội dung được tách ra từ kế hoạch HI-Loop gốc của team.
 
-## Mở rộng danh sách phòng ban (4 lên 6)
+## Mở rộng danh sách phòng ban (4 lên 6) — ✅ đã triển khai (2026-06-27)
 
-Khi cần phủ toàn bộ nghiệp vụ của greenSM, hệ thống có thể mở rộng định tuyến và xử lý lên sáu
-phòng ban:
+Hệ thống đã mở rộng định tuyến và xử lý lên sáu phòng ban (chi tiết:
+`docs/superpowers/specs/2026-06-27-six-departments-design.md`):
 
 | # | Phòng ban | Vai trò |
 | --- | --- | --- |
@@ -19,6 +20,9 @@ phòng ban:
 | 6 | Quản lý Rủi ro và Gian lận (Risk & Fraud) | Phát hiện gian lận, lạm dụng khuyến mãi, tài khoản bất thường |
 
 ## Cơ chế chia việc khi lên 6 phòng
+
+> Router Agent (mục 1) và Analyst Agent (mục 2) đã triển khai cùng đợt 4→6 (2026-06-27).
+> Global Report chéo phòng (mục 3) vẫn **chưa triển khai**.
 
 ### 1. Nâng cấp Router Agent
 

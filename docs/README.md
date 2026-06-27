@@ -98,7 +98,7 @@ và gộp phần AI vào `ai-systems.md`; các file còn lại trỏ về ba fil
 
 | File | Mục đích |
 | --- | --- |
-| `architecture/routing-taxonomy.md` | 4 phòng ban và bảng topic đến phòng |
+| `architecture/routing-taxonomy.md` | 6 phòng ban và bảng topic đến phòng |
 | `architecture/e2e-flow.md` | Luồng đầu cuối, dùng để đối chiếu code |
 
 ## Spec và plan (`docs/superpowers/`)

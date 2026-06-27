@@ -56,12 +56,12 @@ Lưới Safety luôn thắng. Bất kỳ review nào chứa từ khóa nguy hi�
 | Safety | Vận hành | 1 giờ | P5 |
 | Driver Behavior | Vận hành | 8 giờ | P3 |
 | App Issue | IT | 12 giờ | P3 |
-| Payment | CSKH | 12 giờ | P3 |
-| Pricing | CSKH | 12 giờ | P3 |
+| Payment | Tài chính & Thanh toán | 12 giờ | P3 |
+| Pricing | Quản lý Rủi ro & Gian lận | 12 giờ | P3 |
 | Delay | Vận hành | 8 giờ | P3 |
 | Other | CSKH | 24 giờ | P4 |
 
-Hai luật ghi đè quan trọng. Mọi ticket P5 bị ép về Vận hành (đội phản ứng nhanh) bất kể chủ đề. Phản hồi tích cực chung chưa gắn chủ đề chuyên môn (positive + Other) chuyển về Marketing để khai thác truyền thông; còn positive về app, tài xế hay thanh toán vẫn về đúng phòng chuyên môn theo topic.
+Hai luật ghi đè quan trọng. Mọi ticket P5 bị ép về Vận hành (đội phản ứng nhanh) bất kể chủ đề. Phản hồi tích cực chung hoặc góp ý tính năng (positive + Other/App Issue) chuyển về Sản phẩm để khai thác nâng cấp UX/UI; còn positive gắn chủ đề chuyên môn khác (thanh toán, tài xế, giá cước...) vẫn về đúng phòng theo topic.
 
 Router quyết định phòng ban. LLM không được tự gán phòng, nó chỉ viết tiêu đề, mô tả nguyên nhân và hành động đề xuất.
 
@@ -80,7 +80,7 @@ Bốn role:
 | `staff` | Nhân viên | Việc hàng ngày của phòng mình: feedback, tasks, support, chat |
 | `guest` | Khách | Dashboard rút gọn, gửi feedback, chat hỗ trợ CSKH |
 
-Bốn phòng ban: IT, CSKH, Vận hành, Marketing. Một tài khoản vận hành (admin/manager/staff) có thể chưa được gán phòng. Khi đó họ chưa xem được dữ liệu phòng nào cho tới khi admin gán.
+Sáu phòng ban: IT, CSKH, Vận hành, Tài chính & Thanh toán, Sản phẩm, Quản lý Rủi ro & Gian lận. Một tài khoản vận hành (admin/manager/staff) có thể chưa được gán phòng. Khi đó họ chưa xem được dữ liệu phòng nào cho tới khi admin gán.
 
 Cách hệ thống chặn xem chéo phòng: backend chạy bằng service role key của Supabase nên bỏ qua RLS của Postgres. Vì vậy mọi kiểm tra quyền nằm ở tầng API trong `pipeline/auth_guard.py`. Có hai helper:
 

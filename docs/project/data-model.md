@@ -60,7 +60,7 @@ Hồ sơ người dùng, mở rộng từ `auth.users`. Mỗi user Supabase có 
 | `email` | TEXT | Email, sao chép từ auth lúc đăng ký. |
 | `full_name` | TEXT | Tên hiển thị. Mặc định lấy phần trước `@` của email nếu không khai báo. |
 | `role` | TEXT | Vai trò RBAC: `admin`, `manager`, `staff`, `guest`. Mặc định `guest` (xem mục 9). |
-| `department` | TEXT | Phòng ban: `IT`, `CSKH`, `Vận hành`, `Marketing`. `NULL` nghĩa là chưa được gán phòng, khi đó ops user chưa xem được dữ liệu phòng nào. |
+| `department` | TEXT | Phòng ban: `IT`, `CSKH`, `Vận hành`, `Tài chính & Thanh toán`, `Sản phẩm`, `Quản lý Rủi ro & Gian lận`. `NULL` nghĩa là chưa được gán phòng, khi đó ops user chưa xem được dữ liệu phòng nào. |
 | `created_at` / `updated_at` | TIMESTAMPTZ | Thời điểm tạo và cập nhật. |
 
 Ứng dụng: quyết định một người thấy gì và làm được gì. `role` chia theo bậc quyền, `department`
@@ -148,10 +148,10 @@ chủ đề)`.
 | `severity` | TEXT | `P1`..`P5`. Mặc định `P2`. |
 | `area` | TEXT | Khu vực. |
 | `status` | TEXT | `open`, `in_progress`, hoặc trạng thái đã xử lý. Mặc định `open`. |
-| `assigned_team` | TEXT | Phòng nhận ticket: `IT`, `CSKH`, `Vận hành`, `Marketing`. |
+| `assigned_team` | TEXT | Phòng nhận ticket: `IT`, `CSKH`, `Vận hành`, `Tài chính & Thanh toán`, `Sản phẩm`, `Quản lý Rủi ro & Gian lận`. |
 | `topic` | TEXT | Chủ đề định tuyến. |
 | `priority` | TEXT | Ưu tiên xử lý. |
-| `ticket_type` | TEXT | `incident` cho rủi ro vận hành, `opportunity` cho cụm tích cực của Marketing. Mặc định `incident`. |
+| `ticket_type` | TEXT | `incident` cho rủi ro vận hành, `opportunity` cho cụm tích cực của Sản phẩm. Mặc định `incident`. |
 | `routing_source` | TEXT | Nguồn quyết định định tuyến (rule nào, bảng nào). |
 | `sla_due_at` | TIMESTAMPTZ | Hạn SLA. |
 | `task_id` | UUID | Trỏ tới `tasks` khi alert đã được gom vào một công việc. |
@@ -172,7 +172,7 @@ hoặc do manager duyệt báo cáo rồi triển khai (`source=report`).
 | `owner_id` | UUID | Nhân viên (staff) được giao. `NULL` khi chưa giao. Xoá user thì về `NULL`. |
 | `title` | TEXT | Tên việc. |
 | `summary` | TEXT | Mô tả ngắn. |
-| `assigned_team` | TEXT | Phòng phụ trách: `IT`, `CSKH`, `Vận hành`, `Marketing`. |
+| `assigned_team` | TEXT | Phòng phụ trách: `IT`, `CSKH`, `Vận hành`, `Tài chính & Thanh toán`, `Sản phẩm`, `Quản lý Rủi ro & Gian lận`. |
 | `topic` | TEXT | Chủ đề. |
 | `area` | TEXT | Khu vực. |
 | `priority` | TEXT | `P1`..`P5`. Mặc định `P2`. |
@@ -324,7 +324,7 @@ Các giá trị này lặp lại ở nhiều bảng; gom về một chỗ để 
 | Khái niệm | Giá trị hợp lệ | Xuất hiện ở |
 |---|---|---|
 | Vai trò (role) | `admin`, `manager`, `staff`, `guest` | `profiles.role` |
-| Phòng ban | `IT`, `CSKH`, `Vận hành`, `Marketing` | `profiles.department`, `alerts.assigned_team`, `tasks.assigned_team` |
+| Phòng ban | `IT`, `CSKH`, `Vận hành`, `Tài chính & Thanh toán`, `Sản phẩm`, `Quản lý Rủi ro & Gian lận` | `profiles.department`, `alerts.assigned_team`, `tasks.assigned_team` |
 | Chủ đề (topic) | `Safety`, `Driver Behavior`, `App Issue`, `Payment`, `Pricing`, `Delay`, `Other` | `feedback.topic`, `tasks.topic` |
 | Cảm xúc | `positive`, `neutral`, `negative` | `feedback.sentiment` |
 | Mức nghiêm trọng | `P1`..`P5` (P5 nặng nhất) | `feedback.severity`, `alerts.severity`, `*.priority` |
@@ -334,10 +334,11 @@ Các giá trị này lặp lại ở nhiều bảng; gom về một chỗ để 
 | Trạng thái duyệt báo cáo hoàn thành | `submitted`, `approved`, `rejected` | `task_completion_reports.status` |
 | Mốc audit task | `assigned`, `accepted`, `completion_submitted`, `completion_approved`, `completion_rejected`, `reopened`, `status_changed` | `task_events.action` |
 
-Ghi chú lịch sử: trước đây hệ thống có thêm phòng `Safety` và `Pricing`. Từ migration
-`20260625000000`, hai cái này không còn là phòng ban (topic `Safety` định tuyến về `Vận hành`,
-topic `Pricing` về `CSKH`). `Safety` và `Pricing` vẫn tồn tại như topic và như persona phân
-tích, nhưng không gán user vào đó nữa.
+Ghi chú lịch sử: trước đây hệ thống có thêm phòng `Safety` và `Pricing` (bỏ ở migration
+`20260625000000`) và `Marketing` (bỏ ở migration `20260630000000`, reassign user + dữ liệu
+lịch sử về `Sản phẩm`). Các topic vẫn được định tuyến: topic `Safety` về `Vận hành`, topic
+`Pricing` về `Quản lý Rủi ro & Gian lận`. `Safety` và `Pricing` vẫn tồn tại như topic định
+tuyến, nhưng không gán user vào đó nữa.
 
 ## 10. Hàm và trigger trong database
 

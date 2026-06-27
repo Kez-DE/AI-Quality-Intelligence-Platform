@@ -13,9 +13,9 @@ Hệ thống có hai trục phân quyền: **role** (cấp độ quyền) và **
 
 `VALID_ROLES = {admin, manager, staff, guest}`. `OPS_ROLES = {admin, manager, staff}` là nhóm nhân sự vận hành (phân biệt với guest).
 
-## 4 phòng ban
+## 6 phòng ban
 
-`IT`, `CSKH`, `Vận hành`, `Marketing`. Định nghĩa ở `DEPARTMENTS` (`departments.py`), `DEPARTMENT_PERSONAS` (`analyst_agent.py`) và `valid_departments` (`users_admin.py`). Một ops user có thể chưa được gán phòng (`department = null`), khi đó không xem được dữ liệu phòng nào cho tới khi admin gán.
+`IT`, `CSKH`, `Vận hành`, `Tài chính & Thanh toán`, `Sản phẩm`, `Quản lý Rủi ro & Gian lận`. Định nghĩa ở `DEPARTMENTS` (`departments.py`), `DEPARTMENT_PERSONAS` (`analyst_agent.py`) và `valid_departments` (`users_admin.py`). Một ops user có thể chưa được gán phòng (`department = null`), khi đó không xem được dữ liệu phòng nào cho tới khi admin gán.
 
 ---
 
@@ -75,7 +75,7 @@ Endpoint admin-only (qua `require_admin`): `GET /api/agent/stats`, `POST /api/in
 ## Quản lý user — `users_admin.py`
 
 - `PATCH /api/users/{id}/role` — đổi role; chặn admin tự đổi quyền chính mình; ghi `audit_logs` action `role_change`.
-- `PATCH /api/users/{id}/department` — gán phòng; `valid_departments = [null, IT, CSKH, Vận hành, Marketing]`; ghi audit.
+- `PATCH /api/users/{id}/department` — gán phòng; `valid_departments = [null, IT, CSKH, Vận hành, Tài chính & Thanh toán, Sản phẩm, Quản lý Rủi ro & Gian lận]`; ghi audit.
 
 Bootstrap: user đăng ký **đầu tiên** thành admin (migration RBAC), các user sau mặc định guest.
 
@@ -89,7 +89,7 @@ Endpoint `POST /api/agent/chat` phân hai luồng:
 
 **Ops (staff/manager/admin)** dùng `AGENT_SYSTEM_PROMPT` + RAG nội bộ. Trong `agent_chat`, `scope_team = user.department` nếu role khác admin và có phòng, ngược lại None (admin xem toàn hệ thống). `scope_team` được truyền xuống `run_chat_agent`, rồi `execute_tool` ép mọi tool lọc về đúng phòng đó để chống rò rỉ dữ liệu chéo phòng.
 
-RAG nội bộ (`knowledge_base.py`) lọc chunk theo `department` trong frontmatter: phòng không có tài liệu thì trả rỗng, **không** fallback sang phòng khác. KB hiện chỉ có doc cho 4 phòng (Safety, CSKH, Vận hành, IT); Pricing và Marketing trả rỗng là đúng thiết kế.
+RAG nội bộ (`knowledge_base.py`) lọc chunk theo `department` trong frontmatter: phòng không có tài liệu thì trả rỗng, **không** fallback sang phòng khác. KB nội bộ hiện chỉ có doc cho IT, CSKH, Vận hành (và nhóm SOP Safety); ba phòng Tài chính & Thanh toán, Sản phẩm, Quản lý Rủi ro & Gian lận chưa có tài liệu nên trả rỗng là đúng thiết kế.
 
 Cả hai luồng đều mask PII (`mask_pii`) ở input và output trước/sau khi gọi LLM.
 

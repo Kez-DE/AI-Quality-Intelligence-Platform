@@ -17,9 +17,9 @@ Runtime hiện tại không dùng pgvector, migration `knowledge_chunks`, hay sc
 4. Tìm kiếm bằng keyword/BM25-lite, có bỏ dấu tiếng Việt và boost theo title/tags.
 5. Nếu có `department`, chỉ trả tài liệu đúng phòng ban để khớp RBAC.
 
-Pricing và Marketing chưa có tài liệu nội bộ trong folder này; khi lọc đúng hai
-phòng đó, retriever trả rỗng là hành vi mong muốn để tránh leak tài liệu phòng
-khác.
+Tài chính & Thanh toán, Sản phẩm và Quản lý Rủi ro & Gian lận chưa có tài liệu nội bộ
+trong folder này; khi lọc đúng các phòng đó, retriever trả rỗng là hành vi mong muốn để
+tránh leak tài liệu phòng khác.
 
 ## Cấu trúc
 
