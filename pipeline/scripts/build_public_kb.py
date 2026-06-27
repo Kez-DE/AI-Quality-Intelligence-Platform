@@ -15,7 +15,7 @@ SECTIONS = {
     "1": ("an_toan", "An toàn & sự cố", "Safety"),
     "2": ("dat_xe_dich_vu", "Đặt xe & dịch vụ", "Vận hành"),
     "3": ("cuoc_phi_thanh_toan", "Cước phí & thanh toán", "CSKH"),
-    "4": ("khuyen_mai_uu_dai", "Khuyến mãi & ưu đãi", "Marketing"),
+    "4": ("khuyen_mai_uu_dai", "Khuyến mãi & ưu đãi", "Sản phẩm"),
     "5": ("tai_khoan", "Tài khoản", "CSKH"),
     "6": ("ho_tro_phan_hoi", "Hỗ trợ & phản hồi", "CSKH"),
 }
