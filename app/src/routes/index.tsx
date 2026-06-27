@@ -1,17 +1,23 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+  Activity,
   ArrowRight,
   BarChart3,
   Bell,
   Brain,
   Car,
+  CheckCircle2,
+  Clock,
   Layers,
   MessageSquare,
   Shield,
+  ShieldCheck,
   Sparkles,
+  TrendingUp,
   Workflow,
   Zap,
 } from "lucide-react";
+import { Card } from "@/components/ui/card";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -36,6 +42,7 @@ function Landing() {
         <div className="absolute top-1/4 -left-32 h-[24rem] w-[24rem] rounded-full bg-xanh-cyan/15 blur-3xl" />
         <div className="absolute bottom-0 left-1/3 h-[20rem] w-[20rem] rounded-full bg-xanh-mint/40 blur-3xl" />
       </div>
+
       {/* Nav */}
       <header className="sticky top-0 z-30 backdrop-blur-xl bg-background/70 border-b border-border/60">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -72,8 +79,7 @@ function Landing() {
             </div>
             <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold leading-[1.05]">
               Biến hàng nghìn phản hồi mỗi ngày thành{" "}
-              <span className="text-xanh-green">hành động vận hành</span>
-              .
+              <span className="text-xanh-green">hành động vận hành</span>.
             </h1>
             <p className="mt-5 text-lg text-muted-foreground max-w-2xl">
               Quality Operation Cockpit cho xanhSM — phân loại tự động, phát hiện
@@ -91,10 +97,23 @@ function Landing() {
               </Link>
               <Link
                 to="/auth"
-                className="h-12 px-6 rounded-xl border border-border bg-card font-semibold flex items-center gap-2 hover:border-xanh-green/40"
+                className="h-12 px-6 rounded-xl border border-border bg-card/80 backdrop-blur font-semibold flex items-center gap-2 hover:border-xanh-green/40 transition-colors"
               >
                 Đăng nhập
               </Link>
+            </div>
+
+            {/* Hàng tin cậy — điểm nhấn năng lực lõi */}
+            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-mono text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5 text-success" /> Realtime ingest
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <ShieldCheck className="h-3.5 w-3.5 text-success" /> PII masking
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Brain className="h-3.5 w-3.5 text-success" /> Multi-agent LLM
+              </span>
             </div>
           </div>
           <div className="lg:col-span-5">
@@ -105,12 +124,12 @@ function Landing() {
 
       {/* Features */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
-        <div className="text-center max-w-2xl mx-auto mb-10">
-          <div className="text-xs font-mono text-xanh-deep">TÍNH NĂNG</div>
-          <h2 className="font-display text-3xl sm:text-4xl font-bold mt-1">
-            Một khoang lái — toàn bộ vòng đời chất lượng
-          </h2>
-        </div>
+        <SectionTitle
+          icon={Sparkles}
+          eyebrow="TÍNH NĂNG"
+          title="Một khoang lái — toàn bộ vòng đời chất lượng"
+          sub="Từ thu thập phản hồi đến hành động vận hành, tất cả trong một cockpit."
+        />
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Feature
             icon={MessageSquare}
@@ -147,12 +166,12 @@ function Landing() {
 
       {/* Personas */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
-        <div className="text-center max-w-2xl mx-auto mb-10">
-          <div className="text-xs font-mono text-xanh-deep">AI CẦN DỰ ÁN NÀY?</div>
-          <h2 className="font-display text-3xl sm:text-4xl font-bold mt-1">
-            Phục vụ tài xế xe công nghệ & doanh nghiệp như VinGroup / xanhSM
-          </h2>
-        </div>
+        <SectionTitle
+          icon={Layers}
+          eyebrow="AI CẦN DỰ ÁN NÀY?"
+          title="Phục vụ tài xế xe công nghệ & doanh nghiệp như VinGroup / xanhSM"
+          sub="Mỗi vai trò vận hành đều có góc nhìn riêng trên cùng một nguồn dữ liệu."
+        />
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[
             { icon: Layers, t: "CS Team", d: "Xử lý phản hồi nhanh hơn, ưu tiên tự động." },
@@ -161,16 +180,16 @@ function Landing() {
           ].map((p) => {
             const Icon = p.icon;
             return (
-              <div
+              <Card
                 key={p.t}
-                className="rounded-2xl border border-border bg-card p-5 hover:shadow-[var(--shadow-card)] transition-shadow"
+                className="rounded-2xl border bg-card/80 backdrop-blur p-5 hover:border-xanh-green/40 hover:shadow-[var(--shadow-card)] transition-all"
               >
-                <div className="h-10 w-10 rounded-lg bg-xanh-mint grid place-items-center">
+                <div className="h-11 w-11 rounded-xl bg-xanh-mint grid place-items-center">
                   <Icon className="h-5 w-5 text-xanh-deep" />
                 </div>
                 <div className="font-display font-semibold mt-3">{p.t}</div>
-                <div className="text-sm text-muted-foreground mt-1">{p.d}</div>
-              </div>
+                <div className="text-sm text-muted-foreground mt-1 leading-relaxed">{p.d}</div>
+              </Card>
             );
           })}
         </div>
@@ -179,22 +198,26 @@ function Landing() {
       {/* CTA */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-20">
         <div
-          className="rounded-3xl p-10 text-white text-center"
+          className="relative overflow-hidden rounded-3xl p-10 sm:p-12 text-white text-center shadow-[var(--shadow-green)]"
           style={{ background: "var(--gradient-hero)" }}
         >
-          <h2 className="font-display text-3xl sm:text-4xl font-bold">
-            Sẵn sàng phát hiện sự cố sớm?
-          </h2>
-          <p className="mt-3 opacity-90 max-w-xl mx-auto">
-            Đăng nhập vào Quality Operation Cockpit — bắt đầu phân tích phản hồi
-            và chat với AI ngay hôm nay.
-          </p>
-          <Link
-            to="/auth"
-            className="inline-flex mt-6 h-12 px-7 rounded-xl bg-card text-xanh-deep font-semibold items-center gap-2 hover:scale-[1.02] transition-transform"
-          >
-            Đăng nhập <ArrowRight className="h-4 w-4" />
-          </Link>
+          <div className="pointer-events-none absolute -top-16 -right-10 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-20 -left-10 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
+          <div className="relative">
+            <h2 className="font-display text-3xl sm:text-4xl font-bold">
+              Sẵn sàng phát hiện sự cố sớm?
+            </h2>
+            <p className="mt-3 opacity-90 max-w-xl mx-auto">
+              Đăng nhập vào Quality Operation Cockpit — bắt đầu phân tích phản hồi
+              và chat với AI ngay hôm nay.
+            </p>
+            <Link
+              to="/auth"
+              className="inline-flex mt-6 h-12 px-7 rounded-xl bg-card text-xanh-deep font-semibold items-center gap-2 hover:scale-[1.02] transition-transform shadow-lg"
+            >
+              Đăng nhập <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -208,6 +231,82 @@ function Landing() {
   );
 }
 
+function SectionTitle({
+  icon: Icon,
+  eyebrow,
+  title,
+  sub,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  eyebrow?: string;
+  title: string;
+  sub?: string;
+}) {
+  return (
+    <div className="flex items-start gap-3 mb-8">
+      <div className="h-11 w-11 rounded-xl bg-primary/10 text-primary grid place-items-center shrink-0">
+        <Icon className="h-5 w-5" />
+      </div>
+      <div>
+        {eyebrow && (
+          <div className="text-xs font-mono font-semibold uppercase tracking-wider text-xanh-deep">
+            {eyebrow}
+          </div>
+        )}
+        <h2 className="font-display text-2xl sm:text-3xl font-bold tracking-tight mt-1 leading-tight">
+          {title}
+        </h2>
+        {sub && <p className="text-sm text-muted-foreground mt-2 max-w-2xl">{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  trend,
+  tone = "default",
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  sub?: string;
+  trend?: string;
+  tone?: "default" | "good";
+}) {
+  return (
+    <Card
+      className={`p-4 bg-card/80 backdrop-blur hover:shadow-[var(--shadow-card)] transition-all ${
+        tone === "good" ? "ring-1 ring-primary/30" : ""
+      }`}
+    >
+      <div className="flex items-start justify-between">
+        <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+          {label}
+        </span>
+        <Icon className="h-4 w-4 text-primary" />
+      </div>
+      <div className="mt-2 font-display text-2xl font-bold tracking-tight text-xanh-deep">
+        {value}
+      </div>
+      {(trend || sub) && (
+        <div className="mt-1 flex items-center gap-1.5 text-[11px]">
+          {trend && (
+            <span className="inline-flex items-center gap-0.5 font-semibold text-success">
+              <TrendingUp className="h-3 w-3" />
+              {trend}
+            </span>
+          )}
+          {sub && <span className="text-muted-foreground">{sub}</span>}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function Feature({
   icon: Icon,
   title,
@@ -218,53 +317,52 @@ function Feature({
   desc: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 hover:border-xanh-green/40 transition-colors">
+    <Card className="rounded-2xl border bg-card/80 backdrop-blur p-5 hover:border-xanh-green/40 hover:shadow-[var(--shadow-card)] transition-all">
       <div
-        className="h-10 w-10 rounded-lg grid place-items-center text-white"
+        className="h-11 w-11 rounded-xl grid place-items-center text-white shadow-[var(--shadow-green)]"
         style={{ background: "var(--gradient-green)" }}
       >
         <Icon className="h-5 w-5" />
       </div>
       <div className="font-display font-semibold mt-3">{title}</div>
-      <div className="text-sm text-muted-foreground mt-1">{desc}</div>
-    </div>
+      <div className="text-sm text-muted-foreground mt-1 leading-relaxed">{desc}</div>
+    </Card>
   );
 }
 
 function PreviewCard() {
   return (
-    <div className="rounded-3xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-xs font-mono text-muted-foreground">QUALITY · SNAPSHOT</div>
+    <Card className="rounded-3xl border bg-card/80 backdrop-blur p-5 shadow-[var(--shadow-card)]">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary grid place-items-center">
+            <Activity className="h-4 w-4" />
+          </div>
+          <div className="text-xs font-mono text-muted-foreground">QUALITY · SNAPSHOT</div>
+        </div>
         <span className="text-[10px] font-mono text-xanh-green inline-flex items-center gap-1">
           <span className="h-1.5 w-1.5 rounded-full bg-xanh-green animate-pulse" /> LIVE
         </span>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        {[
-          { v: "12,480", l: "Feedback/ngày" },
-          { v: "97.4%", l: "Auto-classified" },
-          { v: "4.2′", l: "MTTD sự cố" },
-          { v: "94%", l: "SLA on-time" },
-        ].map((s) => (
-          <div
-            key={s.l}
-            className="rounded-xl p-3 border border-border bg-gradient-to-br from-card to-xanh-mint/40"
-          >
-            <div className="font-display text-2xl font-bold text-xanh-deep">{s.v}</div>
-            <div className="text-[11px] text-muted-foreground">{s.l}</div>
-          </div>
-        ))}
+        <StatCard
+          icon={MessageSquare}
+          label="Feedback/ngày"
+          value="12,480"
+          trend="8.2%"
+          tone="good"
+        />
+        <StatCard icon={Brain} label="Auto-classified" value="97.4%" sub="confidence cao" tone="good" />
+        <StatCard icon={Clock} label="MTTD sự cố" value="4.2′" sub="phát hiện" />
+        <StatCard icon={CheckCircle2} label="SLA on-time" value="94%" sub="đúng hẹn" />
       </div>
-      <div className="mt-4 rounded-xl border border-border p-3 bg-gradient-to-br from-xanh-mint/20 to-card">
-        <div className="text-[10px] font-mono text-muted-foreground mb-1">
-          ALERT · 2′ trước
+      <div className="mt-4 rounded-xl border border-xanh-coral/30 bg-xanh-coral/5 p-3">
+        <div className="text-[10px] font-mono text-xanh-coral mb-1 flex items-center gap-1.5">
+          <Bell className="h-3 w-3" /> ALERT · 2′ trước
         </div>
         <div className="text-sm font-semibold">Spike khiếu nại thanh toán · TP.HCM Q7</div>
-        <div className="text-xs text-muted-foreground">
-          +280% trong 30 phút · 14 case · P0
-        </div>
+        <div className="text-xs text-muted-foreground">+280% trong 30 phút · 14 case · P0</div>
       </div>
-    </div>
+    </Card>
   );
 }

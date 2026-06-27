@@ -5,12 +5,12 @@ import type { FunnelData } from "../../types";
 import { Card, SectionHeader } from "../../primitives";
 
 const STAGES = [
-  { key: "total" as const, label: "Tổng feedback", color: "oklch(0.38 0.08 240)" },
-  { key: "classified" as const, label: "Đã phân loại", color: "var(--xanh-cyan)" },
-  { key: "needs_review" as const, label: "Cần review", color: "var(--xanh-amber)" },
-  { key: "alerts_triggered" as const, label: "Sinh alert", color: "oklch(0.62 0.2 35)" },
-  { key: "tickets_created" as const, label: "Tạo ticket", color: "var(--xanh-coral)" },
-  { key: "resolved" as const, label: "Đã giải quyết", color: "var(--xanh-green)" },
+  { key: "total" as const, label: "Tổng feedback", color: "var(--color-chart-1)" },
+  { key: "classified" as const, label: "Đã phân loại", color: "var(--color-chart-5)" },
+  { key: "needs_review" as const, label: "Cần review", color: "var(--color-chart-4)" },
+  { key: "alerts_triggered" as const, label: "Sinh alert", color: "var(--color-chart-3)" },
+  { key: "tickets_created" as const, label: "Tạo ticket", color: "var(--color-chart-4)" },
+  { key: "resolved" as const, label: "Đã giải quyết", color: "var(--color-chart-2)" },
 ];
 
 function buildFunnelData(funnel: FunnelData) {
@@ -70,7 +70,7 @@ export function PipelineFunnel() {
               >
                 <LabelList
                   position="right"
-                  fill="oklch(0.4 0.04 200)"
+                  fill="var(--color-muted-foreground)"
                   stroke="none"
                   dataKey="name"
                   style={{ fontSize: 11, fontFamily: "JetBrains Mono" }}

@@ -1,6 +1,7 @@
 import {
   Bar,
   BarChart,
+  CartesianGrid,
   Cell,
   LabelList,
   ResponsiveContainer,
@@ -13,10 +14,10 @@ import { useCockpitOverview } from "@/hooks/useCockpitOverview";
 import { Card, SectionHeader } from "../../primitives";
 
 function barColor(score: number) {
-  if (score <= 3) return "oklch(0.65 0.18 155)";   // xanh lá đậm
-  if (score <= 6) return "oklch(0.72 0.16 145)";   // xanh lá
-  if (score <= 8) return "var(--xanh-amber)";       // vàng cam
-  return "var(--xanh-coral)";                       // đỏ
+  if (score <= 3) return "var(--color-chart-2)"; // rủi ro thấp · teal-green
+  if (score <= 6) return "var(--color-chart-1)"; // trung bình · cyan
+  if (score <= 8) return "var(--color-chart-4)"; // nâng cao · amber
+  return "var(--color-chart-3)"; // cao · coral
 }
 
 interface TooltipProps {
@@ -64,9 +65,10 @@ export function RiskHistogram() {
               layout="vertical"
               margin={{ top: 4, right: 40, left: 8, bottom: 4 }}
             >
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} />
               <XAxis
                 type="number"
-                tick={{ fontSize: 10, fontFamily: "JetBrains Mono" }}
+                tick={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: "var(--color-muted-foreground)" }}
                 axisLine={false}
                 tickLine={false}
               />
@@ -74,19 +76,19 @@ export function RiskHistogram() {
                 type="category"
                 dataKey="score"
                 width={28}
-                tick={{ fontSize: 10, fontFamily: "JetBrains Mono" }}
+                tick={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: "var(--color-muted-foreground)" }}
                 axisLine={false}
                 tickLine={false}
               />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: "oklch(0.96 0.02 170)" }} />
-              <Bar dataKey="count" radius={[0, 4, 4, 0]} maxBarSize={20}>
+              <Tooltip content={<CustomTooltip />} cursor={{ fill: "var(--color-muted)" }} />
+              <Bar dataKey="count" radius={[0, 6, 6, 0]} maxBarSize={20}>
                 {chartData.map((entry) => (
                   <Cell key={entry.score} fill={barColor(entry.scoreNum)} />
                 ))}
                 <LabelList
                   dataKey="count"
                   position="right"
-                  style={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: "oklch(0.5 0.03 170)" }}
+                  style={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: "var(--color-muted-foreground)" }}
                 />
               </Bar>
             </BarChart>

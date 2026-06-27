@@ -17,9 +17,9 @@ function shortDate(iso: string) {
 }
 
 const LINES = [
-  { key: "positive", label: "Tích cực", color: "var(--xanh-green)", dash: undefined },
-  { key: "neutral", label: "Trung tính", color: "var(--xanh-cyan)", dash: "4 2" },
-  { key: "negative", label: "Tiêu cực", color: "var(--xanh-coral)", dash: "3 3" },
+  { key: "positive", label: "Tích cực", color: "var(--color-chart-2)", dash: undefined },
+  { key: "neutral", label: "Trung tính", color: "var(--color-chart-1)", dash: "4 2" },
+  { key: "negative", label: "Tiêu cực", color: "var(--color-chart-3)", dash: "3 3" },
 ] as const;
 
 interface CustomTooltipProps {
@@ -75,16 +75,16 @@ export function SentimentLineChart() {
         ) : (
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={chartData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="2 4" stroke="oklch(0.92 0.03 170)" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 10, fontFamily: "JetBrains Mono" }}
+                tick={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: "var(--color-muted-foreground)" }}
                 interval={2}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 10, fontFamily: "JetBrains Mono" }}
+                tick={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: "var(--color-muted-foreground)" }}
                 axisLine={false}
                 tickLine={false}
                 width={32}

@@ -6,17 +6,17 @@ import { Card, SectionHeader } from "../../primitives";
 
 // Màu node theo nhóm
 const NODE_COLOR: Record<string, string> = {
-  positive: "oklch(0.65 0.18 155)",
-  neutral: "var(--xanh-cyan)",
-  negative: "var(--xanh-coral)",
-  P1: "oklch(0.72 0.16 145)",
-  P2: "oklch(0.7 0.14 155)",
-  P3: "var(--xanh-amber)",
-  P4: "oklch(0.65 0.18 35)",
-  P5: "var(--xanh-coral)",
-  open: "var(--xanh-amber)",
-  in_progress: "var(--xanh-cyan)",
-  resolved: "var(--xanh-green)",
+  positive: "var(--color-chart-2)",
+  neutral: "var(--color-chart-1)",
+  negative: "var(--color-chart-3)",
+  P1: "var(--color-chart-2)",
+  P2: "var(--color-chart-1)",
+  P3: "var(--color-chart-4)",
+  P4: "var(--color-chart-3)",
+  P5: "var(--color-chart-3)",
+  open: "var(--color-chart-4)",
+  in_progress: "var(--color-chart-1)",
+  resolved: "var(--color-chart-2)",
 };
 
 const NODE_LABEL: Record<string, string> = {
@@ -112,7 +112,7 @@ function SankeyCanvas({ flows }: { flows: SankeyLink[] }) {
       const y1 = toNode.top + toOff + lh / 2;
       const mx = (x0 + x1) / 2;
 
-      return { f, x0, y0, x1, y1, mx, lh, color: NODE_COLOR[f.from] ?? "#aaa" };
+      return { f, x0, y0, x1, y1, mx, lh, color: NODE_COLOR[f.from] ?? "var(--color-muted-foreground)" };
     });
 
   return (
@@ -132,7 +132,7 @@ function SankeyCanvas({ flows }: { flows: SankeyLink[] }) {
             textAnchor="middle"
             fontSize={9}
             fontFamily="JetBrains Mono"
-            fill="oklch(0.55 0.03 200)"
+            fill="var(--color-muted-foreground)"
           >
             {label}
           </text>
@@ -165,7 +165,7 @@ function SankeyCanvas({ flows }: { flows: SankeyLink[] }) {
         {Object.entries(nodeY).map(([name, { top, height }]) => {
           const ci = nodeCol[name] ?? 0;
           const x = COL_X[ci];
-          const color = NODE_COLOR[name] ?? "var(--xanh-deep)";
+          const color = NODE_COLOR[name] ?? "var(--color-chart-1)";
           const label = NODE_LABEL[name] ?? name;
           const isRight = ci === 2;
           return (
@@ -177,7 +177,7 @@ function SankeyCanvas({ flows }: { flows: SankeyLink[] }) {
                 textAnchor={isRight ? "start" : "end"}
                 fontSize={10}
                 fontFamily="JetBrains Mono"
-                fill="oklch(0.35 0.04 200)"
+                fill="var(--color-foreground)"
               >
                 {label}
               </text>

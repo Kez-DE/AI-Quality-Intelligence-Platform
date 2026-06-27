@@ -33,8 +33,8 @@ export function TrendCard() {
         subtitle="Tổng phản hồi · Phản hồi tiêu cực · Spike"
         right={
           <div className="flex items-center gap-3 text-[11px] font-mono">
-            <Legend color="var(--xanh-green)" label="tổng" />
-            <Legend color="var(--xanh-coral)" label="tiêu cực" />
+            <Legend color="var(--color-chart-1)" label="tổng" />
+            <Legend color="var(--color-chart-3)" label="tiêu cực" />
           </div>
         }
       />
@@ -51,20 +51,20 @@ export function TrendCard() {
           <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-44">
             <defs>
               <linearGradient id="gTotal" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stopColor="var(--xanh-green)" stopOpacity="0.35" />
-                <stop offset="100%" stopColor="var(--xanh-green)" stopOpacity="0" />
+                <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity="0.4" />
+                <stop offset="100%" stopColor="var(--color-chart-1)" stopOpacity="0" />
               </linearGradient>
             </defs>
             {[0.25, 0.5, 0.75].map((p) => (
-              <line key={p} x1="0" x2={w} y1={h * p} y2={h * p} stroke="oklch(0.92 0.03 170)" strokeDasharray="2 4" />
+              <line key={p} x1="0" x2={w} y1={h * p} y2={h * p} stroke="var(--color-border)" strokeDasharray="3 3" />
             ))}
             <path d={`${buildPath(totals, max, w, h)} L ${w} ${h} L 0 ${h} Z`} fill="url(#gTotal)" />
-            <path d={buildPath(totals, max, w, h)} fill="none" stroke="var(--xanh-green)" strokeWidth="2.5" />
-            <path d={buildPath(negatives, max, w, h)} fill="none" stroke="var(--xanh-coral)" strokeWidth="2" strokeDasharray="3 3" />
+            <path d={buildPath(totals, max, w, h)} fill="none" stroke="var(--color-chart-1)" strokeWidth="2.5" />
+            <path d={buildPath(negatives, max, w, h)} fill="none" stroke="var(--color-chart-3)" strokeWidth="2" strokeDasharray="3 3" />
             {spikeIdx >= 0 && negatives[spikeIdx] > 0 && (
               <>
-                <circle cx={spikeIdx * stepX} cy={h - (negatives[spikeIdx] / max) * h} r="6" fill="var(--xanh-coral)" />
-                <text x={spikeIdx * stepX + 10} y={h - (negatives[spikeIdx] / max) * h - 4} fontSize="10" fill="var(--xanh-coral)" fontFamily="JetBrains Mono">
+                <circle cx={spikeIdx * stepX} cy={h - (negatives[spikeIdx] / max) * h} r="6" fill="var(--color-chart-3)" />
+                <text x={spikeIdx * stepX + 10} y={h - (negatives[spikeIdx] / max) * h - 4} fontSize="10" fill="var(--color-chart-3)" fontFamily="JetBrains Mono">
                   spike · {spikeDate.slice(5)}
                 </text>
               </>
