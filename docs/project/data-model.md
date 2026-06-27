@@ -1,5 +1,7 @@
 # Mô hình dữ liệu Supabase (Data Dictionary)
 
+> **Cập nhật 2026-06-27:** đồng bộ với migrations Supabase (6 phòng, task/report/correction).
+
 Tài liệu này mô tả toàn bộ bảng, cột, kiểu dữ liệu và ý nghĩa nghiệp vụ của cơ sở dữ liệu
 Postgres trên Supabase. Đây là tài liệu tra cứu chính cho ai cần hiểu dữ liệu chảy qua hệ
 thống: từ lúc khách gửi phản hồi, qua phân loại AI, sinh cảnh báo, gom thành công việc, cho
@@ -245,7 +247,7 @@ duyệt và triển khai thành task.
 | `root_cause_summary` | TEXT | Tóm tắt nguyên nhân gốc, tách riêng khỏi Markdown để query được. |
 | `created_at` | TIMESTAMPTZ | |
 
-Ràng buộc: `UNIQUE(team, report_date)` để mỗi phòng chỉ có một báo cáo mỗi ngày.
+Nhiều báo cáo trong ngày cho cùng một phòng là hợp lệ; ràng buộc duy nhất `(team, report_date)` đã bỏ từ migration `20260629000000`.
 
 Ứng dụng: là nơi luồng HI-Loop Approval diễn ra. Manager sửa `suggested_tasks` rồi bấm duyệt;
 hàm `approve_report_and_dispatch` biến từng hành động thành `tasks` với `source=report`.
@@ -324,7 +326,7 @@ Các giá trị này lặp lại ở nhiều bảng; gom về một chỗ để 
 | Khái niệm | Giá trị hợp lệ | Xuất hiện ở |
 |---|---|---|
 | Vai trò (role) | `admin`, `manager`, `staff`, `guest` | `profiles.role` |
-| Phòng ban | `IT`, `CSKH`, `Vận hành`, `Tài chính & Thanh toán`, `Sản phẩm`, `Quản lý Rủi ro & Gian lận` | `profiles.department`, `alerts.assigned_team`, `tasks.assigned_team` |
+| Phòng ban | `IT`, `CSKH`, `Vận hành`, `Tài chính & Thanh toán`, `Sản phẩm`, `Quản lý Rủi ro & Gian lận` | `profiles.department`, `alerts.assigned_team`, `tasks.assigned_team`, `department_reports.team`, `task_completion_reports.team` |
 | Chủ đề (topic) | `Safety`, `Driver Behavior`, `App Issue`, `Payment`, `Pricing`, `Delay`, `Other` | `feedback.topic`, `tasks.topic` |
 | Cảm xúc | `positive`, `neutral`, `negative` | `feedback.sentiment` |
 | Mức nghiêm trọng | `P1`..`P5` (P5 nặng nhất) | `feedback.severity`, `alerts.severity`, `*.priority` |
