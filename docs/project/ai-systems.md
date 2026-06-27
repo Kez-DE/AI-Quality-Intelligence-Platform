@@ -1,8 +1,8 @@
 # AI Systems — xanhSM Quality Operation Cockpit
 
-Tài liệu mô tả kiến trúc AI của dự án: các lớp AI, luồng dữ liệu, và cách chạy trong từng worker.
+> **Cập nhật 2026-06-27:** bổ sung mô tả RAG hybrid (Cohere + BM25 + RRF) tại `/api/agent/rag-chat`; đồng bộ roster agent với code.
 
-> Cập nhật: 2026-06-17
+Tài liệu mô tả kiến trúc AI của dự án: các lớp AI, luồng dữ liệu, và cách chạy trong từng worker.
 
 ---
 
@@ -53,6 +53,17 @@ Có **2 cơ chế**, chia theo `guest` vs non-guest:
 ### Context builder — `services/agent_context.py` (RAG-lite, rule-based)
 
 Đọc 300 feedback + 20 alert gần nhất từ Supabase, dùng `Counter` tổng hợp phân bố severity/sentiment/topic/area + alert status + live-stream state → render thành text block tiêm vào system prompt cho chat của staff.
+
+### RAG hybrid: `POST /api/agent/rag-chat` (`pipeline/agent/rag_engine.py`)
+
+Endpoint riêng dành cho ops staff (require_ops_staff) để tra cứu tài liệu SOP/SLA nội bộ. Khác với `/api/agent/chat` (dùng agent_context.py lấy dữ liệu thời gian thực), endpoint này dùng hybrid search hai nguồn:
+
+- **Vector search:** embed câu hỏi bằng Cohere `embed-multilingual-v3.0`, gọi RPC `match_graph_nodes` trên pgvector (Supabase). Lọc bỏ node ngắn (Topics/Departments dưới 80 ký tự).
+- **BM25-lite keyword search:** tra cơ sở tri thức Markdown cục bộ qua `knowledge_base.py`.
+
+Hai kết quả được gộp bằng **Reciprocal Rank Fusion (RRF, k=60)**. Mỗi chunk nhận `rrf_score = rrf_vector + rrf_keyword`; lấy top 4 sau khi dedup theo `(document_title, heading)`. Kết quả trả về gồm `content` (câu trả lời LLM trích dẫn theo `[Nguồn N]`) và mảng `sources` (title, heading, department, similarity, rrf_score, content).
+
+Non-admin user bị ép `scope_team = user.department` khi gọi cả hai search, tránh rò rỉ dữ liệu chéo phòng.
 
 ---
 

@@ -1,11 +1,13 @@
 # Hệ thống Agent — Hướng dẫn kiến trúc & vận hành
 
+> **Cập nhật 2026-06-27:** đồng bộ roster (8 agent + Orchestrator + report_builder), ghi rõ nuance "6 agents" trong orchestrator, bổ sung mô tả report_builder.
+
 AI Quality Intelligence Platform có hai lớp agent tách biệt:
 
 - **`pipeline/agents/`** — các agent nghiệp vụ chạy theo batch, điều phối bởi `orchestrator.py`. Tài liệu này mô tả lớp đó.
 - **`pipeline/agent/`** — chat agent ReAct + RAG cho giao diện chat. Xem [rbac-departments.md](rbac-departments.md) phần chat.
 
-Lớp `agents/` gồm 8 agent nghiệp vụ + 1 orchestrator. Orchestrator không phải agent: nó chỉ điều phối thứ tự, retry và logging.
+Lớp `agents/` gồm 8 agent nghiệp vụ + `orchestrator.py` (coordinator) + `report_builder.py` (builder helper). Orchestrator không phải agent: nó chỉ điều phối thứ tự, retry và logging. `report_builder.py` cũng không phải agent: cung cấp `build_department_report_markdown` và `store_department_report` để render Markdown và lưu báo cáo theo lệnh của orchestrator.
 
 ---
 
@@ -41,6 +43,8 @@ Step 6-7  for team in TEAMS:
 `TEAMS = list(DEPARTMENTS)` → IT, CSKH, Vận hành, Tài chính & Thanh toán, Sản phẩm, Quản lý Rủi ro & Gian lận.
 
 Một chi tiết dễ nhầm: `insight_agent` bên trong tự gọi `router_agent.route_ticket` cho từng feedback để lọc đúng phòng, nên `router_agent` được dùng ở cả Step 3 lẫn Step 6.
+
+**Nuance về con số agent trong orchestrator:** docstring và log startup của `orchestrator.py` ghi "6 agents", còn trường `agents_used` trong kết quả trả về liệt kê 7. Cách đối chiếu cho khỏi nhầm: `run_agent_pipeline` điều phối 6 agent xử lý (alert_agent, router_agent qua spike_detector, ticket_agent, task_agent, insight_agent, analyst_agent); `agents_used` cộng thêm `ingestion_agent` thành 7. Agent thứ 8 là `scoring_agent`, không có trong `agents_used` vì chạy độc lập ở ml-worker (ingestion_agent cũng chủ yếu chạy ở ingest-worker, orchestrator chỉ liệt kê nó trong manifest). Nhãn "6" trong docstring là số cũ, chưa cập nhật theo task_agent. Ngoài ra orchestrator gọi `report_builder` (build + store báo cáo) nhưng đây không phải agent. Tổng số module trong `pipeline/agents/` là **8 agent nghiệp vụ + Orchestrator + report_builder**.
 
 Helper chung trong `agents/common.py`: `get_db()` (Supabase client singleton), `call_llm()` (wrap model_router + cache LRU + nuốt lỗi), `log_agent_run()` (ghi file JSONL + insert bảng `agent_run_logs`). Schema I/O định nghĩa bằng Pydantic trong `agents/schemas.py`.
 
