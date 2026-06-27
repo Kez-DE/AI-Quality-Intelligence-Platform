@@ -73,6 +73,8 @@ export default function SupportChatWidget() {
   const [busy, setBusy] = useState(false);
   const [authed, setAuthed] = useState(false);
   const [activeSource, setActiveSource] = useState<Source | null>(null);
+  // Chips gợi ý chỉ hiện TRƯỚC khi user gửi tin nhắn đầu tiên; gửi xong ẩn vĩnh viễn trong phiên.
+  const [showSuggestions, setShowSuggestions] = useState(true);
   const [msgs, setMsgs] = useState<Msg[]>([
     {
       role: "assistant",
@@ -91,6 +93,7 @@ export default function SupportChatWidget() {
   async function send(text?: string) {
     const q = (text ?? input).trim();
     if (!q || busy) return;
+    setShowSuggestions(false); // ẩn chips ngay khi có tin nhắn hợp lệ đầu tiên (không hiện lại)
     const history = [...msgs, { role: "user" as const, content: q }];
     setMsgs(history);
     setInput("");
@@ -206,14 +209,16 @@ export default function SupportChatWidget() {
             )}
           </div>
 
-          <div className="flex flex-wrap gap-1.5 px-3 pb-2 pt-2">
-            {SUGGESTIONS.map((s) => (
-              <button key={s} onClick={() => send(s)} disabled={busy}
-                className="rounded-full bg-secondary px-2.5 py-1 text-xs text-secondary-foreground transition-colors hover:bg-accent disabled:opacity-50">
-                {s}
-              </button>
-            ))}
-          </div>
+          {showSuggestions && (
+            <div className="flex flex-wrap gap-1.5 px-3 pb-2 pt-2">
+              {SUGGESTIONS.map((s) => (
+                <button key={s} onClick={() => send(s)} disabled={busy}
+                  className="rounded-full bg-secondary px-2.5 py-1 text-xs text-secondary-foreground transition-colors hover:bg-accent disabled:opacity-50">
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="flex items-center gap-3 border-t px-3 py-2 text-[11px] text-muted-foreground">
             <a href={`tel:${HOTLINE}`} className="inline-flex items-center gap-1 hover:text-foreground"><Phone className="h-3 w-3" />{HOTLINE}</a>
