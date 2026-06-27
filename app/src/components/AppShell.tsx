@@ -6,6 +6,7 @@ import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 import { useTheme } from "@/hooks/useTheme";
 import NotificationPanel from "@/components/NotificationPanel";
 import { DepartmentBadge } from "@/components/DepartmentBadge";
+import SupportChatWidget from "@/components/SupportChatWidget";
 import {
   Bell,
   Bot,
@@ -261,6 +262,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <main className="flex-1 md:py-6 md:px-8 pt-28 pb-10 px-4 max-w-7xl text-foreground">
         {children}
       </main>
+
+      {/* Trợ lý nổi đặt ở layout → giữ xuyên suốt khi chuyển tab, không reset hội thoại. */}
+      <SupportChatWidget />
     </div>
   );
 }

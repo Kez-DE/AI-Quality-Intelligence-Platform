@@ -22,7 +22,6 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import SupportChatWidget from "@/components/SupportChatWidget";
 
 /* ---------------- Dữ liệu hiển thị (đại diện, công khai) ---------------- */
 const trendData = Array.from({ length: 14 }).map((_, i) => {
@@ -444,8 +443,6 @@ export default function GuestDashboard() {
           ))}
         </div>
       </section>
-
-      <SupportChatWidget />
     </div>
   );
 }

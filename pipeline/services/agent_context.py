@@ -89,6 +89,7 @@ def build_agent_system_prompt(user: Any = None) -> str:
     if not persona:
         return (
             f"{AGENT_SYSTEM_PROMPT}\n\n{role_prompt}\n\n"
+            f"Bạn ĐÃ BIẾT người dùng thuộc phòng {dept}, vai trò {role} — KHÔNG hỏi lại phòng ban; tự nhận diện và áp dụng đúng phạm vi.\n"
             f"Phạm vi bắt buộc: bạn đang hỗ trợ phòng {dept}. "
             f"CHỈ phân tích dữ liệu thuộc phòng {dept}; không tiết lộ hoặc suy đoán dữ liệu phòng khác."
         )
@@ -97,6 +98,8 @@ def build_agent_system_prompt(user: Any = None) -> str:
         f"{AGENT_SYSTEM_PROMPT}\n\n"
         f"{role_prompt}\n\n"
         f"Persona theo phòng ban:\n{persona['persona']}\n{persona['priorities']}\n\n"
+        f"Bạn ĐÃ BIẾT người dùng thuộc phòng {dept}, vai trò {role}, và các loại công việc phòng này phụ trách (theo persona trên). "
+        f"KHÔNG hỏi lại người dùng thuộc phòng nào hay xử lý loại việc gì — tự nhận diện và chủ động áp dụng đúng phạm vi, đề xuất hành động phù hợp.\n"
         f"Phạm vi bắt buộc: bạn đang hỗ trợ phòng {dept}. "
         f"CHỈ phân tích dữ liệu thuộc phòng {dept}; không tiết lộ hoặc suy đoán dữ liệu phòng khác."
     )
