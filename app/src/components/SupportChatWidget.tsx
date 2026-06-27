@@ -1,7 +1,8 @@
 // Trợ lý CSKH nổi (floating) cho Khách + trang chủ.
 // - Đã đăng nhập (khách): gọi /api/agent/chat — backend tự phân tầng guest→RAG công khai
 //   (CHỈ KB công khai, KHÔNG chạm dữ liệu nội bộ).
-// - Trang chủ (chưa đăng nhập): trả lời tư vấn rule-based + thông tin liên hệ công khai.
+// - Trang chủ (chưa đăng nhập): tư vấn rule-based + thông tin liên hệ công khai; mọi vấn đề
+//   cần xử lý đều điều hướng: liên hệ khẩn cấp + đăng nhập để gửi phản hồi chính thức.
 // Mọi câu trả lời chỉ xoay quanh hỗ trợ khách hàng, hướng dẫn — không lộ dữ liệu nội bộ.
 import { useEffect, useRef, useState } from "react";
 import { Bot, X, Send, Sparkles, Phone, Mail } from "lucide-react";
@@ -19,32 +20,49 @@ type Msg = { role: "user" | "assistant"; content: string };
 const SUGGESTIONS = [
   "Cách gửi phản hồi?",
   "Liên hệ CSKH",
+  "Báo sự cố / cần giúp đỡ",
   "Yêu cầu hoàn tiền",
-  "Báo sự cố chuyến đi",
 ];
 
-// Tư vấn rule-based (dùng khi chưa đăng nhập). Chỉ thông tin khách hàng + liên hệ công khai.
+// Tư vấn rule-based (dùng khi CHƯA đăng nhập). Chỉ thông tin khách hàng + liên hệ công khai.
+// Mọi vấn đề cần xử lý → điều hướng: liên hệ khẩn cấp/Hotline + đăng nhập để gửi phản hồi.
 function cannedReply(q: string): string {
   const s = q.toLowerCase();
-  if (/(gửi|phản hồi|đánh giá|góp ý|review)/.test(s))
-    return `Bạn có thể gửi phản hồi ngay tại mục “Gửi phản hồi · đánh giá” trên trang Khách hàng (cần đăng nhập), hoặc qua Hotline ${HOTLINE} / email ${EMAIL_CSKH}. AI sẽ tự phân loại và chuyển tới đội xử lý phù hợp.`;
-  if (/(điểm|chỉ số|chất lượng|hài lòng|sla)/.test(s))
-    return "Các chỉ số dịch vụ công khai (điểm dịch vụ, tỉ lệ hài lòng, thời gian đáp ứng, tỉ lệ hoàn thành) hiển thị ngay ở phần “Chỉ số dịch vụ công khai” trên trang Khách hàng.";
-  if (/(cskh|liên hệ|hotline|tổng đài|hỗ trợ|gọi)/.test(s))
-    return `Kênh hỗ trợ chính thức:\n• Hotline 24/7: ${HOTLINE}\n• Email CSKH: ${EMAIL_CSKH}\n• Hoặc mục Hỗ trợ trong ứng dụng Green SM.`;
-  if (/(hoàn tiền|refund|trừ tiền|thanh toán|cước|hoá đơn|hóa đơn)/.test(s))
-    return `Để yêu cầu hoàn tiền hoặc khiếu nại thanh toán: gửi phản hồi chủ đề “Thanh toán” kèm mã chuyến đi, hoặc liên hệ Hotline ${HOTLINE} / email ${EMAIL_CSKH}. Nên cung cấp mã chuyến + thời gian phát sinh để xử lý nhanh.`;
+
+  // 1) Khẩn cấp / an toàn / bị xâm hại — ưu tiên cao nhất, trả lời ân cần + điều hướng hỗ trợ.
+  if (
+    /(xâm hại|xam hai|xâm phạm|hành hung|hanh hung|bị đánh|bi danh|đánh tôi|bị thương|hành hạ|tấn công|tan cong|cướp|cuop|trộm|sàm sỡ|sam so|quấy rối|quay roi|đe dọa|đe doạ|de doa|hăm dọa|bạo lực|bao luc|tai nạn|tai nan|khẩn cấp|khan cap|nguy hiểm|nguy hiem|bắt cóc|bat coc|cứu|giúp với|giup voi|sợ hãi|so hai|bị hại)/.test(
+      s,
+    )
+  )
+    return `Mình rất tiếc về việc bạn đang gặp phải và mình ở đây để hỗ trợ bạn.\n\n⚠️ Nếu bạn đang gặp nguy hiểm hoặc cần hỗ trợ khẩn cấp, hãy gọi ngay 113 (Công an) hoặc 115 (Cấp cứu).\n\nVới sự cố liên quan chuyến đi xanhSM (tài xế, an toàn, quấy rối): gọi Hotline ${HOTLINE} (24/7) ngay và giữ lại bằng chứng (mã chuyến, ảnh chụp, thời gian).\n\nĐể gửi khiếu nại/phản hồi chính thức và được theo dõi xử lý: hãy bấm "Đăng nhập" ở góc trên, rồi vào mục "Gửi phản hồi" trên trang Khách hàng. Email hỗ trợ: ${EMAIL_CSKH}.`;
+
+  // 2) Chủ đề cụ thể.
+  if (/(hoàn tiền|refund|trừ tiền|thanh toán|cước phí|hoá đơn|hóa đơn)/.test(s))
+    return `Để yêu cầu hoàn tiền/khiếu nại thanh toán: hãy bấm "Đăng nhập" rồi gửi phản hồi chủ đề "Thanh toán" kèm mã chuyến đi trên trang Khách hàng (AI sẽ chuyển tới đội xử lý). Cần gấp: Hotline ${HOTLINE} hoặc email ${EMAIL_CSKH} — nên cung cấp mã chuyến + thời gian phát sinh.`;
   if (/(đặt xe|gọi xe|booking|điểm đón|đặt chuyến)/.test(s))
-    return "Để đặt xe: mở ứng dụng Green SM, chọn điểm đón và điểm đến, xác nhận loại xe rồi đặt. Nếu app gặp lỗi, bạn có thể báo qua mục Hỗ trợ hoặc Hotline " + HOTLINE + ".";
-  if (/(an toàn|tai nạn|sự cố|khẩn cấp|nguy hiểm|quấy rối)/.test(s))
-    return `Trường hợp khẩn cấp về tính mạng, gọi 113 ngay. Với sự cố chuyến đi (tài xế, an toàn), hãy gọi Hotline ${HOTLINE} và gửi phản hồi kèm mã chuyến để được ưu tiên xử lý.`;
+    return `Để đặt xe: mở ứng dụng Green SM, chọn điểm đón và điểm đến, xác nhận loại xe rồi đặt. Nếu app gặp lỗi, hãy gọi Hotline ${HOTLINE} hoặc đăng nhập để gửi phản hồi.`;
   if (/(khuyến mãi|mã giảm|ưu đãi|voucher|điểm thưởng)/.test(s))
-    return "Mã khuyến mãi & ưu đãi hiện trong ứng dụng Green SM ở mục “Ưu đãi”. Áp dụng mã ở bước xác nhận chuyến trước khi đặt.";
+    return "Mã khuyến mãi & ưu đãi hiển thị trong ứng dụng Green SM ở mục “Ưu đãi”. Áp dụng mã ở bước xác nhận chuyến trước khi đặt.";
   if (/(tài khoản|đăng nhập|mật khẩu|đăng ký)/.test(s))
-    return "Bạn quản lý tài khoản ngay trong ứng dụng Green SM. Quên mật khẩu: dùng “Quên mật khẩu” để nhận liên kết đặt lại qua email/SĐT đã đăng ký.";
-  if (/(dữ liệu|riêng tư|cá nhân|bảo mật|xóa|gdpr)/.test(s))
+    return "Bạn quản lý tài khoản trong ứng dụng Green SM. Quên mật khẩu: dùng “Quên mật khẩu” để nhận liên kết đặt lại qua email/SĐT đã đăng ký. Đăng nhập trên trang này để gửi phản hồi và theo dõi xử lý.";
+  if (/(dữ liệu|riêng tư|cá nhân|bảo mật|xóa tài khoản|gdpr)/.test(s))
     return `Về quyền dữ liệu cá nhân (truy cập, chỉnh sửa, xóa, rút đồng ý), liên hệ bộ phận bảo vệ dữ liệu: ${DPO_EMAIL} hoặc ${DPO_PHONE}.`;
-  return `Mình là trợ lý CSKH xanhSM, hỗ trợ bạn về: gửi phản hồi, xem chỉ số dịch vụ, liên hệ CSKH (Hotline ${HOTLINE}), hoàn tiền, đặt xe, an toàn, khuyến mãi. Bạn cần hỗ trợ gì ạ?`;
+  if (/(điểm|chỉ số|chất lượng|hài lòng|sla)/.test(s))
+    return "Các chỉ số dịch vụ công khai (điểm dịch vụ, tỉ lệ hài lòng, thời gian đáp ứng, tỉ lệ hoàn thành) hiển thị ở phần “Chỉ số dịch vụ công khai” trên trang Khách hàng.";
+  if (/(cskh|liên hệ|hotline|tổng đài|gọi điện|số điện thoại|số máy)/.test(s))
+    return `Kênh hỗ trợ chính thức:\n• Hotline 24/7: ${HOTLINE}\n• Email CSKH: ${EMAIL_CSKH}\n• Hoặc mục Hỗ trợ trong ứng dụng Green SM.`;
+
+  // 3) Khiếu nại / phản hồi / cần giúp đỡ (chung) — điều hướng đăng nhập + gửi phản hồi.
+  if (
+    /(khiếu nại|khieu nai|phản ánh|phan anh|tố cáo|to cao|phản hồi|phan hoi|góp ý|gop y|đánh giá|danh gia|review|vấn đề|van de|sự việc|su viec|không hài lòng|bức xúc|buc xuc|giúp|giup|hỗ trợ|ho tro|cần|can)/.test(
+      s,
+    )
+  )
+    return `Để được hỗ trợ và xử lý chính thức, bạn hãy bấm "Đăng nhập" (góc trên bên phải) rồi vào mục "Gửi phản hồi · đánh giá" trên trang Khách hàng — AI sẽ tự phân loại và chuyển phản hồi của bạn tới đội phù hợp, và bạn theo dõi được trạng thái xử lý.\n\nCần hỗ trợ ngay: Hotline ${HOTLINE} (24/7) · ${EMAIL_CSKH}.`;
+
+  // 4) Mặc định — vẫn điều hướng liên hệ + đăng nhập gửi phản hồi.
+  return `Mình là trợ lý CSKH xanhSM, hỗ trợ thông tin về dịch vụ (đặt xe, thanh toán, an toàn, khuyến mãi).\n\nNếu bạn cần phản ánh/khiếu nại hoặc gặp sự cố, hãy bấm "Đăng nhập" rồi gửi phản hồi trên trang Khách hàng để được theo dõi xử lý. Hỗ trợ ngay: Hotline ${HOTLINE} · ${EMAIL_CSKH}.`;
 }
 
 export default function SupportChatWidget() {
@@ -55,7 +73,7 @@ export default function SupportChatWidget() {
   const [msgs, setMsgs] = useState<Msg[]>([
     {
       role: "assistant",
-      content: `Xin chào 👋 Mình là trợ lý CSKH xanhSM. Mình chỉ hỗ trợ thông tin dành cho khách hàng (đặt xe, phản hồi, thanh toán, khuyến mãi, an toàn). Hotline ${HOTLINE} · ${EMAIL_CSKH}.`,
+      content: `Xin chào 👋 Mình là trợ lý CSKH xanhSM. Mình hỗ trợ thông tin dành cho khách hàng (đặt xe, phản hồi, thanh toán, khuyến mãi, an toàn). Nếu bạn gặp sự cố hoặc cần khiếu nại, mình sẽ hướng dẫn bạn liên hệ đúng kênh và đăng nhập để gửi phản hồi. Hotline ${HOTLINE} · ${EMAIL_CSKH}.`,
     },
   ]);
   const endRef = useRef<HTMLDivElement>(null);
