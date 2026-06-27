@@ -5,6 +5,7 @@ import { CockpitFilterProvider } from "@/components/cockpit/CockpitFilterContext
 import { CockpitView } from "@/components/cockpit/CockpitView";
 import GuestDashboard from "@/components/GuestDashboard";
 import EmployeesPanel from "@/components/EmployeesPanel";
+import SupportChatWidget from "@/components/SupportChatWidget";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
@@ -64,6 +65,8 @@ function DashboardPage() {
       </CockpitFilterProvider>
 
       {showEmployees && me && <EmployeesPanel me={me} />}
+
+      <SupportChatWidget />
     </div>
   );
 }

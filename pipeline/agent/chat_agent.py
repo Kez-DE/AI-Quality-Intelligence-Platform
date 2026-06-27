@@ -31,11 +31,12 @@ def run_chat_agent(
     dùng execute_tool mặc định (dành cho ops/admin).
     """
     active_tools = tools_override if tools_override is not None else TOOLS_DEFINITIONS
+    collected_sources: list = []
 
     def _execute(name: str, args: dict) -> str:
         if execute_fn is not None:
             return execute_fn(name, args)
-        return execute_tool(name, args, scope_team=scope_team)
+        return execute_tool(name, args, scope_team=scope_team, sources_out=collected_sources)
 
     # Lọc PII từ input messages
     current_messages = []
@@ -75,6 +76,8 @@ def run_chat_agent(
                 result["content"] = mask_pii(result["content"])
             if "message" in result and result["message"].get("content"):
                 result["message"]["content"] = mask_pii(result["message"]["content"])
+            if collected_sources:
+                result["sources"] = collected_sources
             return result
             
         # Có tool calls -> thực thi các tools
@@ -108,6 +111,7 @@ def run_chat_agent(
     return {
         "content": "Tôi đã thử phân tích dữ liệu nhưng mất quá nhiều bước. Vui lòng yêu cầu ngắn gọn hoặc cụ thể hơn.",
         "provider": "system",
-        "model": "agent_loop"
+        "model": "agent_loop",
+        "sources": collected_sources,
     }
 

@@ -122,10 +122,11 @@ def submit_feedback(content: str, topic: str = "Other", sentiment: str = "negati
         return f"Lỗi khi gửi phản hồi: {str(e)[:200]}"
 
 
-def search_knowledge_base(query: str, scope_team: str | None = None) -> str:
+def search_knowledge_base(query: str, scope_team: str | None = None, sources_out: list | None = None) -> str:
     """Tra cứu SOP/SLA/quy trình nội bộ bằng Hybrid Search (Vector + BM25 + RRF).
 
-    scope_team != None (ops): chỉ tìm trong tài liệu của phòng đó (khớp RBAC)."""
+    scope_team != None (ops): chỉ tìm trong tài liệu của phòng đó (khớp RBAC).
+    sources_out != None: ghi thêm nguồn có cấu trúc để client hiện trích dẫn [Nguồn N] bấm được."""
     try:
         query_emb = embedder.embed_query(query)
         vector_results = _vector_search(query_emb, scope_team, top_k=6)
@@ -141,6 +142,14 @@ def search_knowledge_base(query: str, scope_team: str | None = None) -> str:
             blocks.append(
                 f"\n[Nguồn {i}] {r['document_title']} › {r['heading']} (phòng: {dept})\n{r['content']}"
             )
+            if sources_out is not None:
+                sources_out.append({
+                    "index": i,
+                    "title": r.get("document_title") or "Tài liệu nội bộ",
+                    "heading": r.get("heading") or "",
+                    "department": dept,
+                    "content": r.get("content") or "",
+                })
         return "\n".join(blocks)
     except Exception as e:
         # Fallback về BM25 nếu Hybrid lỗi (vd: Cohere API down)
@@ -333,8 +342,9 @@ GUEST_TOOLS_DEFINITIONS = [
     }
 ]
 
-def execute_tool(name: str, args: dict, scope_team: str | None = None) -> str:
-    """Thực thi tool OPS/ADMIN. scope_team != None → ép mọi truy vấn về đúng phòng đó."""
+def execute_tool(name: str, args: dict, scope_team: str | None = None, sources_out: list | None = None) -> str:
+    """Thực thi tool OPS/ADMIN. scope_team != None → ép mọi truy vấn về đúng phòng đó.
+    sources_out: thu thập nguồn có cấu trúc từ search_knowledge_base (cho trích dẫn click được)."""
     if name == "get_feedback_summary":
         return get_feedback_summary(days=args.get("days", 7), scope_team=scope_team)
     elif name == "get_hot_areas":
@@ -346,7 +356,7 @@ def execute_tool(name: str, args: dict, scope_team: str | None = None) -> str:
         team = scope_team or args.get("team_name", "")
         return get_team_priority_tasks(team_name=team)
     elif name == "search_knowledge_base":
-        return search_knowledge_base(query=args.get("query", ""), scope_team=scope_team)
+        return search_knowledge_base(query=args.get("query", ""), scope_team=scope_team, sources_out=sources_out)
     return f"Error: Tool '{name}' not found"
 
 
