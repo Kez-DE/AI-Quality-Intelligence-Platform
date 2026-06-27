@@ -143,7 +143,7 @@ def detect_spikes(
         effective_severity = f"P{severity}" if severity else row.get("severity", "P3")
         route = route_ticket(topic, effective_severity, sentiment, log_run=False)
         team = route["team"]
-        ticket_type = "opportunity" if team == "Marketing" and sentiment == "positive" else "incident"
+        ticket_type = "opportunity" if team == "Sản phẩm" and sentiment == "positive" else "incident"
         key = (area, topic, team, ticket_type)
         group = groups.setdefault(
             key,

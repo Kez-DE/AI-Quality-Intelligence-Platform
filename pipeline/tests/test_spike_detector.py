@@ -35,12 +35,12 @@ class TestSpikeDetector(unittest.TestCase):
             {"area": "A", "topic": "Safety", "team": "Vận hành"},
             {"area": "B", "topic": "Safety", "team": "Vận hành"},
             {"area": "C", "topic": "App Issue", "team": "IT"},
-            {"area": "D", "topic": "Other", "team": "Marketing"},
+            {"area": "D", "topic": "Other", "team": "Sản phẩm"},
         ]
 
         selected = _select_candidates(candidates, recent_alerts=[], limit=3)
 
-        self.assertEqual([group["team"] for group in selected], ["Vận hành", "IT", "Marketing"])
+        self.assertEqual([group["team"] for group in selected], ["Vận hành", "IT", "Sản phẩm"])
 
     @patch("spike_detector.create_or_update_ticket")
     @patch("spike_detector.analyze_spike")
@@ -140,7 +140,7 @@ class TestSpikeDetector(unittest.TestCase):
     @patch("spike_detector.analyze_spike")
     @patch("spike_detector.get_supabase")
     @patch("spike_detector.has_supabase_admin_key", return_value=True)
-    def test_positive_cluster_creates_marketing_opportunity(
+    def test_positive_cluster_creates_san_pham_opportunity(
         self,
         _mock_has_key,
         mock_get_supabase,
@@ -170,7 +170,7 @@ class TestSpikeDetector(unittest.TestCase):
 
         self.assertEqual(result["alerts_created"], 1)
         kwargs = mock_create_ticket.call_args.kwargs
-        self.assertEqual(kwargs["team"], "Marketing")
+        self.assertEqual(kwargs["team"], "Sản phẩm")
         self.assertEqual(kwargs["ticket_type"], "opportunity")
 
 
