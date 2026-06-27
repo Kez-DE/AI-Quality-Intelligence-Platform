@@ -1,3 +1,5 @@
+> **Cập nhật 2026-06-27:** sửa cấu trúc pipeline cho khớp code.
+
 C2-App-116/
 │
 ├── 🔒 [KHUNG COHORT — KHÔNG ĐỘNG]
@@ -22,25 +24,38 @@ C2-App-116/
 │   ├── package.json
 │   └── vite.config.ts
 │
-├── 🐍 pipeline/                    # BACKEND xử lý — Python
-│   ├── ingest/
-│   │   └── load_batch.py           # đọc seed → feedback_raw
-│   ├── clean/
-│   │   └── preprocess.py           # dedup, PII mask, chuẩn hóa
-│   ├── ml/
-│   │   ├── label_with_llm.py       # LLM gán nhãn train data (1 lần)
-│   │   ├── train.py                # train TF-IDF + LinearSVC
-│   │   ├── classify.py             # inference + severity rule
-│   │   └── model.joblib            # artifact đã train
-│   ├── analytics/
-│   │   └── spike.py                # SQL aggregate 1h-vs-7d → alert
-│   ├── agent/
-│   │   ├── router.py               # routing table (rule cứng)
-│   │   ├── llm_agent.py            # LLM quyết ca khó → ticket JSON
-│   │   └── guardrails.py           # Safety override, confidence gate
-│   ├── db/
-│   │   └── supabase_client.py      # ghi raw/processed/alerts/tickets
-│   ├── run_batch.py                # ★ ORCHESTRATOR — nút bấm demo
+├── 🐍 pipeline/                    # BACKEND xử lý: module phẳng + 2 thư mục agent
+│   ├── ingest.py                   # đọc batch phản hồi vào feedback_raw
+│   ├── clean.py                    # dedup, PII mask, chuẩn hóa text
+│   ├── classifier.py               # TF-IDF + LinearSVC: gán topic + severity
+│   ├── rules.py                    # rule cứng severity override
+│   ├── spike_detector.py           # SQL aggregate 1h-vs-7d, sinh alert
+│   ├── llm_agent.py                # LLM xử lý ca khó, sinh ticket JSON
+│   ├── main.py                     # pipeline orchestrator (batch)
+│   ├── worker_ticket.py            # worker xử lý ticket queue
+│   ├── worker_ingest.py            # worker nhận ingest stream
+│   ├── worker_ml.py                # worker chạy ML classify
+│   ├── worker_agent.py             # worker gọi multi-agent pipeline
+│   ├── departments.py              # registry 6 phòng ban + routing map
+│   ├── auth_guard.py               # RBAC guard cho pipeline endpoints
+│   ├── agent/                      # Chat + RAG (AI chat endpoint)
+│   │   ├── chat_agent.py           # xử lý turn chat
+│   │   ├── chat_tools.py           # tool definitions cho chat
+│   │   ├── rag_engine.py           # RAG hybrid: Cohere embed + BM25 + RRF k=60
+│   │   ├── knowledge_base.py       # KB nội bộ (embed + retrieve)
+│   │   ├── public_kb.py            # KB công khai (khách guest)
+│   │   └── model_router.py         # chọn model theo context
+│   ├── agents/                     # Multi-agent nghiệp vụ (8 agent + Orchestrator + helper)
+│   │   ├── orchestrator.py         # Orchestrator: chia việc cho 8 agent nghiệp vụ
+│   │   ├── router_agent.py         # Router: định tuyến phòng ban
+│   │   ├── ingestion_agent.py      # Ingest: tiếp nhận, làm sạch phản hồi
+│   │   ├── scoring_agent.py        # Scoring: tính 5-dim risk score
+│   │   ├── analyst_agent.py        # Analyst: phân tích, đề xuất hành động
+│   │   ├── insight_agent.py        # Insight: xu hướng tổng hợp
+│   │   ├── alert_agent.py          # Alert: phát hiện spike, sinh cảnh báo
+│   │   ├── task_agent.py           # Task: tạo và giao task phòng ban
+│   │   ├── ticket_agent.py         # Ticket: sinh ticket chính thức
+│   │   └── report_builder.py       # Helper: tổng hợp báo cáo
 │   ├── requirements.txt
 │   └── .env                        # key pipeline (gitignore)
 │

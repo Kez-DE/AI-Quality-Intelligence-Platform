@@ -17,9 +17,9 @@ Hệ thống đã mở rộng định tuyến và xử lý lên sáu phòng ban 
 | 1 | Công nghệ Thông tin (IT / Engineering) | Lỗi hệ thống, ứng dụng, server, API, GPS, thanh toán kỹ thuật |
 | 2 | Vận hành (Operations) | Hoạt động tài xế, chuyến xe, quy trình vận hành |
 | 3 | Chăm sóc Khách hàng (Customer Support) | Tiếp nhận và xử lý khiếu nại, hỗ trợ người dùng |
-| 4 | Tài chính và Thanh toán (Finance & Payment) | Hoàn tiền, đối soát giao dịch, lỗi thanh toán |
+| 4 | Tài chính & Thanh toán (Finance & Payment) | Hoàn tiền, đối soát giao dịch, lỗi thanh toán |
 | 5 | Sản phẩm (Product Management) | Cải thiện tính năng, UX/UI, đề xuất nâng cấp |
-| 6 | Quản lý Rủi ro và Gian lận (Risk & Fraud) | Phát hiện gian lận, lạm dụng khuyến mãi, tài khoản bất thường |
+| 6 | Quản lý Rủi ro & Gian lận (Risk & Fraud) | Phát hiện gian lận, lạm dụng khuyến mãi, tài khoản bất thường |
 
 ## Cơ chế chia việc khi lên 6 phòng
 
@@ -32,8 +32,8 @@ Trang bị taxonomy mới (cập nhật `data/taxonomy/routing_table.json`) đ�
 nghiệp vụ giữa các phòng. Ví dụ:
 
 - Khách không thanh toán được do app sập: giao IT.
-- Khách bị trừ tiền hai lần, yêu cầu hoàn: giao Tài chính và Thanh toán.
-- Phát hiện hàng loạt cuốc xe ảo lạm dụng khuyến mãi: giao Quản lý Rủi ro và Gian lận.
+- Khách bị trừ tiền hai lần, yêu cầu hoàn: giao Tài chính & Thanh toán.
+- Phát hiện hàng loạt cuốc xe ảo lạm dụng khuyến mãi: giao Quản lý Rủi ro & Gian lận.
 - Giao diện đặt xe khó dùng khiến khách nhầm điểm đón: giao Sản phẩm.
 
 ### 2. Nâng cấp Analyst Agent
