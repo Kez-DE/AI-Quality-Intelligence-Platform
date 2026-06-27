@@ -173,6 +173,44 @@ class TestSpikeDetector(unittest.TestCase):
         self.assertEqual(kwargs["team"], "Sản phẩm")
         self.assertEqual(kwargs["ticket_type"], "opportunity")
 
+    @patch("spike_detector.create_or_update_ticket")
+    @patch("spike_detector.analyze_spike")
+    @patch("spike_detector.get_supabase")
+    @patch("spike_detector.has_supabase_admin_key", return_value=True)
+    def test_positive_app_issue_cluster_creates_san_pham_opportunity(
+        self,
+        _mock_has_key,
+        mock_get_supabase,
+        mock_analyze_spike,
+        mock_create_ticket,
+    ):
+        # App Issue + positive nay route về Sản phẩm (góp ý UX) -> ticket opportunity.
+        feedback = [
+            {
+                "id": str(index),
+                "text": "Giao diện đặt xe rất mượt",
+                "area": "HN-CauGiay",
+                "severity": "P1",
+                "topic": "App Issue",
+                "sentiment": "positive",
+            }
+            for index in range(5)
+        ]
+        mock_get_supabase.return_value = _database(feedback)
+        mock_analyze_spike.return_value = {
+            "title": "Tín hiệu tích cực về app",
+            "description": "Khách hàng khen giao diện",
+            "action": "Khai thác cải tiến UX",
+        }
+        mock_create_ticket.return_value = {"action": "created"}
+
+        result = detect_spikes(max_spikes=1)
+
+        self.assertEqual(result["alerts_created"], 1)
+        kwargs = mock_create_ticket.call_args.kwargs
+        self.assertEqual(kwargs["team"], "Sản phẩm")
+        self.assertEqual(kwargs["ticket_type"], "opportunity")
+
 
 if __name__ == "__main__":
     unittest.main()
