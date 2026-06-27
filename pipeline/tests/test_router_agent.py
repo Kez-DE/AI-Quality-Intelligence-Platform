@@ -32,7 +32,7 @@ def test_positive_sentiment_routes_san_pham_for_other_and_app_issue():
 
 
 def test_sentiment_override_without_topics_is_ignored():
-    # Override thiếu "topics" KHÔNG được ép về Marketing (chống tái sinh bug cũ);
+    # Override thiếu "topics" KHÔNG được ép về một phòng (chống tái sinh bug cũ);
     # ticket rơi xuống topic match như bình thường.
     config = {
         "default_team": "CSKH",
