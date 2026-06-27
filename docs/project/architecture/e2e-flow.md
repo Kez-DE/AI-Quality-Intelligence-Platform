@@ -151,7 +151,7 @@ Nhân viên xem task trên `tasks.tsx`. Mỗi task từ báo cáo hiển thị b
 
 ## Ghi chú về trạng thái hiện tại
 
-- Tất cả 6 chặng pipeline (Luồng 1-7 một phần) và 12 luồng chuẩn đang hoạt động trong production.
+- Pipeline chính (Luồng 1-7) và toàn bộ 12 luồng chuẩn đang hoạt động trong production.
 - HI-Loop Approval đã được triển khai đầy đủ (xem commit lịch sử gần nhất).
 - Có 6 phòng ban: IT, CSKH, Vận hành, Tài chính & Thanh toán, Sản phẩm, Quản lý Rủi ro & Gian lận.
 - Accuracy định tuyến và cách đo trung thực: xem `docs/project/architecture/routing-taxonomy.md`.
@@ -247,7 +247,7 @@ Backend dùng `SERVICE_ROLE_KEY` (bypass RLS Supabase). Gate quyền ở tầng 
 
 ## Luồng 12: Topology worker + API (`main.py`, `worker_*.py`)
 
-5 service Railway:
+5 service backend Railway:
 
 | Service | File entrypoint | Công việc |
 |---------|----------------|-----------|

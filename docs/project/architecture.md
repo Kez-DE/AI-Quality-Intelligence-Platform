@@ -162,7 +162,7 @@ Endpoint: `GET /api/insights/departments`, `GET /api/insights/departments/{team}
 `pipeline/auth_guard.py` xác thực Supabase JWT + đọc role từ `profiles`. 4 role: **admin / manager / staff / guest**.
 - Backend dùng SERVICE_ROLE_KEY (bypass RLS) nên gate quyền ở tầng API: `require_admin`, `require_ops_staff`.
 - `pipeline/users_admin.py` — CRUD user (admin only).
-- Bootstrap: user đăng ký đầu tiên = admin, còn lại = staff.
+- Bootstrap: user đăng ký đầu tiên = admin, còn lại = guest (mặc định theo migration `default_role_guest`).
 
 ## Region mapping (code ↔ label)
 
