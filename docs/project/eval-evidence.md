@@ -1,5 +1,25 @@
 # Eval Evidence — Gate G2 (MVP)
 
+> **Cập nhật 2026-06-27** — Bổ sung bằng chứng e2e thật (pytest, eval router/model, health, pipeline smoke, frontend build).
+
+## Bằng chứng e2e — 2026-06-27
+
+**Ground truth đã xác minh từ code:**
+- 6 phòng ban: IT, CSKH, Vận hành, Tài chính & Thanh toán, Sản phẩm, Quản lý Rủi ro & Gian lận.
+- Agent: 8 nghiệp vụ (*_agent.py) + Orchestrator + report_builder (helper).
+- RAG hybrid: Cohere embed-multilingual-v3.0 + BM25-lite + RRF (k=60).
+- 4 worker: ticket/ingest/ml/agent; API scheduler on-demand.
+
+**Kết quả chạy:**
+- pytest: **132 passed, 3 skipped, 2 xfailed, 0 failed** — exit code 0 (Python 3.14.6, pytest 9.1.0; chạy với `-p no:capture` do bug `ValueError: I/O operation on closed file` trong pytest capture layer trên Py3.14)
+- route_eval (N=4837 seed_train_labeled): **topic accuracy 78.7%, dept accuracy 73.6%** — lệnh: `python -m eval.route_eval`
+- evaluate_model (gold_dataset.json, N=40): **topic 92.5% (37/40), sentiment 100%, severity 100%** — lệnh: `python -m eval.evaluate_model eval/gold_dataset.json`
+- /health: `{"status":"ok","message":"Backend service is running","version":"1.0.0","uptime_seconds":16297,"data_file_exists":true,"routing_taxonomy_loaded":true,"routing_routes":7,"llm_provider":"openrouter","llm_has_key":true}`
+- pipeline smoke (5 bản ghi từ seed_demo_150.json): ingest→clean→classify chạy OK — module import OK; ví dụ record 1: `topic=Driver Behavior sentiment=negative severity=P3 conf=0.79`
+- frontend build: **pass** — `npm run build` (bun không có trên CI host này); build hoàn thành trong 494ms, dist/server/assets/ tạo đủ
+
+---
+
 Bằng chứng đánh giá cho **user flow chính**: phản hồi thô → làm sạch PII → phân loại (model ML + rule engine) → gán topic/sentiment/severity/confidence + cờ `needs_review`.
 
 > **Output thật, không mock.** Mọi kết quả dưới đây sinh trực tiếp từ pipeline phân loại của hệ thống (`clean.mask_pii` → `clean.clean_text` → `classifier.predict_feedback`, trong đó `predict_feedback` chạy model TF-IDF/LinearSVC `.joblib` rồi áp `rules.apply_rules`).
