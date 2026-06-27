@@ -16,14 +16,18 @@ const TEAM_LABEL: Record<string, string> = {
   IT: "Kỹ thuật / IT",
   CSKH: "Chăm sóc khách hàng",
   "Vận hành": "Vận hành",
-  Marketing: "Marketing",
+  "Tài chính & Thanh toán": "Tài chính & Thanh toán",
+  "Sản phẩm": "Sản phẩm",
+  "Quản lý Rủi ro & Gian lận": "Rủi ro & Gian lận",
 };
 
 const TEAM_HINT: Record<string, string> = {
   IT: "Lỗi ứng dụng, bản đồ, thanh toán trong app",
-  CSKH: "Khiếu nại chung, trải nghiệm dịch vụ, giá cước, voucher, cần phản hồi khách",
+  CSKH: "Khiếu nại chung, trải nghiệm dịch vụ, cần phản hồi khách",
   "Vận hành": "Tài xế, thiếu cuốc, chậm trễ, khu vực nóng, sự cố an toàn hiện trường",
-  Marketing: "Nhận diện thương hiệu, cảm nhận tích cực/tiêu cực thị trường",
+  "Tài chính & Thanh toán": "Thanh toán, hoàn tiền, đối soát giao dịch",
+  "Sản phẩm": "Trải nghiệm UX/UI, góp ý tính năng, phản hồi tích cực",
+  "Quản lý Rủi ro & Gian lận": "Lạm dụng khuyến mãi, gian lận, giá cước bất thường",
 };
 
 const RISK_LABEL: Record<string, string> = {
