@@ -18,6 +18,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import SupportChatWidget from "@/components/SupportChatWidget";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -227,6 +228,8 @@ function Landing() {
           <span>Data Engineering · AI/NLP · Operations</span>
         </div>
       </footer>
+
+      <SupportChatWidget />
     </div>
   );
 }

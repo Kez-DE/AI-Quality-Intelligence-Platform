@@ -59,7 +59,7 @@ const NAV: NavItem[] = [
   { to: "/dashboard", label: "Tổng quan", icon: Gauge, roles: ALL_ROLES, group: "overview" },
 
   // 2. Vận hành — theo đúng luồng dữ liệu đi qua hệ thống.
-  { to: "/feedback", label: "Phản hồi", icon: MessageSquare, roles: ALL_ROLES, group: "operations" },
+  { to: "/feedback", label: "Phản hồi", icon: MessageSquare, roles: AUTHENTICATED_ROLES, group: "operations" },
   { to: "/alerts", label: "Phân loại Ticket", icon: Bell, roles: AUTHENTICATED_ROLES, group: "operations" },
   { to: "/tasks", label: "Quản lý công việc", icon: Kanban, roles: AUTHENTICATED_ROLES, group: "operations" },
   { to: "/support", label: "Hỗ trợ CSKH", icon: Headphones, roles: AUTHENTICATED_ROLES, group: "operations" },
@@ -70,7 +70,7 @@ const NAV: NavItem[] = [
   { to: "/completion-reports", label: "Báo cáo hoàn thành", icon: ClipboardCheck, roles: ["admin", "manager"], group: "analytics" },
 
   // 4. Trợ lý AI.
-  { to: "/chat", label: "Trợ lý AI", icon: Sparkles, roles: ALL_ROLES, group: "assistant" },
+  { to: "/chat", label: "Trợ lý AI", icon: Sparkles, roles: AUTHENTICATED_ROLES, group: "assistant" },
 
   // 5. Quản trị — chỉ admin.
   { to: "/live-stream", label: "Luồng trực tiếp", icon: Radio, roles: ["admin"], group: "admin" },

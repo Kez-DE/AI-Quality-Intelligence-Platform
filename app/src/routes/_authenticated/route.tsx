@@ -24,7 +24,7 @@ export const Route = createFileRoute("/_authenticated")({
       role = "guest";
     }
 
-    // Route Guard for Guests
+    // Route Guard for Guests — Khách chỉ dùng Dashboard (đã gồm form phản hồi + trợ lý CSKH nổi).
     const restrictedForGuests = [
       "/alerts",
       "/insights",
@@ -34,6 +34,8 @@ export const Route = createFileRoute("/_authenticated")({
       "/completion-reports",
       "/support",
       "/live-stream",
+      "/feedback",
+      "/chat",
     ];
     if (role === "guest" && restrictedForGuests.some((p) => location.pathname.startsWith(p))) {
       throw redirect({ to: "/dashboard" });
