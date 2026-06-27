@@ -14,21 +14,21 @@ def test_router_topic_routing_per_department():
     # Safety topic giờ do Vận hành xử lý (P3 để tránh P5-override kéo về Vận hành theo đường khác).
     assert _team("Safety", "P3") == "Vận hành"
     assert _team("App Issue", "P3") == "IT"
-    assert _team("Payment", "P3") == "CSKH"
+    assert _team("Payment", "P3") == "Tài chính & Thanh toán"
     assert _team("Driver Behavior", "P3") == "Vận hành"
-    # Pricing giờ về CSKH (front-line), phối hợp IT — không còn đội Pricing riêng.
-    assert _team("Pricing", "P3") == "CSKH"
-    assert _team("Other", "P1", "positive") == "Marketing"
+    # Pricing giờ về Quản lý Rủi ro & Gian lận (lạm dụng KM, giá bất thường).
+    assert _team("Pricing", "P3") == "Quản lý Rủi ro & Gian lận"
+    assert _team("Other", "P1", "positive") == "Sản phẩm"
 
 
-def test_positive_sentiment_only_routes_marketing_for_other_topic():
-    # Positive CHUNG (topic Other) -> Marketing để khai thác truyền thông.
-    assert _team("Other", "P3", "positive") == "Marketing"
-    # Positive gắn chủ đề chuyên môn KHÔNG còn bị ép về Marketing — route theo topic.
-    assert _team("App Issue", "P3", "positive") == "IT"
-    assert _team("Payment", "P3", "positive") == "CSKH"
+def test_positive_sentiment_routes_san_pham_for_other_and_app_issue():
+    # Positive CHUNG (Other) hoặc góp ý app (App Issue) -> Sản phẩm để nâng cấp UX.
+    assert _team("Other", "P3", "positive") == "Sản phẩm"
+    assert _team("App Issue", "P3", "positive") == "Sản phẩm"
+    # Positive gắn chủ đề chuyên môn khác KHÔNG bị ép về Sản phẩm — route theo topic.
+    assert _team("Payment", "P3", "positive") == "Tài chính & Thanh toán"
     assert _team("Driver Behavior", "P3", "positive") == "Vận hành"
-    assert _team("Pricing", "P3", "positive") == "CSKH"
+    assert _team("Pricing", "P3", "positive") == "Quản lý Rủi ro & Gian lận"
 
 
 def test_sentiment_override_without_topics_is_ignored():
@@ -38,7 +38,7 @@ def test_sentiment_override_without_topics_is_ignored():
         "default_team": "CSKH",
         "routes": [{"topic": "App Issue", "team": "IT", "sla_hours": 12, "priority_default": "P3"}],
         "severity_overrides": [],
-        "sentiment_overrides": [{"sentiment": "positive", "team": "Marketing", "sla_hours": 48}],
+        "sentiment_overrides": [{"sentiment": "positive", "team": "Sản phẩm", "sla_hours": 48}],
     }
     with patch("agents.router_agent.load_routing_table", return_value=config):
         assert _team("App Issue", "P3", "positive") == "IT"

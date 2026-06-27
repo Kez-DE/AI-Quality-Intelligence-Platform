@@ -4,8 +4,8 @@
     { "topic": "Safety",          "team": "Vận hành", "sla_hours": 1,  "priority_default": "P5", "description": "Sự cố an toàn, tai nạn, đe doạ — đội Vận hành phản ứng nhanh tại hiện trường, ưu tiên tính mạng." },
     { "topic": "Driver Behavior", "team": "Vận hành", "sla_hours": 8,  "priority_default": "P3", "description": "Hành vi/thái độ tài xế, điều phối cung-cầu thuộc đội Vận hành." },
     { "topic": "App Issue",       "team": "IT",       "sla_hours": 12, "priority_default": "P3", "description": "Lỗi ứng dụng, bản đồ, sự cố kỹ thuật do đội IT xử lý." },
-    { "topic": "Payment",         "team": "CSKH",     "sla_hours": 12, "priority_default": "P3", "description": "Vấn đề thanh toán, hoàn tiền — CSKH hỗ trợ khách trực tiếp." },
-    { "topic": "Pricing",         "team": "CSKH",     "sla_hours": 12, "priority_default": "P3", "description": "Giá cước, voucher/khuyến mãi, trừ tiền không rõ lý do — CSKH hỗ trợ khách trực tiếp, phối hợp IT kiểm tra lỗi kỹ thuật." },
+    { "topic": "Payment",         "team": "Tài chính & Thanh toán", "sla_hours": 12, "priority_default": "P3", "description": "Vấn đề thanh toán, hoàn tiền, đối soát giao dịch." },
+    { "topic": "Pricing",         "team": "Quản lý Rủi ro & Gian lận", "sla_hours": 12, "priority_default": "P3", "description": "Lạm dụng khuyến mãi, gian lận, giá cước bất thường." },
     { "topic": "Delay",           "team": "Vận hành", "sla_hours": 8,  "priority_default": "P3", "description": "Chậm trễ, thiếu cuốc, khu vực nóng do đội Vận hành điều phối." },
     { "topic": "Other",           "team": "CSKH",     "sla_hours": 24, "priority_default": "P4", "description": "Phản hồi chung chưa phân loại rõ — CSKH tiếp nhận." }
   ],
@@ -13,6 +13,6 @@
     { "severity": "P5", "team": "Vận hành", "sla_hours": 1, "priority_default": "P5", "description": "Mọi ticket mức P5 ép về Vận hành (đội phản ứng nhanh) bất kể chủ đề — ưu tiên xử lý khẩn cấp." }
   ],
   "sentiment_overrides": [
-    { "sentiment": "positive", "topics": ["Other"], "team": "Marketing", "sla_hours": 48, "priority_default": "P4", "description": "Phản hồi tích cực chung (chưa gắn chủ đề chuyên môn) phản ánh cảm nhận thương hiệu — chuyển Marketing theo dõi & khai thác truyền thông. Positive về app/tài xế/thanh toán vẫn route theo topic về đúng phòng chuyên môn." }
+    { "sentiment": "positive", "topics": ["Other", "App Issue"], "team": "Sản phẩm", "sla_hours": 48, "priority_default": "P4", "description": "Phản hồi tích cực hoặc góp ý tính năng chuyển về Sản phẩm để nâng cấp UX/UI." }
   ]
 }
