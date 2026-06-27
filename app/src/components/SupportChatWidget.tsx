@@ -1,7 +1,9 @@
 // Trợ lý CSKH/đồng hành nổi (floating) — dùng cho Khách, trang chủ, và mọi account ops.
-// - Đã đăng nhập: gọi /api/agent/chat — backend tự phân tầng theo role + phòng ban
+// - Đã đăng nhập (trong app): gọi /api/agent/chat — backend tự phân tầng theo role + phòng ban
 //   (guest→KB công khai; staff→SOP/cách làm + task phòng mình; manager→+báo cáo; admin→full).
-// - Trang chủ (chưa đăng nhập): tư vấn rule-based + liên hệ công khai.
+// - Trang chủ/landing (prop publicOnly): LUÔN chạy tầng công khai như tài khoản Khách —
+//   gửi public_only=true để backend ép Public FAQ/CSKH, không lộ dữ liệu nội bộ kể cả khi
+//   ops/admin đang đăng nhập. Khách chưa đăng nhập: tư vấn rule-based + liên hệ công khai.
 // Bong bóng trả lời render Markdown (in đậm, danh sách, bảng). Trích dẫn [Nguồn N] bấm được
 // để mở chi tiết tài liệu ngay trong widget.
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -126,7 +128,7 @@ function makeCitationComponents(sources: Source[] | undefined, onOpen: (s: Sourc
   };
 }
 
-export default function SupportChatWidget() {
+export default function SupportChatWidget({ publicOnly = false }: { publicOnly?: boolean } = {}) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -136,7 +138,15 @@ export default function SupportChatWidget() {
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [msgs, setMsgs] = useState<Msg[]>([greeting()]);
   const { data: me } = useMe();
-  const suggestions = useMemo(() => suggestionsFor(authed ? me : undefined), [authed, me]);
+  // Trang chủ/landing (publicOnly): luôn dùng gợi ý CSKH công khai, bỏ qua role thật.
+  const suggestions = useMemo(
+    () => suggestionsFor(authed && !publicOnly ? me : undefined),
+    [authed, me, publicOnly],
+  );
+  // Dòng trạng thái: trang chủ (publicOnly) hỗ trợ công khai; trong app trả lời theo quyền.
+  const statusLine = publicOnly
+    ? "Online · hỗ trợ thông tin công khai"
+    : "Online · trả lời theo quyền của bạn";
   const endRef = useRef<HTMLDivElement>(null);
 
   function resetChat() {
@@ -165,12 +175,18 @@ export default function SupportChatWidget() {
     let sources: Source[] | undefined;
     try {
       if (authed) {
-        const res = await apiFetch<{ data?: { content?: string; sources?: Source[] } }>("/api/agent/chat", {
-          method: "POST",
-          body: JSON.stringify({
-            messages: history.slice(-8).map(({ role, content }) => ({ role, content })),
-          }),
-        });
+        const res = await apiFetch<{ data?: { content?: string; sources?: Source[] } }>(
+          "/api/agent/chat",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              messages: history.slice(-8).map(({ role, content }) => ({ role, content })),
+              // publicOnly (trang chủ) → backend ép tầng công khai (Public FAQ/CSKH),
+              // không truy cập dữ liệu/tool nội bộ kể cả khi đang đăng nhập ops/admin.
+              public_only: publicOnly,
+            }),
+          },
+        );
         reply = res.data?.content?.trim() || cannedReply(q);
         sources = res.data?.sources;
       } else {
@@ -204,7 +220,7 @@ export default function SupportChatWidget() {
             <div className="flex-1">
               <div className="font-display font-semibold leading-none">Trợ lý đồng hành xanhSM</div>
               <div className="mt-1 flex items-center gap-1.5 text-xs opacity-90">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300" /> Online · trả lời theo quyền của bạn
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300" /> {statusLine}
               </div>
             </div>
             <button

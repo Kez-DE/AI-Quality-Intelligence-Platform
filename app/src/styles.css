@@ -99,6 +99,7 @@
     radial-gradient(at 50% 100%, oklch(0.92 0.09 196 / 0.4) 0px, transparent 50%);
   --shadow-green: 0 20px 50px -20px color-mix(in oklab, oklch(0.72 0.13 198) 45%, transparent);
   --shadow-card: 0 4px 24px -8px color-mix(in oklab, oklch(0.32 0.08 205) 20%, transparent);
+  --shadow-elevated: 0 18px 44px -18px color-mix(in oklab, oklch(0.32 0.08 205) 32%, transparent);
 }
 
 .dark {
@@ -143,6 +144,7 @@
     radial-gradient(at 90% 10%, oklch(0.7 0.13 185 / 0.1) 0px, transparent 50%),
     radial-gradient(at 50% 100%, oklch(0.32 0.08 205 / 0.18) 0px, transparent 50%);
   --shadow-card: 0 4px 28px -10px color-mix(in oklab, black 55%, transparent);
+  --shadow-elevated: 0 20px 50px -18px color-mix(in oklab, black 60%, transparent);
 }
 
 @layer base {
@@ -270,4 +272,109 @@
 .live-feedback-row-new {
   animation: live-feedback-slide-in 1200ms cubic-bezier(0.16, 1, 0.3, 1) both;
   will-change: transform, opacity, background-color;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   AURORA GRADIENT CARDS — viền gradient động + quầng sáng màu thương hiệu,
+   giúp card nổi bật trên nền. Caller tự đặt bo góc (rounded-2xl…) + nền
+   (bg-card…); pseudo-element viền kế thừa bo góc qua border-radius: inherit.
+   ════════════════════════════════════════════════════════════════════════ */
+@property --aurora-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 120deg;
+}
+
+@keyframes aurora-spin {
+  to { --aurora-angle: 480deg; }
+}
+
+@layer components {
+  /* Card nổi bật với viền Aurora + quầng sáng nhẹ ở trạng thái nghỉ, sáng hơn khi hover. */
+  .aurora-card {
+    position: relative;
+    isolation: isolate;
+    box-shadow:
+      var(--shadow-card),
+      0 0 22px -10px color-mix(in oklab, var(--xanh-cyan) 40%, transparent);
+    transition:
+      transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 260ms ease;
+  }
+  /* Viền gradient động (mask trick) — chỉ hiện vành mỏng quanh mép card. */
+  .aurora-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1.25px;
+    background: conic-gradient(
+      from var(--aurora-angle),
+      var(--xanh-cyan),
+      var(--xanh-green),
+      var(--primary-glow),
+      var(--xanh-mint),
+      var(--xanh-cyan)
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0.55;
+    pointer-events: none;
+    animation: aurora-spin 16s linear infinite;
+  }
+  .aurora-card:hover {
+    transform: translateY(-3px);
+    box-shadow:
+      var(--shadow-green),
+      0 22px 55px -16px color-mix(in oklab, var(--xanh-cyan) 50%, transparent),
+      0 10px 32px -14px color-mix(in oklab, var(--xanh-green) 45%, transparent);
+  }
+  .aurora-card:hover::before {
+    opacity: 0.95;
+  }
+
+  /* Biến thể viền rõ + quay chậm hơn — hợp cho statistic card đứng yên. */
+  .aurora-static::before {
+    opacity: 0.8;
+    animation-duration: 26s;
+  }
+
+  /* Container chung: bo góc lớn + đổ bóng mềm, nhấc nhẹ khi hover. */
+  .card-elevated {
+    box-shadow: var(--shadow-elevated);
+    transition:
+      transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 240ms ease;
+  }
+  .card-elevated:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-green);
+  }
+}
+
+/* Tôn trọng người dùng tắt chuyển động: dừng quay viền + bỏ nhấc card. */
+@media (prefers-reduced-motion: reduce) {
+  .aurora-card::before { animation: none !important; }
+  .aurora-card:hover,
+  .card-elevated:hover { transform: none !important; }
+}
+
+/* Fade-in nhẹ cho các dòng live-feed của trang chủ (port từ nicez). */
+@keyframes landing-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@layer utilities {
+  .animate-fade-in {
+    animation: landing-fade-in 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in { animation: none !important; }
 }

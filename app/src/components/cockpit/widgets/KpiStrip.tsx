@@ -24,7 +24,7 @@ function KpiSkeleton() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
       {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="rounded-xl border border-border bg-card p-3 shadow-[var(--shadow-card)] animate-pulse">
+        <div key={i} className="rounded-2xl border border-border bg-card p-3 shadow-[var(--shadow-card)] animate-pulse">
           <div className="flex items-center justify-between mb-3">
             <div className="h-2.5 bg-muted rounded w-3/4" />
             <div className="h-3.5 w-3.5 bg-muted rounded" />
@@ -134,10 +134,10 @@ export function KpiStrip() {
         return (
           <div
             key={i.label}
-            className={`rounded-xl border bg-card p-3 shadow-[var(--shadow-card)] transition-colors ${
+            className={`p-3 ${
               i.urgent
-                ? "border-xanh-coral/50 ring-1 ring-inset ring-xanh-coral/20 bg-xanh-coral/[0.03]"
-                : "border-border"
+                ? "rounded-2xl border border-xanh-coral/50 bg-xanh-coral/[0.03] shadow-[var(--shadow-card)] ring-1 ring-inset ring-xanh-coral/20 transition-colors"
+                : "aurora-card aurora-static rounded-2xl bg-card"
             }`}
           >
             <div className="flex items-center justify-between">

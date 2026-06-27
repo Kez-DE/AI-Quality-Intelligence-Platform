@@ -6,7 +6,7 @@ import { AREAS, regionLabel } from "@/lib/regions";
 import { toast } from "sonner";
 import {
   Activity, BarChart3, Bot, CheckCircle2, ChevronRight, Clock, Compass, Cpu,
-  Eye, Heart, Info, MapPin, MessageSquare, PenLine, Send, Shield, Sparkles,
+  Eye, Filter, Heart, Info, MapPin, MessageSquare, PenLine, Send, Shield, Sparkles,
   Star, Tag, ThumbsDown, ThumbsUp, TrendingUp, AlertTriangle, Smile, Meh, Frown,
 } from "lucide-react";
 import {
@@ -70,7 +70,7 @@ const benefits = [
 ];
 
 type Review = {
-  id: number; rating: number; time: string; channel: string; region: string;
+  id: number; name: string; rating: number; time: string; channel: string; region: string;
   text: string; sentiment: string; topic: string; status: string;
 };
 
@@ -79,6 +79,56 @@ const sentimentMap: Record<string, { icon: any; label: string; cls: string }> = 
   neutral: { icon: Meh, label: "Trung lập", cls: "text-warning bg-warning/10 border-warning/30" },
   negative: { icon: Frown, label: "Tiêu cực", cls: "text-destructive bg-destructive/10 border-destructive/30" },
 };
+
+// Trạng thái xử lý phản hồi → màu badge (info / warning / success), đồng bộ tone với cả file.
+const statusMap: Record<string, string> = {
+  "Đã tiếp nhận": "border-info/30 bg-info/10 text-info",
+  "Đang xử lý": "border-warning/30 bg-warning/10 text-warning",
+  "Hoàn tất": "border-success/30 bg-success/10 text-success",
+};
+
+const STATUS_FILTERS = ["Tất cả", "Đã tiếp nhận", "Đang xử lý", "Hoàn tất"] as const;
+type StatusFilter = (typeof STATUS_FILTERS)[number];
+
+// Lịch sử phản hồi mẫu (đại diện) để Khách thấy ngay cả khi chưa gửi gì trong phiên này.
+const seedReviews: Review[] = [
+  {
+    id: 1,
+    name: "Bạn",
+    rating: 5,
+    time: "2 giờ trước",
+    channel: "Ứng dụng",
+    region: "HN-Cau-Giay",
+    text: "Tài xế rất lịch sự, xe sạch sẽ và đến đúng giờ. Mình sẽ tiếp tục dùng dịch vụ.",
+    sentiment: "positive",
+    topic: "Tài xế",
+    status: "Đã tiếp nhận",
+  },
+  {
+    id: 2,
+    name: "Bạn",
+    rating: 3,
+    time: "Hôm qua",
+    channel: "Ứng dụng",
+    region: "HCM-Quan-1",
+    text: "App hơi chậm khi đặt xe vào giờ cao điểm, hy vọng đội kỹ thuật sớm cải thiện.",
+    sentiment: "neutral",
+    topic: "App",
+    status: "Đang xử lý",
+  },
+  {
+    id: 3,
+    name: "Bạn",
+    rating: 5,
+    time: "3 ngày trước",
+    channel: "Hotline",
+    region: "DN-Hai-Chau",
+    text: "Trải nghiệm tốt, giá hợp lý, tổng đài hỗ trợ nhiệt tình. Cảm ơn xanhSM.",
+    sentiment: "positive",
+    topic: "Giá",
+    status: "Hoàn tất",
+  },
+];
 
 function StatCard({ icon: Icon, label, value, sub, trend, tone = "default" }: {
   icon: any; label: string; value: string; sub?: string;
@@ -135,13 +185,30 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
 }
 
 export default function GuestDashboard() {
-  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviews, setReviews] = useState<Review[]>(seedReviews);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("Tất cả");
   const [rating, setRating] = useState(5);
   const [text, setText] = useState("");
   const [channel, setChannel] = useState("Ứng dụng");
   const [region, setRegion] = useState(AREAS[0].code);
   const [submitting, setSubmitting] = useState(false);
   const pieData = useMemo(() => topicData.map((t) => ({ name: t.topic, value: t.value, color: t.color })), []);
+  const filteredReviews = useMemo(
+    () => (statusFilter === "Tất cả" ? reviews : reviews.filter((r) => r.status === statusFilter)),
+    [reviews, statusFilter],
+  );
+  const statusCounts = useMemo(() => {
+    const counts: Record<StatusFilter, number> = {
+      "Tất cả": reviews.length,
+      "Đã tiếp nhận": 0,
+      "Đang xử lý": 0,
+      "Hoàn tất": 0,
+    };
+    for (const r of reviews) {
+      if (r.status in counts) counts[r.status as StatusFilter] += 1;
+    }
+    return counts;
+  }, [reviews]);
 
   async function submitFeedback(e: React.FormEvent) {
     e.preventDefault();
@@ -156,6 +223,7 @@ export default function GuestDashboard() {
       setReviews((prev) => [
         {
           id: Date.now(),
+          name: "Bạn",
           rating,
           time: "Vừa xong",
           channel,
@@ -274,43 +342,98 @@ export default function GuestDashboard() {
         </Card>
       </section>
 
-      {/* Your reviews (in-session) */}
-      {reviews.length > 0 && (
-        <section>
+      {/* Your reviews (seed history + in-session) */}
+      <section id="guest-reviews">
+        <div className="aurora-card rounded-2xl bg-card/80 p-6">
           <SectionTitle
             icon={MessageSquare}
             title="Phản hồi của bạn"
-            sub={`${reviews.length} phản hồi đã gửi trong phiên này · AI tự gán nhãn`}
+            sub={`${reviews.length} phản hồi · theo dõi trạng thái xử lý`}
             right={
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="gap-1"><ThumbsUp className="h-3 w-3 text-success" />{reviews.filter((r) => r.sentiment === "positive").length}</Badge>
-                <Badge variant="outline" className="gap-1"><ThumbsDown className="h-3 w-3 text-destructive" />{reviews.filter((r) => r.sentiment === "negative").length}</Badge>
+                <Badge variant="outline" className="gap-1">
+                  <ThumbsUp className="h-3 w-3 text-success" />
+                  {reviews.filter((r) => r.sentiment === "positive").length}
+                </Badge>
+                <Badge variant="outline" className="gap-1">
+                  <ThumbsDown className="h-3 w-3 text-destructive" />
+                  {reviews.filter((r) => r.sentiment === "negative").length}
+                </Badge>
               </div>
             }
           />
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {reviews.map((r) => {
-              const s = sentimentMap[r.sentiment] || sentimentMap.neutral;
+
+          {/* Lọc theo trạng thái (client-side) */}
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <Filter className="h-3.5 w-3.5" /> Lọc theo trạng thái
+            </span>
+            {STATUS_FILTERS.map((f) => {
+              const active = statusFilter === f;
               return (
-                <div key={r.id} className="rounded-xl border bg-background/60 p-4">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <div className="flex gap-0.5">
-                      {[1, 2, 3, 4, 5].map((n) => <Star key={n} className={`h-3.5 w-3.5 ${n <= r.rating ? "fill-warning text-warning" : "text-muted-foreground/30"}`} />)}
-                    </div>
-                    <Badge variant="outline" className="border-info/30 bg-info/10 text-info">{r.status}</Badge>
-                  </div>
-                  <p className="mb-3 text-sm leading-relaxed text-foreground/90">{r.text}</p>
-                  <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                    <Badge variant="outline" className={`gap-1 ${s.cls}`}><s.icon className="h-3 w-3" />{s.label}</Badge>
-                    <Badge variant="secondary" className="gap-1"><Tag className="h-3 w-3" />{r.topic}</Badge>
-                    <Badge variant="secondary" className="gap-1"><MapPin className="h-3 w-3" />{regionLabel(r.region)}</Badge>
-                  </div>
-                </div>
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setStatusFilter(f)}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    active
+                      ? "border-primary/40 bg-primary/10 text-primary"
+                      : "border-border bg-background/60 text-muted-foreground hover:bg-secondary/50"
+                  }`}
+                >
+                  {f}
+                  <span
+                    className={`rounded-full px-1.5 text-[10px] font-semibold ${
+                      active ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {statusCounts[f]}
+                  </span>
+                </button>
               );
             })}
           </div>
-        </section>
-      )}
+
+          {filteredReviews.length === 0 ? (
+            <div className="rounded-xl border border-dashed bg-background/40 p-8 text-center text-sm text-muted-foreground">
+              Chưa có phản hồi nào ở trạng thái này.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filteredReviews.map((r) => {
+                const s = sentimentMap[r.sentiment] || sentimentMap.neutral;
+                const statusCls = statusMap[r.status] || statusMap["Đã tiếp nhận"];
+                return (
+                  <div
+                    key={r.id}
+                    className="rounded-xl border bg-background/60 p-4 shadow-[var(--shadow-card)] transition-colors hover:bg-secondary/40"
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-0.5">
+                          {[1, 2, 3, 4, 5].map((n) => <Star key={n} className={`h-3.5 w-3.5 ${n <= r.rating ? "fill-warning text-warning" : "text-muted-foreground/30"}`} />)}
+                        </div>
+                        <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          {r.time}
+                        </span>
+                      </div>
+                      <Badge variant="outline" className={statusCls}>{r.status}</Badge>
+                    </div>
+                    <p className="mb-3 text-sm leading-relaxed text-foreground/90">{r.text}</p>
+                    <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                      <Badge variant="outline" className={`gap-1 ${s.cls}`}><s.icon className="h-3 w-3" />{s.label}</Badge>
+                      <Badge variant="secondary" className="gap-1"><Tag className="h-3 w-3" />{r.topic}</Badge>
+                      <Badge variant="secondary" className="gap-1"><MapPin className="h-3 w-3" />{regionLabel(r.region)}</Badge>
+                      <Badge variant="secondary" className="gap-1"><MessageSquare className="h-3 w-3" />{r.channel}</Badge>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* Pipeline */}
       <section>

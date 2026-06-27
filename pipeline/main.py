@@ -39,6 +39,10 @@ class ChatMessageReq(BaseModel):
 
 class ChatReq(BaseModel):
     messages: list[ChatMessageReq]
+    # public_only: ép trợ lý chạy ở TẦNG CÔNG KHAI (Public FAQ/CSKH) cho MỌI vai trò.
+    # Chỉ HẠ quyền, không bao giờ nâng quyền (guest vẫn là guest). Dùng cho widget trợ lý
+    # ở trang chủ/landing để không lộ dữ liệu nội bộ kể cả khi ops/admin đang đăng nhập.
+    public_only: bool = False
 
 
 class StatusUpdateReq(BaseModel):
@@ -1162,7 +1166,10 @@ def _append_safe_client_history(normalized: list[dict], messages: list[ChatMessa
 
 @app.post("/api/agent/chat")
 def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
-    if user.role == "guest":
+    # TẦNG CÔNG KHAI: áp dụng cho guest, hoặc khi client yêu cầu public_only (widget trang chủ).
+    # public_only chỉ HẠ quyền — ops/admin đăng nhập vẫn bị giới hạn về Public FAQ + submit_feedback,
+    # KHÔNG truy cập tool/dữ liệu nội bộ. Không thể dùng để nâng quyền.
+    if user.role == "guest" or payload.public_only:
         check_rate_limit(chat_rate_limit, user.id)
         if not payload.messages:
             raise HTTPException(status_code=400, detail="messages must be a non-empty list")

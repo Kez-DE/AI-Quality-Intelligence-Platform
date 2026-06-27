@@ -92,10 +92,10 @@ function AuthPage() {
         style={{ background: "var(--gradient-mesh)" }}
       />
 
-      <div className="mx-auto grid min-h-screen w-full max-w-7xl grid-cols-1 lg:grid-cols-[1.05fr_1fr]">
-        {/* LEFT — brand panel */}
+      <div className="mx-auto grid min-h-screen w-full max-w-7xl grid-cols-1 lg:grid-cols-[1.05fr_1fr] lg:gap-6 lg:p-6">
+        {/* LEFT — brand panel (card nổi: bo góc + viền Aurora + quầng sáng, đồng bộ với Auth Card) */}
         <section
-          className="relative hidden flex-col justify-between overflow-hidden p-10 text-white lg:flex"
+          className="aurora-card relative hidden flex-col justify-between overflow-hidden rounded-[2rem] p-10 text-white lg:flex"
           style={{ background: "var(--gradient-hero)" }}
         >
           <Link to="/" className="relative z-10 flex items-center gap-3">
