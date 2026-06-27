@@ -121,7 +121,7 @@ class Settings(BaseSettings):
     ticket_critical_threshold: int = Field(default=1, alias="TICKET_CRITICAL_THRESHOLD")
     ticket_high_risk_threshold: int = Field(default=3, alias="TICKET_HIGH_RISK_THRESHOLD")
     ticket_volume_spike_threshold: int = Field(default=10, alias="TICKET_VOLUME_SPIKE_THRESHOLD")
-    ticket_marketing_spike_threshold: int = Field(default=5, alias="TICKET_MARKETING_SPIKE_THRESHOLD")
+    ticket_opportunity_spike_threshold: int = Field(default=5, alias="TICKET_OPPORTUNITY_SPIKE_THRESHOLD")
     ticket_alert_cooldown_minutes: int = Field(default=60, alias="TICKET_ALERT_COOLDOWN_MINUTES")
     auto_ticket_workflow_enabled: bool = Field(default=True, alias="AUTO_TICKET_WORKFLOW_ENABLED")
     auto_ticket_in_progress_after_seconds: int = Field(default=10, alias="AUTO_TICKET_IN_PROGRESS_AFTER_SECONDS")

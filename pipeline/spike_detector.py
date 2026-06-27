@@ -18,7 +18,7 @@ _settings = get_settings()
 CRITICAL_THRESHOLD = _settings.ticket_critical_threshold
 HIGH_RISK_THRESHOLD = _settings.ticket_high_risk_threshold
 VOLUME_SPIKE_THRESHOLD = _settings.ticket_volume_spike_threshold
-MARKETING_SPIKE_THRESHOLD = _settings.ticket_marketing_spike_threshold
+OPPORTUNITY_SPIKE_THRESHOLD = _settings.ticket_opportunity_spike_threshold
 ALERT_COOLDOWN_MINUTES = _settings.ticket_alert_cooldown_minutes
 
 
@@ -47,7 +47,7 @@ def _group_threshold(group: dict) -> int | None:
     if max_severity >= 4:
         return HIGH_RISK_THRESHOLD
     if group["ticket_type"] == "opportunity":
-        return MARKETING_SPIKE_THRESHOLD
+        return OPPORTUNITY_SPIKE_THRESHOLD
     if group["sentiments"].get("negative", 0) > 0:
         return VOLUME_SPIKE_THRESHOLD
     return None
