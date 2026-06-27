@@ -12,6 +12,7 @@
 | Python | 3.10+ | `python --version` |
 | Node.js | 18+ (khuyên 20 LTS) | `node --version` |
 | npm | 9+ | `npm --version` |
+| bun | 1.0+ (công cụ chính cho frontend; cài bằng `npm install -g bun`) | `bun --version` |
 | Git | 2.30+ | `git --version` |
 
 ## 1. Cài đặt công cụ
