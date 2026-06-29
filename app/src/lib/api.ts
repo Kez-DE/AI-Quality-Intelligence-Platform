@@ -63,18 +63,24 @@ export async function apiFetch<T = unknown>(path: string, init: RequestInit = {}
   if (token) headers.set("Authorization", `Bearer ${token}`);
   if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
 
-  const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
-  if (!res.ok) {
-    let detail = `${res.status} ${res.statusText}`;
-    try {
-      const body = (await res.json()) as { detail?: string };
-      if (body?.detail) detail = body.detail;
-    } catch {
-      // body không phải JSON — giữ status text.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, { ...init, headers, signal: controller.signal });
+    if (!res.ok) {
+      let detail = `${res.status} ${res.statusText}`;
+      try {
+        const body = (await res.json()) as { detail?: string };
+        if (body?.detail) detail = body.detail;
+      } catch {
+        // body không phải JSON — giữ status text.
+      }
+      throw new Error(detail);
     }
-    throw new Error(detail);
+    return (await res.json()) as T;
+  } finally {
+    clearTimeout(timeout);
   }
-  return (await res.json()) as T;
 }
 
 /** Đọc danh tính + role của user đang đăng nhập. Dùng để render nav/route theo quyền. */

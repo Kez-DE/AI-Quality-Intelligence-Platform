@@ -11,10 +11,24 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function DashboardPage() {
-  const { data: me, isLoading } = useMe();
+  const { data: me, isLoading, isError } = useMe();
 
   if (isLoading) {
     return <div className="py-20 text-center text-sm text-muted-foreground">Đang tải bảng điều khiển…</div>;
+  }
+
+  if (isError || !me) {
+    return (
+      <div className="py-20 text-center text-sm text-muted-foreground">
+        <p>Không kết nối được server. Hãy kiểm tra backend đang chạy.</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-3 text-xs underline hover:text-foreground"
+        >
+          Thử lại
+        </button>
+      </div>
+    );
   }
 
   // Khách (guest): trang khách hàng đầy đủ panel — chỉ số công khai, gửi phản hồi, quyền lợi.
