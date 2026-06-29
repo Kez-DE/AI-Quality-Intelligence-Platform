@@ -90,45 +90,6 @@ const statusMap: Record<string, string> = {
 const STATUS_FILTERS = ["Tất cả", "Đã tiếp nhận", "Đang xử lý", "Hoàn tất"] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
 
-// Lịch sử phản hồi mẫu (đại diện) để Khách thấy ngay cả khi chưa gửi gì trong phiên này.
-const seedReviews: Review[] = [
-  {
-    id: 1,
-    name: "Bạn",
-    rating: 5,
-    time: "2 giờ trước",
-    channel: "Ứng dụng",
-    region: "HN-Cau-Giay",
-    text: "Tài xế rất lịch sự, xe sạch sẽ và đến đúng giờ. Mình sẽ tiếp tục dùng dịch vụ.",
-    sentiment: "positive",
-    topic: "Tài xế",
-    status: "Đã tiếp nhận",
-  },
-  {
-    id: 2,
-    name: "Bạn",
-    rating: 3,
-    time: "Hôm qua",
-    channel: "Ứng dụng",
-    region: "HCM-Quan-1",
-    text: "App hơi chậm khi đặt xe vào giờ cao điểm, hy vọng đội kỹ thuật sớm cải thiện.",
-    sentiment: "neutral",
-    topic: "App",
-    status: "Đang xử lý",
-  },
-  {
-    id: 3,
-    name: "Bạn",
-    rating: 5,
-    time: "3 ngày trước",
-    channel: "Hotline",
-    region: "DN-Hai-Chau",
-    text: "Trải nghiệm tốt, giá hợp lý, tổng đài hỗ trợ nhiệt tình. Cảm ơn xanhSM.",
-    sentiment: "positive",
-    topic: "Giá",
-    status: "Hoàn tất",
-  },
-];
 
 function StatCard({ icon: Icon, label, value, sub, trend, tone = "default" }: {
   icon: any; label: string; value: string; sub?: string;
@@ -185,7 +146,7 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
 }
 
 export default function GuestDashboard() {
-  const [reviews, setReviews] = useState<Review[]>(seedReviews);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("Tất cả");
   const [rating, setRating] = useState(5);
   const [text, setText] = useState("");
@@ -342,14 +303,14 @@ export default function GuestDashboard() {
         </Card>
       </section>
 
-      {/* Your reviews (seed history + in-session) */}
+      {/* Your reviews (in-session only, no mock) */}
       <section id="guest-reviews">
         <div className="aurora-card rounded-2xl bg-card/80 p-6">
           <SectionTitle
             icon={MessageSquare}
             title="Phản hồi của bạn"
-            sub={`${reviews.length} phản hồi · theo dõi trạng thái xử lý`}
-            right={
+            sub={reviews.length > 0 ? `${reviews.length} phản hồi · theo dõi trạng thái xử lý` : "Gửi đánh giá để xem lịch sử xử lý"}
+            right={reviews.length > 0 ? (
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="gap-1">
                   <ThumbsUp className="h-3 w-3 text-success" />
@@ -360,77 +321,90 @@ export default function GuestDashboard() {
                   {reviews.filter((r) => r.sentiment === "negative").length}
                 </Badge>
               </div>
-            }
+            ) : undefined}
           />
 
-          {/* Lọc theo trạng thái (client-side) */}
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <Filter className="h-3.5 w-3.5" /> Lọc theo trạng thái
-            </span>
-            {STATUS_FILTERS.map((f) => {
-              const active = statusFilter === f;
-              return (
-                <button
-                  key={f}
-                  type="button"
-                  onClick={() => setStatusFilter(f)}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                    active
-                      ? "border-primary/40 bg-primary/10 text-primary"
-                      : "border-border bg-background/60 text-muted-foreground hover:bg-secondary/50"
-                  }`}
-                >
-                  {f}
-                  <span
-                    className={`rounded-full px-1.5 text-[10px] font-semibold ${
-                      active ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {statusCounts[f]}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {filteredReviews.length === 0 ? (
-            <div className="rounded-xl border border-dashed bg-background/40 p-8 text-center text-sm text-muted-foreground">
-              Chưa có phản hồi nào ở trạng thái này.
+          {reviews.length === 0 ? (
+            <div className="rounded-xl border border-dashed bg-background/40 p-8 text-center">
+              <MessageSquare className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
+              <p className="text-sm font-medium">Bạn chưa gửi phản hồi nào</p>
+              <p className="mt-1 text-xs text-muted-foreground">Điền form bên trên để gửi đánh giá đầu tiên.</p>
+              <a href="#guest-feedback" className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline">
+                <PenLine className="h-3.5 w-3.5" /> Gửi phản hồi ngay
+              </a>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredReviews.map((r) => {
-                const s = sentimentMap[r.sentiment] || sentimentMap.neutral;
-                const statusCls = statusMap[r.status] || statusMap["Đã tiếp nhận"];
-                return (
-                  <div
-                    key={r.id}
-                    className="rounded-xl border bg-background/60 p-4 shadow-[var(--shadow-card)] transition-colors hover:bg-secondary/40"
-                  >
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <div className="flex gap-0.5">
-                          {[1, 2, 3, 4, 5].map((n) => <Star key={n} className={`h-3.5 w-3.5 ${n <= r.rating ? "fill-warning text-warning" : "text-muted-foreground/30"}`} />)}
+            <>
+              {/* Lọc theo trạng thái (client-side) */}
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  <Filter className="h-3.5 w-3.5" /> Lọc theo trạng thái
+                </span>
+                {STATUS_FILTERS.map((f) => {
+                  const active = statusFilter === f;
+                  return (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setStatusFilter(f)}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                        active
+                          ? "border-primary/40 bg-primary/10 text-primary"
+                          : "border-border bg-background/60 text-muted-foreground hover:bg-secondary/50"
+                      }`}
+                    >
+                      {f}
+                      <span
+                        className={`rounded-full px-1.5 text-[10px] font-semibold ${
+                          active ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {statusCounts[f]}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {filteredReviews.length === 0 ? (
+                <div className="rounded-xl border border-dashed bg-background/40 p-8 text-center text-sm text-muted-foreground">
+                  Chưa có phản hồi nào ở trạng thái này.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {filteredReviews.map((r) => {
+                    const s = sentimentMap[r.sentiment] || sentimentMap.neutral;
+                    const statusCls = statusMap[r.status] || statusMap["Đã tiếp nhận"];
+                    return (
+                      <div
+                        key={r.id}
+                        className="rounded-xl border bg-background/60 p-4 shadow-[var(--shadow-card)] transition-colors hover:bg-secondary/40"
+                      >
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className="flex gap-0.5">
+                              {[1, 2, 3, 4, 5].map((n) => <Star key={n} className={`h-3.5 w-3.5 ${n <= r.rating ? "fill-warning text-warning" : "text-muted-foreground/30"}`} />)}
+                            </div>
+                            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              {r.time}
+                            </span>
+                          </div>
+                          <Badge variant="outline" className={statusCls}>{r.status}</Badge>
                         </div>
-                        <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          {r.time}
-                        </span>
+                        <p className="mb-3 text-sm leading-relaxed text-foreground/90">{r.text}</p>
+                        <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                          <Badge variant="outline" className={`gap-1 ${s.cls}`}><s.icon className="h-3 w-3" />{s.label}</Badge>
+                          <Badge variant="secondary" className="gap-1"><Tag className="h-3 w-3" />{r.topic}</Badge>
+                          <Badge variant="secondary" className="gap-1"><MapPin className="h-3 w-3" />{regionLabel(r.region)}</Badge>
+                          <Badge variant="secondary" className="gap-1"><MessageSquare className="h-3 w-3" />{r.channel}</Badge>
+                        </div>
                       </div>
-                      <Badge variant="outline" className={statusCls}>{r.status}</Badge>
-                    </div>
-                    <p className="mb-3 text-sm leading-relaxed text-foreground/90">{r.text}</p>
-                    <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                      <Badge variant="outline" className={`gap-1 ${s.cls}`}><s.icon className="h-3 w-3" />{s.label}</Badge>
-                      <Badge variant="secondary" className="gap-1"><Tag className="h-3 w-3" />{r.topic}</Badge>
-                      <Badge variant="secondary" className="gap-1"><MapPin className="h-3 w-3" />{regionLabel(r.region)}</Badge>
-                      <Badge variant="secondary" className="gap-1"><MessageSquare className="h-3 w-3" />{r.channel}</Badge>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>
