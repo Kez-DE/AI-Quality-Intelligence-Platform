@@ -5,6 +5,17 @@ import AppShell from "@/components/AppShell";
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async ({ location }) => {
+    // If OAuth returned an error in the hash, pass it to /auth via sessionStorage
+    const hash = location.hash?.slice(1) ?? "";
+    if (hash) {
+      const p = new URLSearchParams(hash);
+      const desc = p.get("error_description") || p.get("error");
+      if (desc) {
+        sessionStorage.setItem("oauth_error", decodeURIComponent(desc.replace(/\+/g, " ")));
+        throw redirect({ to: "/auth" });
+      }
+    }
+
     const { data: sessionData } = await supabase.auth.getSession();
     if (!sessionData.session) throw redirect({ to: "/auth" });
 

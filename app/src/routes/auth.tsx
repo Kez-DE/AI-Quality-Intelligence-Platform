@@ -45,6 +45,24 @@ function AuthPage() {
   const [authError, setAuthError] = useState("");
 
   useEffect(() => {
+    // OAuth error comes back as hash params: #error=...&error_description=...
+    const hash = window.location.hash.slice(1);
+    if (hash) {
+      const p = new URLSearchParams(hash);
+      const desc = p.get("error_description") || p.get("error");
+      if (desc) {
+        setAuthError(getAuthErrorMessage({ message: decodeURIComponent(desc.replace(/\+/g, " ")) }));
+        window.history.replaceState(null, "", window.location.pathname);
+        return;
+      }
+    }
+    // Also check sessionStorage (set by /_authenticated/route.tsx on redirect)
+    const stored = sessionStorage.getItem("oauth_error");
+    if (stored) {
+      setAuthError(getAuthErrorMessage({ message: stored }));
+      sessionStorage.removeItem("oauth_error");
+      return;
+    }
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) window.location.replace("/dashboard");
     });
@@ -377,8 +395,14 @@ function getAuthErrorMessage(error: { code?: string; message?: string }) {
       return "Email này đã được đăng ký. Hãy chuyển sang đăng nhập.";
     case "over_email_send_rate_limit":
       return "Đã gửi quá nhiều email xác nhận. Vui lòng chờ vài phút rồi thử lại.";
-    default:
-      return error.message ?? "Đã có lỗi xảy ra";
+    default: {
+      const msg = error.message ?? "";
+      if (/already registered|already been registered/i.test(msg))
+        return "Email này đã đăng ký bằng Google. Hãy nhấn nút Google để đăng nhập.";
+      if (/user_already_exists|user already exists/i.test(msg))
+        return "Email này đã được đăng ký. Hãy chuyển sang đăng nhập.";
+      return msg || "Đã có lỗi xảy ra";
+    }
   }
 }
 
