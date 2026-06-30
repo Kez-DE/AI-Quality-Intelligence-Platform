@@ -52,6 +52,13 @@ function AuthPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (mode === "signup") {
+      const checks = validatePassword(password);
+      if (!Object.values(checks).every(Boolean)) {
+        setAuthError("Mật khẩu chưa đủ mạnh. Hãy đáp ứng tất cả 5 tiêu chí.");
+        return;
+      }
+    }
     setLoading(true);
     try {
       if (mode === "signup") {
@@ -243,8 +250,8 @@ function AuthPage() {
                   value={password}
                   onChange={(v) => { setPassword(v); setAuthError(""); }}
                   required
-                  minLength={mode === "signup" ? 8 : undefined}
                 />
+                {mode === "signup" && <PasswordStrengthHint password={password} />}
 
                 {authError && (
                   <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
