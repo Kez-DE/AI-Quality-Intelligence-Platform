@@ -168,13 +168,19 @@ def _extract_chat_response(response: object) -> tuple[dict, dict]:
     if message is None:
         raise ValueError("LLM response choice has no message")
 
+    # OpenRouter can embed an upstream/rate-limit error on a "200 OK" choice
+    # instead of raising — treat that the same as a hard failure so it fails over.
+    choice_error = getattr(choices[0], "error", None)
+    if choice_error:
+        raise ValueError(f"LLM provider returned an embedded error: {choice_error}")
+
     content = getattr(message, "content", None)
     tool_calls = getattr(message, "tool_calls", None)
-    
+
     msg_dict = {"role": "assistant"}
     if content is not None:
         msg_dict["content"] = content
-        
+
     if tool_calls is not None:
         tc_list = []
         for tc in tool_calls:
@@ -188,6 +194,13 @@ def _extract_chat_response(response: object) -> tuple[dict, dict]:
             }
             tc_list.append(tc_dict)
         msg_dict["tool_calls"] = tc_list
+
+    # Reasoning-capable models (e.g. Gemini 2.5 Flash Lite) can spend their whole
+    # completion on hidden reasoning tokens and stop without emitting visible
+    # content or a tool call. That's an empty non-answer, not a valid reply —
+    # raise so the caller retries/fails over instead of returning "" to the user.
+    if not msg_dict.get("content") and not msg_dict.get("tool_calls"):
+        raise ValueError("LLM response has empty content and no tool calls")
 
     usage = getattr(response, "usage", None)
     token_usage = {}
@@ -281,7 +294,8 @@ def _call_provider(
             
         except Exception as e:
             error_str = str(e).lower()
-            if "429" in error_str or "rate limit" in error_str:
+            retryable = "429" in error_str or "rate limit" in error_str or "empty content" in error_str
+            if retryable:
                 if attempt < max_retries - 1:
                     time.sleep(base_delay * (2 ** attempt))
                     continue
