@@ -335,14 +335,18 @@ function ChatPage() {
 
     try {
       const endpoint = "/api/agent/chat"; // backend tự phân tầng: guest→RAG công khai, ops/admin→ReAct Agent
-      const reply = await apiFetch<AgentChatResponse>(endpoint, {
-        method: "POST",
-        body: JSON.stringify({
-          messages: next
-            .slice(-REQUEST_HISTORY_LIMIT)
-            .map(({ role, content }) => ({ role, content })),
-        }),
-      });
+      const reply = await apiFetch<AgentChatResponse>(
+        endpoint,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            messages: next
+              .slice(-REQUEST_HISTORY_LIMIT)
+              .map(({ role, content }) => ({ role, content })),
+          }),
+        },
+        45_000, // ReAct agent có thể chạy nhiều vòng gọi tool + LLM, cần nhiều thời gian hơn request thường
+      );
       const replyContent = reply.data?.content?.trim();
       if (!replyContent) throw new Error("AI không trả về nội dung.");
 

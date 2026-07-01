@@ -56,15 +56,20 @@ async function getAccessToken(): Promise<string | null> {
   return data.session?.access_token ?? null;
 }
 
-/** fetch tới backend, tự gắn Bearer token. Ném Error với message từ `detail` nếu lỗi. */
-export async function apiFetch<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
+/** fetch tới backend, tự gắn Bearer token. Ném Error với message từ `detail` nếu lỗi.
+ *  timeoutMs mặc định 15s; agent chat có thể chạy nhiều vòng gọi tool nên cần lâu hơn. */
+export async function apiFetch<T = unknown>(
+  path: string,
+  init: RequestInit = {},
+  timeoutMs = 15_000,
+): Promise<T> {
   const token = await getAccessToken();
   const headers = new Headers(init.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);
   if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15_000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`${API_BASE}${path}`, { ...init, headers, signal: controller.signal });
     if (!res.ok) {

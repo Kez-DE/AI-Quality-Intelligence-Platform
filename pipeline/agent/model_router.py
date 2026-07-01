@@ -250,6 +250,12 @@ def _call_provider(
                     kwargs["tools"] = tools
                 if tool_choice:
                     kwargs["tool_choice"] = tool_choice
+                # Cap hidden reasoning tokens: reasoning-capable models (e.g.
+                # google/gemini-2.5-flash-lite) will otherwise spend the whole
+                # completion "thinking" with no budget left to emit content or
+                # a tool call, and take far longer doing it (ignored by models
+                # without reasoning support).
+                kwargs["extra_body"] = {"reasoning": {"max_tokens": 400}}
                 response = client.chat.completions.create(**kwargs)
                 return _extract_chat_response(response)
             if provider == "openai":
@@ -294,10 +300,15 @@ def _call_provider(
             
         except Exception as e:
             error_str = str(e).lower()
-            retryable = "429" in error_str or "rate limit" in error_str or "empty content" in error_str
-            if retryable:
-                if attempt < max_retries - 1:
+            if attempt < max_retries - 1:
+                if "429" in error_str or "rate limit" in error_str:
+                    # Server-side throttling — back off before retrying.
                     time.sleep(base_delay * (2 ** attempt))
+                    continue
+                if "empty content" in error_str:
+                    # Stochastic reasoning-only non-answer, not a rate limit —
+                    # retry immediately. Backing off here only burns time toward
+                    # the frontend's request timeout for no benefit.
                     continue
             raise
 
