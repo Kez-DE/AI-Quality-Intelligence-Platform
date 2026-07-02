@@ -1,73 +1,83 @@
-"""Test auth token→identity: hash, verify (fake db), issue validation."""
+"""Test auth token→identity resolve LIVE từ profiles (theo user_id)."""
 import pytest
 
 import mcp_auth as a
 
 
-class _FakeExec:
-    def __init__(self, data):
-        self.data = data
+class _Exec:
+    def __init__(self, data): self.data = data
 
 
-class _FakeQuery:
-    """Fake chain của supabase-py cho mcp_tokens."""
-    def __init__(self, rows):
-        self._rows = rows
-
+class _Query:
+    def __init__(self, rows): self._rows = rows
     def select(self, *a, **k): return self
     def eq(self, *a, **k): return self
     def limit(self, *a, **k): return self
     def update(self, *a, **k): return self
-    def insert(self, *a, **k): return self
-    def execute(self): return _FakeExec(self._rows)
+    def insert(self, row, *a, **k):
+        self._captured = row
+        return self
+    def execute(self): return _Exec(self._rows)
 
 
-class _FakeDB:
-    def __init__(self, rows):
-        self._rows = rows
-    def table(self, name): return _FakeQuery(self._rows)
+class _DB:
+    """Fake trả rows khác nhau theo tên bảng."""
+    def __init__(self, by_table): self._by = by_table; self.last = {}
+    def table(self, name):
+        q = _Query(self._by.get(name, []))
+        self.last[name] = q
+        return q
 
 
-def test_hash_is_deterministic_and_hex():
-    h1 = a.hash_token("abc")
-    h2 = a.hash_token("abc")
-    assert h1 == h2 and len(h1) == 64
-    assert a.hash_token("abc") != a.hash_token("abd")
+def _db(token_rows, profile_rows):
+    return _DB({"mcp_tokens": token_rows, "profiles": profile_rows})
 
 
-def test_verify_valid_token_returns_identity():
-    db = _FakeDB([{"id": "1", "role": "manager", "scope_team": "CSKH", "active": True}])
-    ident = a.verify_token("rawtoken", db=db)
-    assert ident == {"role": "manager", "scope_team": "CSKH"}
+def test_hash_deterministic():
+    assert a.hash_token("abc") == a.hash_token("abc") != a.hash_token("abd")
 
 
-def test_verify_unknown_token_returns_none():
-    db = _FakeDB([])
-    assert a.verify_token("nope", db=db) is None
+def test_admin_profile_is_system_wide():
+    db = _db([{"id": "t1", "user_id": "u1"}], [{"role": "admin", "department": None}])
+    assert a.verify_token("raw", db=db) == {"role": "admin", "scope_team": None}
 
 
-def test_verify_empty_token_returns_none():
-    assert a.verify_token("", db=_FakeDB([])) is None
+def test_staff_with_department_is_scoped():
+    db = _db([{"id": "t1", "user_id": "u1"}], [{"role": "staff", "department": "CSKH"}])
+    assert a.verify_token("raw", db=db) == {"role": "staff", "scope_team": "CSKH"}
 
 
-def test_issue_requires_scope_for_ops():
+def test_staff_without_department_downgrades_to_guest():
+    # nhân viên chưa được admin gán phòng → chỉ submit_feedback, KHÔNG toàn hệ thống
+    db = _db([{"id": "t1", "user_id": "u1"}], [{"role": "staff", "department": None}])
+    assert a.verify_token("raw", db=db) == {"role": "guest", "scope_team": None}
+
+
+def test_guest_profile_only_submit():
+    db = _db([{"id": "t1", "user_id": "u1"}], [{"role": "guest", "department": None}])
+    assert a.verify_token("raw", db=db) == {"role": "guest", "scope_team": None}
+
+
+def test_unknown_token_returns_none():
+    assert a.verify_token("nope", db=_db([], [])) is None
+
+
+def test_token_without_owner_returns_none():
+    assert a.verify_token("orphan", db=_db([{"id": "t1", "user_id": None}], [])) is None
+
+
+def test_missing_profile_returns_none():
+    db = _db([{"id": "t1", "user_id": "ghost"}], [])
+    assert a.verify_token("raw", db=db) is None
+
+
+def test_issue_requires_user_id():
     with pytest.raises(ValueError):
-        a.issue_token("staff", None, db=_FakeDB([]))
+        a.issue_token("", db=_db([], []))
 
 
-def test_issue_admin_forces_scope_none():
-    captured = {}
-
-    class _CapDB(_FakeDB):
-        def table(self, name):
-            outer = self
-            class Q(_FakeQuery):
-                def insert(self, row, *a, **k):
-                    captured.update(row)
-                    return self
-            return Q(outer._rows)
-
-    raw = a.issue_token("admin", "CSKH", label="x", db=_CapDB([]))
+def test_issue_stores_user_id():
+    db = _db([], [])
+    raw = a.issue_token("u1", label="self:a@b.c", db=db)
     assert isinstance(raw, str) and len(raw) > 20
-    assert captured["scope_team"] is None  # admin ép scope=None dù truyền CSKH
-    assert captured["role"] == "admin"
+    assert db.last["mcp_tokens"]._captured["user_id"] == "u1"
