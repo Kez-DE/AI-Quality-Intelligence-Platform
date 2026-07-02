@@ -17,19 +17,31 @@ from agent.chat_tools import (
     tools_for_role,
     execute_tool,
     execute_guest_tool,
+    TOOLS_DEFINITIONS,
     GUEST_TOOLS_DEFINITIONS,
 )
 
 
 def registered_tool_names(role: str | None) -> list[str]:
-    """Tên các tool role này được thấy. guest = chỉ submit_feedback."""
+    """Tên các tool role này được thấy. guest = chỉ submit_feedback.
+
+    Đóng (closed) với role lạ/None → [] để không bao giờ vô tình cấp full quyền
+    (quan trọng cho HTTP: request chưa xác thực không được thừa hưởng tool admin)."""
     if role == "guest":
         return [t["function"]["name"] for t in GUEST_TOOLS_DEFINITIONS]
-    return [t["function"]["name"] for t in tools_for_role(role)]
+    if role in ("staff", "manager", "admin"):
+        return [t["function"]["name"] for t in tools_for_role(role)]
+    return []
 
 
 def call_tool(role: str | None, scope_team: str | None, name: str, args: dict) -> str:
-    """Route một tool call. scope_team LUÔN từ config server, không bao giờ từ args."""
+    """Route một tool call. scope_team LUÔN từ config server, không bao giờ từ args.
+
+    Gate quyền theo role ngay tại đây (defense in depth): dù HTTP server đăng ký sẵn
+    mọi tool, role không đủ quyền vẫn bị chặn ở tầng thực thi.
+    """
+    if name not in registered_tool_names(role):
+        return f"❌ Vai trò '{role}' không có quyền dùng tool '{name}'."
     if role == "guest":
         return execute_guest_tool(name, args, user_id=None)
     # admin: scope_team=None (toàn hệ thống). ops (staff/manager): ép về phòng của server.
@@ -37,9 +49,47 @@ def call_tool(role: str | None, scope_team: str | None, name: str, args: dict) -
     return execute_tool(name, args, scope_team=effective_scope)
 
 
-def _description_for(name: str, role: str | None) -> str:
-    defs = GUEST_TOOLS_DEFINITIONS if role == "guest" else tools_for_role(role)
-    for t in defs:
+def make_tool_handlers(identity):
+    """Dựng 6 wrapper tool, mỗi cái resolve identity qua callable `identity()` →
+    (role, scope_team). Dùng chung cho stdio (identity cố định) và HTTP (identity
+    theo từng request qua token). scope_team KHÔNG bao giờ nằm trong args tool."""
+    def get_feedback_summary(days: int = 7) -> str:
+        role, scope = identity()
+        return call_tool(role, scope, "get_feedback_summary", {"days": days})
+
+    def get_hot_areas(hours: int = 24, limit: int = 5) -> str:
+        role, scope = identity()
+        return call_tool(role, scope, "get_hot_areas", {"hours": hours, "limit": limit})
+
+    def get_sla_tickets() -> str:
+        role, scope = identity()
+        return call_tool(role, scope, "get_sla_tickets", {})
+
+    def get_team_priority_tasks(team_name: str) -> str:
+        role, scope = identity()
+        return call_tool(role, scope, "get_team_priority_tasks", {"team_name": team_name})
+
+    def search_knowledge_base(query: str) -> str:
+        role, scope = identity()
+        return call_tool(role, scope, "search_knowledge_base", {"query": query})
+
+    def submit_feedback(content: str, topic: str = "Other", sentiment: str = "negative") -> str:
+        role, scope = identity()
+        return call_tool(role, scope, "submit_feedback",
+                         {"content": content, "topic": topic, "sentiment": sentiment})
+
+    return {
+        "get_feedback_summary": get_feedback_summary,
+        "get_hot_areas": get_hot_areas,
+        "get_sla_tickets": get_sla_tickets,
+        "get_team_priority_tasks": get_team_priority_tasks,
+        "search_knowledge_base": search_knowledge_base,
+        "submit_feedback": submit_feedback,
+    }
+
+
+def _description_for(name: str, role: str | None = None) -> str:
+    for t in list(TOOLS_DEFINITIONS) + list(GUEST_TOOLS_DEFINITIONS):
         if t["function"]["name"] == name:
             return t["function"]["description"]
     return name
@@ -61,35 +111,8 @@ def build_server():
     role, scope_team = _resolve_identity()
     server = FastMCP("xanhsm-quality")
 
-    # Wrapper có signature rõ ràng để FastMCP sinh input schema đúng cho client.
-    # Mỗi wrapper đóng kín role/scope_team; args tool KHÔNG chứa scope_team.
-    def get_feedback_summary(days: int = 7) -> str:
-        return call_tool(role, scope_team, "get_feedback_summary", {"days": days})
-
-    def get_hot_areas(hours: int = 24, limit: int = 5) -> str:
-        return call_tool(role, scope_team, "get_hot_areas", {"hours": hours, "limit": limit})
-
-    def get_sla_tickets() -> str:
-        return call_tool(role, scope_team, "get_sla_tickets", {})
-
-    def get_team_priority_tasks(team_name: str) -> str:
-        return call_tool(role, scope_team, "get_team_priority_tasks", {"team_name": team_name})
-
-    def search_knowledge_base(query: str) -> str:
-        return call_tool(role, scope_team, "search_knowledge_base", {"query": query})
-
-    def submit_feedback(content: str, topic: str = "Other", sentiment: str = "negative") -> str:
-        return call_tool(role, scope_team, "submit_feedback",
-                         {"content": content, "topic": topic, "sentiment": sentiment})
-
-    handlers = {
-        "get_feedback_summary": get_feedback_summary,
-        "get_hot_areas": get_hot_areas,
-        "get_sla_tickets": get_sla_tickets,
-        "get_team_priority_tasks": get_team_priority_tasks,
-        "search_knowledge_base": search_knowledge_base,
-        "submit_feedback": submit_feedback,
-    }
+    # stdio: identity cố định từ env cho cả tiến trình.
+    handlers = make_tool_handlers(lambda: (role, scope_team))
 
     for name in registered_tool_names(role):
         fn = handlers.get(name)
