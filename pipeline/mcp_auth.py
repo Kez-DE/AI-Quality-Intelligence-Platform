@@ -109,6 +109,54 @@ def issue_token(user_id: str, label: str = "", db=None) -> str:
     return raw
 
 
+# ── OAuth Resource Server verifier ─────────────────────────────────────────
+# Token đến từ 2 nguồn: (1) JWT Supabase — gồm token do OAuth 2.1 server của
+# Supabase phát cho MCP client (sub = user id); (2) bearer bảng mcp_tokens
+# (máy-tới-máy, admin cấp qua CLI). Cả hai đều resolve quyền LIVE từ profiles.
+from mcp.server.auth.provider import AccessToken, TokenVerifier
+
+
+class SupabaseTokenVerifier(TokenVerifier):
+    def __init__(self, db=None):
+        self._db = db
+
+    def _get_db(self):
+        if self._db is None:
+            from agents.common import get_db
+            self._db = get_db()
+        return self._db
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        if not token:
+            return None
+        db = self._get_db()
+        # 1) JWT Supabase (OAuth hoặc session thường)
+        try:
+            result = db.auth.get_user(token)
+            user = getattr(result, "user", None)
+            uid = getattr(user, "id", None)
+            if uid:
+                profs = (
+                    db.table("profiles").select("role,department")
+                    .eq("id", uid).limit(1).execute().data or []
+                )
+                if profs:
+                    ident = _identity_from_profile(
+                        profs[0].get("role"), profs[0].get("department"))
+                    return AccessToken(
+                        token=token, client_id=f"supabase-user:{uid}",
+                        scopes=[], claims=dict(ident))
+                return None  # có JWT nhưng không có profile → từ chối
+        except Exception:
+            pass  # không phải JWT hợp lệ → thử bearer
+        # 2) Bearer bảng mcp_tokens
+        ident = verify_token(token, db=db)
+        if ident:
+            return AccessToken(token=token, client_id="mcp-bearer-token",
+                               scopes=[], claims=dict(ident))
+        return None
+
+
 if __name__ == "__main__":
     # CLI phát token cho một user: python mcp_auth.py <user_id> [label]
     import sys

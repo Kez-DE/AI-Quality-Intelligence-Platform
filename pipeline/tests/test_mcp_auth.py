@@ -81,3 +81,55 @@ def test_issue_stores_user_id():
     raw = a.issue_token("u1", label="self:a@b.c", db=db)
     assert isinstance(raw, str) and len(raw) > 20
     assert db.last["mcp_tokens"]._captured["user_id"] == "u1"
+
+
+# ── SupabaseTokenVerifier: JWT Supabase trước, fallback bearer mcp_tokens ──
+import asyncio
+
+
+class _FakeAuthResult:
+    def __init__(self, uid):
+        class U: id = uid
+        self.user = U() if uid else None
+
+
+class _JwtDB(_DB):
+    """Fake db có .auth.get_user: jwt hợp lệ 'jwt-good' → user u1."""
+    def __init__(self, by_table, jwt_uid=None):
+        super().__init__(by_table)
+        outer = self
+        class Auth:
+            def get_user(self, token):
+                if token == "jwt-good" and jwt_uid:
+                    return _FakeAuthResult(jwt_uid)
+                raise ValueError("bad jwt")
+        self.auth = Auth()
+
+
+def _verify(verifier, token):
+    return asyncio.run(verifier.verify_token(token))
+
+
+def test_verifier_supabase_jwt_maps_profile():
+    db = _JwtDB({"profiles": [{"role": "staff", "department": "CSKH"}]}, jwt_uid="u1")
+    v = a.SupabaseTokenVerifier(db=db)
+    at = _verify(v, "jwt-good")
+    assert at is not None
+    assert at.claims == {"role": "staff", "scope_team": "CSKH"}
+    assert at.client_id == "supabase-user:u1"
+
+
+def test_verifier_falls_back_to_bearer_table():
+    db = _JwtDB({
+        "mcp_tokens": [{"id": "t1", "user_id": "u1"}],
+        "profiles": [{"role": "admin", "department": None}],
+    })  # jwt_uid=None → get_user luôn raise → rơi xuống bearer
+    v = a.SupabaseTokenVerifier(db=db)
+    at = _verify(v, "raw-bearer")
+    assert at is not None and at.claims == {"role": "admin", "scope_team": None}
+
+
+def test_verifier_rejects_garbage():
+    v = a.SupabaseTokenVerifier(db=_JwtDB({}, jwt_uid=None))
+    assert _verify(v, "garbage") is None
+    assert _verify(v, "") is None
