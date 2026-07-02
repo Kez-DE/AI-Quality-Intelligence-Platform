@@ -1,26 +1,28 @@
-"""HTTP MCP server (streamable-http) + auth token→role/scope — multi-user, deploy được.
+"""HTTP MCP server — OAuth Resource Server (Supabase là Authorization Server).
 
-Mỗi request mang `Authorization: Bearer <token>`. Middleware ASGI tra `mcp_tokens`
-→ identity (role, scope_team), set ContextVar cho request đó; tool handler đọc identity
-này. scope_team lấy từ token, KHÔNG từ args → client không leo quyền. Role được kiểm ở
-`call_tool` (đăng ký sẵn mọi tool nhưng chặn theo role mỗi request).
+Client kết nối KHÔNG cần token cấu hình sẵn:
+  claude mcp add --transport http xanhsm <URL>/mcp
+Lần đầu dùng → SDK trả 401 + WWW-Authenticate → client mở browser đăng nhập
+tài khoản Supabase (xanhSM) → token OAuth (JWT Supabase) → verifier resolve
+quyền LIVE từ profiles. Bearer bảng mcp_tokens vẫn nhận (máy-tới-máy).
 
-Stateless (`stateless_http=True`) để scale ngang và để ContextVar propagate trong cùng
-task xử lý request.
-
-Chạy: `PORT=8000 .venv/bin/python mcp_http.py` → client nối `http://host:PORT/mcp`.
+Chạy: `PORT=8000 .venv/bin/python mcp_http.py` → MCP tại /mcp, health tại /health.
 """
-import contextvars
 import os
 
+from mcp.server.auth.middleware.auth_context import get_access_token
+from mcp.server.auth.settings import AuthSettings
 from mcp.server.fastmcp import FastMCP
+from starlette.requests import Request
+from starlette.responses import PlainTextResponse
 
-from mcp_auth import verify_token
+from mcp_auth import SupabaseTokenVerifier
 from mcp_server import make_tool_handlers, _description_for
 
-_identity: contextvars.ContextVar = contextvars.ContextVar(
-    "mcp_identity", default=(None, None)
-)
+SUPABASE_ISSUER = (os.environ.get("SUPABASE_URL", "").rstrip("/") or
+                   "https://fkopgtacyuejfzzfgtau.supabase.co") + "/auth/v1"
+PUBLIC_URL = os.environ.get(
+    "MCP_PUBLIC_URL", "https://mcp-http-production-ffd0.up.railway.app/mcp")
 
 _ALL_TOOLS = [
     "get_feedback_summary", "get_hot_areas", "get_sla_tickets",
@@ -29,60 +31,32 @@ _ALL_TOOLS = [
 
 
 def _current_identity():
-    return _identity.get()
-
-
-class AuthMiddleware:
-    """ASGI middleware thuần (không dùng BaseHTTPMiddleware để ContextVar propagate)."""
-
-    def __init__(self, app):
-        self.app = app
-
-    async def __call__(self, scope, receive, send):
-        if scope["type"] != "http":
-            # lifespan / websocket → passthrough (để session manager của MCP khởi động)
-            return await self.app(scope, receive, send)
-
-        if scope.get("path", "") == "/health":
-            await send({"type": "http.response.start", "status": 200,
-                        "headers": [(b"content-type", b"text/plain; charset=utf-8")]})
-            await send({"type": "http.response.body", "body": b"ok"})
-            return
-
-        headers = dict(scope.get("headers") or [])
-        auth = headers.get(b"authorization", b"").decode()
-        token = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
-        ident = verify_token(token) if token else None
-        if not ident:
-            await send({"type": "http.response.start", "status": 401,
-                        "headers": [(b"content-type", b"text/plain; charset=utf-8"),
-                                    (b"www-authenticate", b"Bearer")]})
-            await send({"type": "http.response.body", "body": b"Unauthorized"})
-            return
-
-        tok = _identity.set((ident["role"], ident["scope_team"]))
-        try:
-            await self.app(scope, receive, send)
-        finally:
-            _identity.reset(tok)
+    at = get_access_token()
+    if at is None or not getattr(at, "claims", None):
+        return (None, None)
+    return (at.claims.get("role"), at.claims.get("scope_team"))
 
 
 def build_app():
-    from mcp.server.transport_security import TransportSecuritySettings
-    # Tắt DNS-rebinding protection (mặc định chỉ cho localhost → Railway host bị 421).
-    # An toàn vì cổng vào đã yêu cầu bearer token; protection này nhắm tấn công trình
-    # duyệt vào server localhost, không áp với API token-authed công khai.
-    ts = TransportSecuritySettings(enable_dns_rebinding_protection=False)
-    server = FastMCP("xanhsm-quality", stateless_http=True, json_response=True,
-                     transport_security=ts)
+    server = FastMCP(
+        "xanhsm-quality",
+        stateless_http=True,
+        json_response=True,
+        token_verifier=SupabaseTokenVerifier(),
+        auth=AuthSettings(issuer_url=SUPABASE_ISSUER,
+                          resource_server_url=PUBLIC_URL),
+    )
+
+    @server.custom_route("/health", methods=["GET"])
+    async def health(_: Request) -> PlainTextResponse:
+        return PlainTextResponse("ok")
+
     handlers = make_tool_handlers(_current_identity)
-    # Đăng ký sẵn mọi tool; quyền theo role được chặn ở call_tool mỗi request.
     for name in _ALL_TOOLS:
         server.add_tool(handlers[name], name=name, description=_description_for(name))
-    return AuthMiddleware(server.streamable_http_app())
+    return server.streamable_http_app()
 
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", "8000"))
-    uvicorn.run(build_app(), host="0.0.0.0", port=port)
+    uvicorn.run(build_app(), host="0.0.0.0", port=int(os.environ.get("PORT", "8000")))
