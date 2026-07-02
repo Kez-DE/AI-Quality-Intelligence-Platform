@@ -290,3 +290,15 @@ Ba việc từ phiên brainstorm "cải thiện dự án + áp dụng MCP + ch�
 **Còn lại (cần người vận hành/kết nối thật):**
 - Chạy `seed_graph_kb.py` để hybrid search phủ vector cho 3 phòng mới.
 - Kết nối Claude Desktop thật gọi thử tool qua MCP server.
+
+### MCP HTTP + auth token→role/phòng (deploy Railway, multi-user)
+
+Mở rộng MCP server sang HTTP để nhiều người dùng qua URL, không cần local.
+
+- **Auth model:** bảng `mcp_tokens` (migration `20260702000000`), lưu SHA-256 token, RLS khóa service-role. Token → (role, scope_team). Không dùng Supabase JWT passthrough (JWT hết hạn 1h, Claude Desktop không refresh được). Quyết định `decisions/0010`.
+- **`pipeline/mcp_http.py`:** FastMCP streamable-http (stateless) + ASGI AuthMiddleware (Bearer→identity qua ContextVar). `scope_team` từ token không từ args; role gate ở `call_tool`. Tắt DNS-rebinding protection (Railway host bị 421; bearer là cổng gác). `/health` bypass cho Railway healthcheck.
+- **`mcp_auth.py`:** hash/verify/issue token (+ CLI `python mcp_auth.py <role> [team]`).
+- **Deploy Railway:** service thứ 7 `mcp-http`, `pipeline/Dockerfile.mcp` (chọn qua `RAILWAY_DOCKERFILE_PATH`). URL: `https://mcp-http-production-ffd0.up.railway.app/mcp`.
+- **Verify production (thật):** `/health` 200; `/mcp` không token → 401; token manager CSKH gọi `get_feedback_summary` ra "Phòng CSKH" (226 fb); hỏi task phòng "Safety" vẫn bị ép về CSKH (scope guard qua mạng). Đăng ký `claude mcp add --transport http xanhsm-quality-remote` → ✔ Connected.
+- **Test:** `test_mcp_auth.py` + `test_mcp_http.py` (14 test); full suite 159 passed local.
+- **Trả lời "nhiều người không cần local":** ĐƯỢC — mỗi người một token (role/phòng riêng), nối qua URL, không cần clone/chạy gì.
