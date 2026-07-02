@@ -69,26 +69,44 @@ URL, không cần cài local**. Đã deploy service `mcp-http` trên Railway.
 
 **URL production:** `https://mcp-http-production-ffd0.up.railway.app/mcp` (health: `/health`).
 
-## Xác thực
+## Xác thực — quyền theo TÀI KHOẢN, resolve live
 
-Mỗi request mang `Authorization: Bearer <token>`. Middleware tra bảng `mcp_tokens` →
-`(role, scope_team)`. Thiếu/sai token → 401. `scope_team` lấy từ token, không từ args →
-không leo quyền; role kiểm ở `call_tool` (tool ngoài quyền trả thông báo chặn).
+Token chỉ là credential gắn với `user_id`; **không** lưu role/phòng. Mỗi request:
+`Bearer <token>` → tra `mcp_tokens` → `user_id` → đọc `profiles.role` + `profiles.department`
+**ngay lúc đó** → ra identity. Thiếu/sai token → 401.
 
-## Cấp phát / thu hồi token
+Ánh xạ profile → quyền MCP:
+
+| Profile | Quyền MCP |
+|---|---|
+| role `admin` | mọi tool, toàn hệ thống |
+| `manager`/`staff` + đã gán phòng | tool theo role, scoped đúng phòng đó |
+| `manager`/`staff` CHƯA gán phòng | chỉ `submit_feedback` (như khách) |
+| role `guest` (tài khoản mới) | chỉ `submit_feedback` |
+
+Vì resolve LIVE, **admin nâng khách → nhân viên/quản lý và gán phòng thì token cũ tự có
+quyền phòng đó ngay — không phải cấp lại token, không cấu hình lại Claude.** `scope_team`
+lấy từ profile không từ args (không leo quyền); nhân viên chưa gán phòng KHÔNG được toàn
+hệ thống (tụt về khách).
+
+## Lấy token
+
+**Self-service (khuyên dùng):** user đăng nhập gọi `POST /api/mcp/token` → nhận token +
+câu lệnh `claude mcp add` sẵn. Quyền tự theo tài khoản của họ.
 
 ```bash
-# cấp token (in ra token thô một lần — lưu lại ngay)
-cd pipeline
-.venv/bin/python mcp_auth.py admin                     # admin, toàn hệ thống
-.venv/bin/python mcp_auth.py manager "CSKH"            # manager phòng CSKH
-.venv/bin/python mcp_auth.py staff "Tài chính & Thanh toán"
-
-# thu hồi: set active=false trong bảng mcp_tokens (theo label hoặc id)
+curl -X POST https://<backend>/api/mcp/token -H "Authorization: Bearer <SUPABASE_JWT>"
 ```
 
-Bảng `mcp_tokens` (migration `20260702000000_mcp_tokens.sql`): chỉ lưu SHA-256 của token,
-RLS khóa service-role. staff/manager bắt buộc có `scope_team`; admin/guest thì null.
+**CLI (admin, theo user_id):**
+
+```bash
+cd pipeline && .venv/bin/python mcp_auth.py <user_id> "nhãn ghi chú"
+```
+
+Bảng `mcp_tokens` (migration `20260702000000` + `20260702010000`): lưu SHA-256 token +
+`user_id`, RLS khóa service-role. Thu hồi: set `active=false` theo `label`/`id`. Xóa tài
+khoản → token tự xóa (FK cascade).
 
 ## Cấu hình client (Claude Desktop / Claude Code)
 

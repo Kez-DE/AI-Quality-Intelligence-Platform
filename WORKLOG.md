@@ -302,3 +302,14 @@ Mở rộng MCP server sang HTTP để nhiều người dùng qua URL, không c�
 - **Verify production (thật):** `/health` 200; `/mcp` không token → 401; token manager CSKH gọi `get_feedback_summary` ra "Phòng CSKH" (226 fb); hỏi task phòng "Safety" vẫn bị ép về CSKH (scope guard qua mạng). Đăng ký `claude mcp add --transport http xanhsm-quality-remote` → ✔ Connected.
 - **Test:** `test_mcp_auth.py` + `test_mcp_http.py` (14 test); full suite 159 passed local.
 - **Trả lời "nhiều người không cần local":** ĐƯỢC — mỗi người một token (role/phòng riêng), nối qua URL, không cần clone/chạy gì.
+
+### MCP token theo tài khoản — quyền resolve live + self-service
+
+Đáp yêu cầu: kết nối MCP phải theo phòng ban được gán, và tự cập nhật khi admin nâng quyền tài khoản.
+
+- **Token gắn `user_id`** (migration `20260702010000`), KHÔNG lưu role/phòng. `verify_token` đọc `profiles.role`+`department` LIVE mỗi request → identity. Admin nâng khách→nhân viên/gán phòng thì token cũ tự phản ánh, không cấp lại.
+- **Ánh xạ:** admin→toàn hệ thống; manager/staff+có phòng→scoped; manager/staff chưa gán phòng hoặc guest→chỉ `submit_feedback`. Nhân viên chưa gán phòng KHÔNG được toàn hệ thống (đóng an toàn).
+- **`POST /api/mcp/token`** (self-service): user đăng nhập tự lấy token + câu lệnh `claude mcp add` sẵn; quyền theo tài khoản họ.
+- **Verify production (thật):** token gắn tài khoản staff (Tài chính) → `search_knowledge_base` OK, `get_feedback_summary` bị chặn theo role; identity resolve đúng từ profile (admin/manager/staff/guest) qua DB thật. Token test đã revoke.
+- **Test:** `test_mcp_auth.py` viết lại cho live-resolution (10 test); full suite 163 passed.
+- **Lưu ý deploy:** đổi `mcp_auth`/`mcp_http` → `railway up --service mcp-http` (đã làm). Endpoint `/api/mcp/token` ở service `backend` (GitHub-linked) → cần merge main hoặc `railway up --service backend` mới live.
