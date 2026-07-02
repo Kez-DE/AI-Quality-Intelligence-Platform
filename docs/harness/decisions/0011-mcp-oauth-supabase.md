@@ -50,7 +50,17 @@ Tradeoffs:
   `fkopgtacyuejfzzfgtau`).
 - Bước "add server + login browser" một lần không bỏ được (giới hạn vật lý).
 
+## Giới hạn đã biết (review cuối 2026-07-02)
+
+- **Chưa bind audience (RFC 8707):** `auth.get_user()` chỉ xác nhận JWT hợp lệ cho project,
+  KHÔNG kiểm token có đúng audience/resource là MCP server này. Hệ quả: một JWT session của
+  web-app cùng project cũng vào được `/mcp`. KHÔNG phải leo quyền (quyền vẫn resolve từ
+  `profiles` của chính user đó), rủi ro confused-deputy thấp vì Supabase là AS duy nhất, một
+  resource. Cần siết nếu mở cho client bên thứ ba.
+- **Tài khoản mới (signup) = `guest`** (migration `20260616000000`): qua MCP chỉ
+  `submit_feedback` — đúng bằng quyền guest sẵn có ở chat khách, không mở rộng phơi nhiễm.
+
 ## Follow-Up
 
-- Cân nhắc consent screen / giới hạn scope OIDC nếu mở cho client bên thứ ba.
+- Cân nhắc consent screen / giới hạn scope OIDC + bind audience nếu mở cho client bên thứ ba.
 - Nếu Supabase đổi endpoint OAuth → cập nhật `issuer_url`.
