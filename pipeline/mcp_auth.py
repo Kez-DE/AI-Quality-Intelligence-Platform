@@ -130,25 +130,33 @@ class SupabaseTokenVerifier(TokenVerifier):
         if not token:
             return None
         db = self._get_db()
-        # 1) JWT Supabase (OAuth hoặc session thường)
+        # 1) JWT Supabase (OAuth hoặc session thường) — chỉ get_user() rơi xuống bearer,
+        # vì JWT hết hạn/không hợp lệ là lý do DUY NHẤT hợp lệ để thử bearer.
+        uid = None
         try:
             result = db.auth.get_user(token)
             user = getattr(result, "user", None)
             uid = getattr(user, "id", None)
-            if uid:
+        except Exception:
+            uid = None  # không phải JWT hợp lệ → thử bearer
+
+        if uid:
+            # uid đã xác thực hợp lệ: tra profiles PHẢI fail-closed, không được rơi
+            # xuống bearer path (lỗi DB tạm thời != JWT invalid).
+            try:
                 profs = (
                     db.table("profiles").select("role,department")
                     .eq("id", uid).limit(1).execute().data or []
                 )
-                if profs:
-                    ident = _identity_from_profile(
-                        profs[0].get("role"), profs[0].get("department"))
-                    return AccessToken(
-                        token=token, client_id=f"supabase-user:{uid}",
-                        scopes=[], claims=dict(ident))
-                return None  # có JWT nhưng không có profile → từ chối
-        except Exception:
-            pass  # không phải JWT hợp lệ → thử bearer
+            except Exception:
+                return None  # ponytail: fail closed, lỗi DB không phải cửa vào bearer
+            if profs:
+                ident = _identity_from_profile(
+                    profs[0].get("role"), profs[0].get("department"))
+                return AccessToken(
+                    token=token, client_id=f"supabase-user:{uid}",
+                    scopes=[], claims=dict(ident))
+            return None  # có JWT nhưng không có profile → từ chối
         # 2) Bearer bảng mcp_tokens
         ident = verify_token(token, db=db)
         if ident:

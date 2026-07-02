@@ -133,3 +133,11 @@ def test_verifier_rejects_garbage():
     v = a.SupabaseTokenVerifier(db=_JwtDB({}, jwt_uid=None))
     assert _verify(v, "garbage") is None
     assert _verify(v, "") is None
+
+
+def test_verifier_rejects_jwt_user_without_profile():
+    # JWT hợp lệ (get_user thành công) nhưng user KHÔNG có profile row →
+    # phải từ chối (None), KHÔNG được leo thang quyền qua fallback bearer.
+    db = _JwtDB({"profiles": []}, jwt_uid="u1")
+    v = a.SupabaseTokenVerifier(db=db)
+    assert _verify(v, "jwt-good") is None
