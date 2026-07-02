@@ -313,3 +313,14 @@ Mở rộng MCP server sang HTTP để nhiều người dùng qua URL, không c�
 - **Verify production (thật):** token gắn tài khoản staff (Tài chính) → `search_knowledge_base` OK, `get_feedback_summary` bị chặn theo role; identity resolve đúng từ profile (admin/manager/staff/guest) qua DB thật. Token test đã revoke.
 - **Test:** `test_mcp_auth.py` viết lại cho live-resolution (10 test); full suite 163 passed.
 - **Lưu ý deploy:** đổi `mcp_auth`/`mcp_http` → `railway up --service mcp-http` (đã làm). Endpoint `/api/mcp/token` ở service `backend` (GitHub-linked) → cần merge main hoặc `railway up --service backend` mới live.
+
+### MCP OAuth tự động — Supabase là Authorization Server (bỏ token thủ công)
+
+Nhân viên kết nối MCP bằng đăng nhập tài khoản, không tạo/copy token nữa.
+
+- **Supabase OAuth 2.1 Server** bật qua Management API (`oauth_server_enabled` + dynamic registration, `authorization_path=/oauth/authorize`). Discovery live: issuer `.../auth/v1`, có registration_endpoint.
+- **`mcp_http.py`** → OAuth Resource Server của MCP SDK: `FastMCP(token_verifier=SupabaseTokenVerifier, auth=AuthSettings(issuer=Supabase, resource=Railway))`. Bỏ AuthMiddleware/ContextVar tự chế. `/health` qua custom_route. Khôi phục `transport_security(enable_dns_rebinding_protection=False)` (rewrite làm rơi → Railway host 421).
+- **`SupabaseTokenVerifier`** (mcp_auth.py): JWT Supabase → `auth.get_user` → profiles LIVE → identity; fallback bearer `mcp_tokens`; fail-closed (JWT không profile → từ chối). 14 test.
+- **Xóa self-service:** trang `/mcp-connect`, nav "Kết nối MCP", `POST /api/mcp/token`. Giữ CLI `mcp_auth.py` + bảng mcp_tokens cho đường máy-tới-máy.
+- **Verify production thật:** deploy Railway; `/mcp` no-token → 401 + WWW-Authenticate resource_metadata; `/.well-known/oauth-protected-resource/mcp` trỏ Supabase AS; E2E JWT thật (demo admin) → 6 tool + get_hot_areas OK; `claude mcp add` không header → "Needs authentication" (OAuth mode). Full pytest 166 pass, tsc 0.
+- Decision `decisions/0011`. Token nhân viên lộ trong chat trước đó đã revoke.

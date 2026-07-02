@@ -69,11 +69,19 @@ URL, không cần cài local**. Đã deploy service `mcp-http` trên Railway.
 
 **URL production:** `https://mcp-http-production-ffd0.up.railway.app/mcp` (health: `/health`).
 
-## Xác thực — quyền theo TÀI KHOẢN, resolve live
+## Xác thực — OAuth theo TÀI KHOẢN, tự động, không token
 
-Token chỉ là credential gắn với `user_id`; **không** lưu role/phòng. Mỗi request:
-`Bearer <token>` → tra `mcp_tokens` → `user_id` → đọc `profiles.role` + `profiles.department`
-**ngay lúc đó** → ra identity. Thiếu/sai token → 401.
+Server là **OAuth 2.1 Resource Server**; **Supabase là Authorization Server** (đã bật OAuth
+2.1 Server + dynamic client registration trên project). Không ai phải tạo/copy token.
+
+Luồng: client (Claude) gọi `/mcp` không token → server trả **401 + `WWW-Authenticate`** kèm
+`resource_metadata` → client đọc `/.well-known/oauth-protected-resource/mcp` → thấy AS là
+Supabase → tự đăng ký client (DCR) + mở browser cho user đăng nhập tài khoản xanhSM →
+Supabase phát **JWT** → mọi request sau gắn JWT đó (client tự refresh).
+
+`SupabaseTokenVerifier` (trong `mcp_auth.py`) verify mỗi request: JWT Supabase →
+`auth.get_user()` → `user.id` → đọc `profiles.role`+`department` **ngay lúc đó** → identity.
+(Fallback: bearer bảng `mcp_tokens` cho đường máy-tới-máy — xem dưới.)
 
 Ánh xạ profile → quyền MCP:
 
@@ -84,40 +92,35 @@ Token chỉ là credential gắn với `user_id`; **không** lưu role/phòng. M
 | `manager`/`staff` CHƯA gán phòng | chỉ `submit_feedback` (như khách) |
 | role `guest` (tài khoản mới) | chỉ `submit_feedback` |
 
-Vì resolve LIVE, **admin nâng khách → nhân viên/quản lý và gán phòng thì token cũ tự có
-quyền phòng đó ngay — không phải cấp lại token, không cấu hình lại Claude.** `scope_team`
-lấy từ profile không từ args (không leo quyền); nhân viên chưa gán phòng KHÔNG được toàn
-hệ thống (tụt về khách).
+Vì resolve LIVE, **admin nâng khách → nhân viên/quản lý và gán phòng thì kết nối cũ tự có
+quyền phòng đó ngay — không cấp lại gì, không cấu hình lại Claude.** `scope_team` lấy từ
+profile không từ args (không leo quyền); JWT hợp lệ nhưng user không có profile → bị từ chối
+(fail-closed).
 
-## Lấy token
-
-**Self-service (khuyên dùng):** user đăng nhập gọi `POST /api/mcp/token` → nhận token +
-câu lệnh `claude mcp add` sẵn. Quyền tự theo tài khoản của họ.
-
-```bash
-curl -X POST https://<backend>/api/mcp/token -H "Authorization: Bearer <SUPABASE_JWT>"
-```
-
-**CLI (admin, theo user_id):**
-
-```bash
-cd pipeline && .venv/bin/python mcp_auth.py <user_id> "nhãn ghi chú"
-```
-
-Bảng `mcp_tokens` (migration `20260702000000` + `20260702010000`): lưu SHA-256 token +
-`user_id`, RLS khóa service-role. Thu hồi: set `active=false` theo `label`/`id`. Xóa tài
-khoản → token tự xóa (FK cascade).
-
-## Cấu hình client (Claude Desktop / Claude Code)
+## Kết nối client (Claude Desktop / Claude Code) — một lệnh, không bí mật
 
 ```bash
 claude mcp add --transport http xanhsm-quality-remote \
-  https://mcp-http-production-ffd0.up.railway.app/mcp \
-  --header "Authorization: Bearer <TOKEN_CỦA_BẠN>"
+  https://mcp-http-production-ffd0.up.railway.app/mcp
 ```
 
-Mỗi người dùng token riêng → thấy đúng quyền phòng ban của mình. Không cần clone repo hay
-chạy gì ở máy.
+Lệnh **giống nhau cho mọi người**. Lần dùng đầu Claude tự mở browser → đăng nhập tài khoản
+xanhSM → xong. Không clone repo, không chạy gì ở máy, không dán token. Bước "add + đăng nhập
+một lần" là giới hạn vật lý duy nhất (server không với tới máy user).
+
+## Đường máy-tới-máy (script / CI) — bearer do admin cấp
+
+Khi cần kết nối không-browser (script, cron, agent tự động), admin cấp bearer token theo
+`user_id` — quyền vẫn theo profile của user đó, resolve live:
+
+```bash
+cd pipeline && .venv/bin/python mcp_auth.py <user_id> "nhãn ghi chú"   # in token 1 lần
+# rồi: claude mcp add --transport http xanhsm ... --header "Authorization: Bearer <token>"
+```
+
+Bảng `mcp_tokens` (migration `20260702000000` + `20260702010000`): lưu SHA-256 token +
+`user_id`, RLS khóa service-role. Thu hồi: `active=false` theo `label`/`id`. Xóa tài khoản
+→ token tự xóa (FK cascade).
 
 ## Deploy lại
 
