@@ -71,7 +71,7 @@ LLM Providers: OpenRouter, OpenAI, Gemini, Groq (cấu hình qua `LLM_PROVIDER` 
 
 ### Yêu cầu
 
-- Python 3.10+
+- Python 3.11 hoặc 3.12 (production Docker pin `python:3.11-slim`; không dùng 3.13/3.14 cho venv)
 - Node.js 18+ (khuyên 20 LTS)
 - Tài khoản Supabase cloud
 - API key LLM (tùy chọn, cần cho agent)
