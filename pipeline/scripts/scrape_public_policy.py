@@ -16,8 +16,6 @@ SEED_URLS = [
     "https://www.greensm.com/vn-vi/terms-policies",
     "https://www.greensm.com/vn-vi/terms-policies/consumer-protection-policy",
     "https://www.greensm.com/vn-vi/terms-policies/privacy-notice",
-    "https://www.greensm.com/vn-vi/terms-policies/operational-regulations",
-    "https://www.greensm.com/vn-vi/terms-policies/terms-of-use",
 ]
 
 
@@ -90,8 +88,10 @@ def main():
         # seed[0] đã cào rồi
         r = help_seed if url == SEED_URLS[0] else scrape(url)
         md = r.get("markdown", "")
-        if len(md.strip()) < 100:
-            print(f"  [{i}/{len(all_urls)}] SKIP (rỗng): {url}")
+        # greensm trả trang 404 có style (>100 ký tự) thay vì lỗi HTTP → lọc soft-404.
+        _soft404 = any(m in md for m in ("Không tìm thấy trang", "Page not found", "404"))
+        if len(md.strip()) < 100 or (_soft404 and len(md.strip()) < 1200):
+            print(f"  [{i}/{len(all_urls)}] SKIP (rỗng/404): {url}")
             continue
         slug = _slug(url)
         fpath = os.path.join(OUT_DIR, f"{slug}.md")
