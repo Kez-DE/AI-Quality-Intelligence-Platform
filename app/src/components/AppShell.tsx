@@ -25,6 +25,7 @@ import {
   Sun,
   Headphones,
   Activity,
+  Plug,
   User as UserIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -72,6 +73,7 @@ const NAV: NavItem[] = [
 
   // 4. Trợ lý AI.
   { to: "/chat", label: "Trợ lý AI", icon: Sparkles, roles: AUTHENTICATED_ROLES, group: "assistant" },
+  { to: "/mcp-connect", label: "Kết nối MCP", icon: Plug, roles: ALL_ROLES, group: "assistant" },
 
   // 5. Quản trị — chỉ admin.
   { to: "/live-stream", label: "Luồng trực tiếp", icon: Radio, roles: ["admin"], group: "admin" },

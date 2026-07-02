@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/tasks'
 import { Route as AuthenticatedSupportRouteImport } from './routes/_authenticated/support'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
+import { Route as AuthenticatedMcpConnectRouteImport } from './routes/_authenticated/mcp-connect'
 import { Route as AuthenticatedLiveStreamRouteImport } from './routes/_authenticated/live-stream'
 import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
 import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticated/feedback'
@@ -52,6 +53,11 @@ const AuthenticatedSupportRoute = AuthenticatedSupportRouteImport.update({
 const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedMcpConnectRoute = AuthenticatedMcpConnectRouteImport.update({
+  id: '/mcp-connect',
+  path: '/mcp-connect',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedLiveStreamRoute = AuthenticatedLiveStreamRouteImport.update({
@@ -113,6 +119,7 @@ export interface FileRoutesByFullPath {
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/insights': typeof AuthenticatedInsightsRoute
   '/live-stream': typeof AuthenticatedLiveStreamRoute
+  '/mcp-connect': typeof AuthenticatedMcpConnectRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/support': typeof AuthenticatedSupportRoute
   '/tasks': typeof AuthenticatedTasksRoute
@@ -129,6 +136,7 @@ export interface FileRoutesByTo {
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/insights': typeof AuthenticatedInsightsRoute
   '/live-stream': typeof AuthenticatedLiveStreamRoute
+  '/mcp-connect': typeof AuthenticatedMcpConnectRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/support': typeof AuthenticatedSupportRoute
   '/tasks': typeof AuthenticatedTasksRoute
@@ -147,6 +155,7 @@ export interface FileRoutesById {
   '/_authenticated/feedback': typeof AuthenticatedFeedbackRoute
   '/_authenticated/insights': typeof AuthenticatedInsightsRoute
   '/_authenticated/live-stream': typeof AuthenticatedLiveStreamRoute
+  '/_authenticated/mcp-connect': typeof AuthenticatedMcpConnectRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/support': typeof AuthenticatedSupportRoute
   '/_authenticated/tasks': typeof AuthenticatedTasksRoute
@@ -165,6 +174,7 @@ export interface FileRouteTypes {
     | '/feedback'
     | '/insights'
     | '/live-stream'
+    | '/mcp-connect'
     | '/reports'
     | '/support'
     | '/tasks'
@@ -181,6 +191,7 @@ export interface FileRouteTypes {
     | '/feedback'
     | '/insights'
     | '/live-stream'
+    | '/mcp-connect'
     | '/reports'
     | '/support'
     | '/tasks'
@@ -198,6 +209,7 @@ export interface FileRouteTypes {
     | '/_authenticated/feedback'
     | '/_authenticated/insights'
     | '/_authenticated/live-stream'
+    | '/_authenticated/mcp-connect'
     | '/_authenticated/reports'
     | '/_authenticated/support'
     | '/_authenticated/tasks'
@@ -252,6 +264,13 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/reports'
       preLoaderRoute: typeof AuthenticatedReportsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/mcp-connect': {
+      id: '/_authenticated/mcp-connect'
+      path: '/mcp-connect'
+      fullPath: '/mcp-connect'
+      preLoaderRoute: typeof AuthenticatedMcpConnectRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/live-stream': {
@@ -329,6 +348,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFeedbackRoute: typeof AuthenticatedFeedbackRoute
   AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
   AuthenticatedLiveStreamRoute: typeof AuthenticatedLiveStreamRoute
+  AuthenticatedMcpConnectRoute: typeof AuthenticatedMcpConnectRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedSupportRoute: typeof AuthenticatedSupportRoute
   AuthenticatedTasksRoute: typeof AuthenticatedTasksRoute
@@ -344,6 +364,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFeedbackRoute: AuthenticatedFeedbackRoute,
   AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
   AuthenticatedLiveStreamRoute: AuthenticatedLiveStreamRoute,
+  AuthenticatedMcpConnectRoute: AuthenticatedMcpConnectRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedSupportRoute: AuthenticatedSupportRoute,
   AuthenticatedTasksRoute: AuthenticatedTasksRoute,
