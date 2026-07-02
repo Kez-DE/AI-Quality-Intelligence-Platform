@@ -16,6 +16,8 @@ SEED_URLS = [
     "https://www.greensm.com/vn-vi/terms-policies",
     "https://www.greensm.com/vn-vi/terms-policies/consumer-protection-policy",
     "https://www.greensm.com/vn-vi/terms-policies/privacy-notice",
+    "https://www.greensm.com/vn-vi/terms-policies/operational-regulations",
+    "https://www.greensm.com/vn-vi/terms-policies/terms-of-use",
 ]
 
 
