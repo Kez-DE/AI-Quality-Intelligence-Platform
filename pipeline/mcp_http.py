@@ -38,6 +38,10 @@ def _current_identity():
 
 
 def build_app():
+    from mcp.server.transport_security import TransportSecuritySettings
+    # Tắt DNS-rebinding protection (mặc định chỉ cho localhost → Railway host bị 421).
+    # An toàn: cổng vào đã yêu cầu OAuth/bearer; protection này nhắm tấn công trình
+    # duyệt vào server localhost, không áp API token-authed công khai.
     server = FastMCP(
         "xanhsm-quality",
         stateless_http=True,
@@ -45,6 +49,8 @@ def build_app():
         token_verifier=SupabaseTokenVerifier(),
         auth=AuthSettings(issuer_url=SUPABASE_ISSUER,
                           resource_server_url=PUBLIC_URL),
+        transport_security=TransportSecuritySettings(
+            enable_dns_rebinding_protection=False),
     )
 
     @server.custom_route("/health", methods=["GET"])
