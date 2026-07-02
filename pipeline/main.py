@@ -235,31 +235,6 @@ def whoami(user: AuthUser = Depends(get_current_user)):
     return {"status": "success", "data": {"id": user.id, "email": user.email, "role": user.role, "department": user.department}}
 
 
-@app.post("/api/mcp/token")
-def create_my_mcp_token(user: AuthUser = Depends(get_current_user)):
-    """Self-service: cấp một MCP bearer token cho chính user đang đăng nhập.
-
-    Token gắn với user_id; quyền (role/phòng) resolve LIVE từ profile mỗi request, nên
-    khi admin nâng quyền/gán phòng thì token này tự phản ánh — không cần cấp lại."""
-    from mcp_auth import issue_token
-    raw = issue_token(user.id, label=f"self:{user.email or user.id}")
-    url = os.environ.get("MCP_PUBLIC_URL",
-                         "https://mcp-http-production-ffd0.up.railway.app/mcp")
-    return {
-        "status": "success",
-        "data": {
-            "token": raw,
-            "url": url,
-            "connect_command": (
-                f'claude mcp add --transport http xanhsm-quality-remote {url} '
-                f'--header "Authorization: Bearer {raw}"'
-            ),
-            "note": ("Token chỉ hiện MỘT lần — lưu lại ngay. Quyền theo role/phòng hiện tại "
-                     "của bạn; admin đổi quyền thì tự cập nhật, không cần token mới."),
-        },
-    }
-
-
 @app.get("/")
 def read_root():
     return {"message": "Welcome to AI Quality Intelligence API"}
