@@ -68,7 +68,13 @@ class AuthMiddleware:
 
 
 def build_app():
-    server = FastMCP("xanhsm-quality", stateless_http=True, json_response=True)
+    from mcp.server.transport_security import TransportSecuritySettings
+    # Tắt DNS-rebinding protection (mặc định chỉ cho localhost → Railway host bị 421).
+    # An toàn vì cổng vào đã yêu cầu bearer token; protection này nhắm tấn công trình
+    # duyệt vào server localhost, không áp với API token-authed công khai.
+    ts = TransportSecuritySettings(enable_dns_rebinding_protection=False)
+    server = FastMCP("xanhsm-quality", stateless_http=True, json_response=True,
+                     transport_security=ts)
     handlers = make_tool_handlers(_current_identity)
     # Đăng ký sẵn mọi tool; quyền theo role được chặn ở call_tool mỗi request.
     for name in _ALL_TOOLS:
