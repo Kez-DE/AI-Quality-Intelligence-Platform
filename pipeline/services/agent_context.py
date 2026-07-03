@@ -6,7 +6,7 @@ from ingest import get_supabase
 from services.live_stream import get_live_stream_status
 from agents.router_agent import route_ticket
 from agents.analyst_agent import DEPARTMENT_PERSONAS
-from departments import alert_department
+from departments import alert_department, DEPARTMENTS
 
 AGENT_SYSTEM_PROMPT = """Bạn là "Trợ lý đồng hành" của Quality Operation Cockpit xanhSM — thân thiện, đồng cảm và luôn sát cánh cùng đội vận hành.
 Nhiệm vụ: giúp đội vận hành hiểu feedback, alerts, spike, chất lượng tài xế/xe/app/thanh toán/an toàn và quyết định bước xử lý tiếp theo.
@@ -121,6 +121,10 @@ DATA_CONTEXT:
     if role != "admin" and dept:
         scope_team = dept
 
+    # Roster phòng ban — nguồn sự thật DEPARTMENTS; luôn có trong context ops/admin,
+    # kể cả khi Supabase lỗi bên dưới.
+    roster_line = f"- Phòng ban hệ thống ({len(DEPARTMENTS)}): {', '.join(DEPARTMENTS)}."
+
     try:
         db = get_supabase()
         feedback = db.table("feedback") \
@@ -136,7 +140,10 @@ DATA_CONTEXT:
             .execute() \
             .data or []
     except Exception as exc:
-        return f"DATA_CONTEXT_ERROR: Không đọc được Supabase context: {str(exc)[:200]}"
+        return (
+            f"DATA_CONTEXT_ERROR: Không đọc được Supabase context: {str(exc)[:200]}\n"
+            f"{roster_line}"
+        )
 
     # Lọc theo phòng ban (ops): feedback qua routing table, alerts qua assigned_team.
     if scope_team:
@@ -161,6 +168,17 @@ DATA_CONTEXT:
     def top(counter: Counter, n: int = 8) -> str:
         return ", ".join(f"{k}: {v}" for k, v in counter.most_common(n)) or "none"
 
+    per_dept_line = ""
+    if scope_team is None:
+        dept_counts = Counter(
+            route_ticket(f.get("topic", ""), f.get("severity", 3), f.get("sentiment"),
+                         log_run=False)["team"]
+            for f in feedback
+        )
+        if dept_counts:
+            per_dept_line = "\n- Feedback theo phòng: " + ", ".join(
+                f"{k}: {v}" for k, v in dept_counts.most_common())
+
     return f"""
 DATA_CONTEXT:
 - Phạm vi dữ liệu: {('phòng ' + scope_team) if scope_team else 'Toàn hệ thống (mọi phòng ban)'}.
@@ -175,6 +193,7 @@ DATA_CONTEXT:
 - Alert mới nhất trong snapshot: {latest_alert_at}.
 - Alert status: {top(alert_status_counts)}
 - Live stream: {get_live_stream_status()}
+{roster_line}{per_dept_line}
 
 Recent alerts:
 {os.linesep.join([f"- [{a.get('severity')}] {a.get('status')} | {a.get('area')} | {a.get('title')}" for a in alerts[:10]]) or "- none"}
