@@ -324,3 +324,17 @@ Nhân viên kết nối MCP bằng đăng nhập tài khoản, không tạo/copy
 - **Xóa self-service:** trang `/mcp-connect`, nav "Kết nối MCP", `POST /api/mcp/token`. Giữ CLI `mcp_auth.py` + bảng mcp_tokens cho đường máy-tới-máy.
 - **Verify production thật:** deploy Railway; `/mcp` no-token → 401 + WWW-Authenticate resource_metadata; `/.well-known/oauth-protected-resource/mcp` trỏ Supabase AS; E2E JWT thật (demo admin) → 6 tool + get_hot_areas OK; `claude mcp add` không header → "Needs authentication" (OAuth mode). Full pytest 166 pass, tsc 0.
 - Decision `decisions/0011`. Token nhân viên lộ trong chat trước đó đã revoke.
+
+## 2026-07-03
+
+### Bổ sung KB từ chính sách thật greensm (cào Firecrawl)
+
+Làm KB nội bộ chính xác hơn bằng chính sách công khai thật của xanhSM.
+
+- **Cào greensm.com** qua Firecrawl (:3002) — mở rộng nguồn, lọc soft-404 → 4 trang thật (helps 15.5k, terms, consumer-protection 22k, privacy 33k). `scrape_public_policy.py`.
+- **Be/Grab** cào tham khảo → `/tmp/competitor_scrape/` (Be là SPA rỗng; Grab terms 10k). **KHÔNG vào repo** — chỉ mượn pattern. `scrape_competitor_ref.py`.
+- **public_kb GIỮ NGUYÊN**: re-build sẽ regress (accordion JS không render answer → xóa câu trả lời tốt sẵn có, gồm Hotline 1555). Đã revert, không chạy build_public_kb.
+- **2 SOP nội bộ neo fact thật:** `sop_khieu_nai_bao_ve_ntd.md` (CSKH — ưu tiên NTD dễ bị tổn thương, ủy quyền khiếu nại), `tech_bao_mat_du_lieu.md` (Rủi ro&Gian lận — MFA/SSO/pentest/log/mã hóa, quyền dữ liệu). Có `source:` URL greensm.
+- **Guardrail:** liên hệ trong KB chỉ greensm (Hotline 1555, 1900 2097 DPO, support.vn@/DPOoffice@greensm.com — đều xác minh có trong scrape). Test `test_kb_no_competitor.py` chặn tên miền Be/Grab.
+- **Re-seed vector:** graph_nodes 128→140; hybrid search 2 phòng mới ra nội dung có nguồn.
+- **Verify:** test_kb_six_departments + test_kb_no_competitor pass; grep data/ sạch competitor.
