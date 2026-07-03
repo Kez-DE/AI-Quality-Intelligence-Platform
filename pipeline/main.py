@@ -1011,38 +1011,6 @@ def alert_workflow_status(_: AuthUser = Depends(require_ops_staff)):
     """Trạng thái workflow ticket — chỉ ops staff."""
     return {"status": "success", "data": dict(ticket_workflow_state)}
 
-@app.patch("/api/alerts/{alert_id}/status")
-def update_alert_status(alert_id: str, payload: dict, user: AuthUser = Depends(require_ops_staff)):
-    new_status = payload.get("status")
-    if new_status not in {"open", "in_progress", "resolved"}:
-        raise HTTPException(status_code=400, detail="Invalid alert status")
-    try:
-        db = get_supabase()
-        if user.role != "admin":
-            rows = db.table("alerts").select("*").eq("id", alert_id).limit(1).execute().data or []
-            if not rows:
-                raise HTTPException(status_code=404, detail="Alert not found")
-            alert = rows[0]
-            task_id = alert.get("task_id")
-            task_team = alert_department(alert)
-            if not task_team and task_id:
-                task = db.table("tasks").select("assigned_team").eq("id", task_id).limit(1).execute().data or []
-                task_team = task[0].get("assigned_team") if task else None
-            if not can_view_team(user, task_team):
-                raise HTTPException(status_code=403, detail="Bạn không có quyền cập nhật alert của phòng ban khác.")
-        data = db.table("alerts") \
-            .update({"status": new_status}) \
-            .eq("id", alert_id) \
-            .execute() \
-            .data or []
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Cannot update alert: {str(exc)[:300]}") from exc
-    if not data:
-        raise HTTPException(status_code=404, detail="Alert not found")
-    return {"status": "success", "data": data[0]}
-
 @app.get("/api/agent/status")
 def agent_status(_: AuthUser = Depends(require_ops_staff)):
     return {"status": "success", "data": get_agent_status()}
