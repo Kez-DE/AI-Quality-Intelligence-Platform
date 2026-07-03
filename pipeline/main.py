@@ -482,6 +482,50 @@ def update_alert_status(alert_id: str, payload: AlertStatusReq,
         raise HTTPException(status_code=503, detail=f"Cannot update alert: {str(exc)[:300]}") from exc
     return {"status": "success", "data": data[0] if data else None}
 
+
+def _compute_sla_summary(alerts: list) -> dict:
+    """Chỉ số SLA từ list alert: đúng hạn/trễ/đang quá hạn + MTTA/MTTR (giây)."""
+    now = datetime.now(timezone.utc)
+    on_time = late = overdue_open = resolved_total = 0
+    ttr: list[float] = []  # created -> resolved
+    tta: list[float] = []  # created -> in_progress
+    for a in alerts:
+        created = _parse_timestamp(a.get("created_at"))
+        due = _parse_timestamp(a.get("sla_due_at"))
+        resolved = _parse_timestamp(a.get("resolved_at"))
+        in_prog = _parse_timestamp(a.get("in_progress_at"))
+        if a.get("status") == "resolved" and resolved:
+            resolved_total += 1
+            if due:
+                if resolved <= due:
+                    on_time += 1
+                else:
+                    late += 1
+            if created:
+                ttr.append((resolved - created).total_seconds())
+        elif due and now > due:
+            overdue_open += 1
+        if in_prog and created:
+            tta.append((in_prog - created).total_seconds())
+    avg = lambda xs: (sum(xs) / len(xs)) if xs else None
+    return {
+        "on_time": on_time, "late": late, "overdue_open": overdue_open,
+        "resolved_total": resolved_total,
+        "mttr_seconds": avg(ttr), "mtta_seconds": avg(tta),
+    }
+
+
+@app.get("/api/alerts/sla-summary")
+def alert_sla_summary(user: AuthUser = Depends(require_ops_staff)):
+    db = get_supabase()
+    rows = db.table("alerts").select(
+        "status,sla_due_at,created_at,in_progress_at,resolved_at,assigned_team,topic,severity,sentiment"
+    ).order("created_at", desc=True).limit(1000).execute().data or []
+    if user.role != "admin":
+        rows = [a for a in rows if can_view_team(user, alert_department(a) or a.get("assigned_team"))]
+    return {"status": "success", "data": _compute_sla_summary(rows)}
+
+
 @app.post("/api/tasks/{task_id}/support-resolve")
 def support_resolve(task_id: str, payload: SupportResolveReq, user: AuthUser = Depends(require_ops_staff)):
     """Bàn CSKH đóng ticket khách trực tiếp (staff/manager/admin trong phòng).
