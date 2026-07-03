@@ -4,7 +4,8 @@ from datetime import datetime, timezone
 from ingest import get_supabase
 
 ticket_workflow_state = {
-    "enabled": os.getenv("AUTO_TICKET_WORKFLOW_ENABLED", "true").lower() == "true",
+    # Mặc định TẮT: alert chuyển trạng thái bằng workflow THẬT (nút ops), không auto theo tuổi.
+    "enabled": os.getenv("AUTO_TICKET_WORKFLOW_ENABLED", "false").lower() == "true",
     "in_progress_after_seconds": int(os.getenv("AUTO_TICKET_IN_PROGRESS_AFTER_SECONDS", "10")),
     "resolved_after_seconds": int(os.getenv("AUTO_TICKET_RESOLVED_AFTER_SECONDS", "30")),
     "last_run_at": None,

@@ -146,15 +146,22 @@ type LiveStreamStatus = {
   } | null;
 };
 
-type TicketWorkflowStatus = {
-  enabled: boolean;
-  in_progress_after_seconds: number;
-  resolved_after_seconds: number;
-  last_run_at: string | null;
-  moved_to_in_progress: number;
-  moved_to_resolved: number;
-  last_error: string | null;
+type SlaSummary = {
+  on_time: number;
+  late: number;
+  overdue_open: number;
+  resolved_total: number;
+  mttr_seconds: number | null;
+  mtta_seconds: number | null;
 };
+
+/** Giây → "Xh Ym" / "Xm" / "Xs" cho hiển thị MTTA/MTTR. */
+function fmtDur(seconds: number): string {
+  const s = Math.round(seconds);
+  if (s >= 3600) return `${Math.floor(s / 3600)}h ${Math.round((s % 3600) / 60)}m`;
+  if (s >= 60) return `${Math.floor(s / 60)}m`;
+  return `${s}s`;
+}
 
 function AlertsPage() {
   const { data: me, isLoading: meLoading } = useMe();
@@ -166,21 +173,21 @@ function AlertsPage() {
   const [severityFilter, setSeverityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [stream, setStream] = useState<LiveStreamStatus | null>(null);
-  const [workflow, setWorkflow] = useState<TicketWorkflowStatus | null>(null);
+  const [sla, setSla] = useState<SlaSummary | null>(null);
 
   async function fetchAlerts(showLoading = false) {
     if (showLoading) setLoading(true);
     try {
-      const [alertsJson, statusJson, workflowJson] = await Promise.all([
+      const [alertsJson, statusJson, slaJson] = await Promise.all([
         apiFetch<{ data?: Alert[] }>("/api/alerts/recent?limit=100"),
         apiFetch<{ data?: LiveStreamStatus }>("/api/live-stream/status"),
-        apiFetch<{ data?: TicketWorkflowStatus }>("/api/alerts/workflow-status"),
+        apiFetch<{ data?: SlaSummary }>("/api/alerts/sla-summary"),
       ]);
       setAlerts(alertsJson.data ?? []);
       setStream(statusJson.data ?? null);
-      setWorkflow(workflowJson.data ?? null);
+      setSla(slaJson.data ?? null);
     } catch {
-      toast.error("Không đọc được trạng thái auto-ticket từ backend");
+      toast.error("Không đọc được trạng thái ticket từ backend");
     } finally {
       if (showLoading) setLoading(false);
     }
@@ -209,9 +216,13 @@ function AlertsPage() {
         method: "PATCH",
         body: JSON.stringify({ status: newStatus }),
       });
-      toast.success(
-        newStatus === "in_progress" ? "✅ Đã nhận xử lý!" : "🎉 Đã đánh dấu hoàn thành!",
-      );
+      if (newStatus === "in_progress") {
+        toast.success("✅ Đã tiếp nhận — đã tạo việc, xem ở Quản lý công việc", {
+          action: { label: "Xem việc", onClick: () => { window.location.href = "/tasks"; } },
+        });
+      } else {
+        toast.success("🎉 Đã đóng ticket!");
+      }
       fetchAlerts();
     } catch (error) {
       toast.error(
@@ -249,6 +260,19 @@ function AlertsPage() {
       alerts.filter((alert) => alertMetadata(alert).assigned_team === team).length,
     ]),
   );
+
+  if (!meLoading && me && me.role !== "admin" && me.role !== "manager") {
+    return (
+      <div className="max-w-lg mx-auto text-center py-16">
+        <ShieldAlert className="h-12 w-12 mx-auto text-xanh-coral mb-3" />
+        <h1 className="font-display text-2xl font-bold">Chỉ dành cho Quản lý</h1>
+        <p className="text-sm text-muted-foreground mt-2">
+          Trang Phân loại Ticket dành cho quản lý & quản trị viên điều phối. Nhân viên nhận
+          việc được giao ở trang <strong>Quản lý công việc</strong>.
+        </p>
+      </div>
+    );
+  }
 
   if (!meLoading && isUnassignedOps(me)) {
     return (
@@ -330,16 +354,21 @@ function AlertsPage() {
         {stream?.last_ticket_error && (
           <span className="text-red-600">Lỗi trigger: {stream.last_ticket_error}</span>
         )}
-        <span className="text-muted-foreground">
-          Workflow:{" "}
-          <strong className="text-foreground">
-            {workflow?.enabled
-              ? `chờ ${workflow.in_progress_after_seconds}s → xử lý → xong ${workflow.resolved_after_seconds}s`
-              : "đã tắt"}
-          </strong>
-        </span>
-        {workflow?.last_error && (
-          <span className="text-red-600">Lỗi workflow: {workflow.last_error}</span>
+        {sla && (
+          <span className="text-muted-foreground">
+            SLA:{" "}
+            <strong className="text-green-600">{sla.on_time} đúng hạn</strong>
+            {" · "}
+            <strong className="text-red-600">{sla.late} trễ</strong>
+            {" · "}
+            <strong className="text-amber-600">{sla.overdue_open} đang quá hạn</strong>
+            {sla.mttr_seconds != null && (
+              <span className="text-foreground"> · MTTR ~{fmtDur(sla.mttr_seconds)}</span>
+            )}
+            {sla.mtta_seconds != null && (
+              <span className="text-foreground"> · MTTA ~{fmtDur(sla.mtta_seconds)}</span>
+            )}
+          </span>
         )}
       </div>
 
@@ -530,7 +559,7 @@ function AlertsPage() {
                         ) : (
                           <AlertTriangle className="h-4 w-4" />
                         )}
-                        Nhận xử lý
+                        Tiếp nhận & Giao việc
                       </button>
                     )}
                     {alert.status === "in_progress" && (
@@ -544,7 +573,7 @@ function AlertsPage() {
                         ) : (
                           <CheckCircle2 className="h-4 w-4" />
                         )}
-                        Đã giải quyết
+                        Đóng ticket
                       </button>
                     )}
                     {alert.status === "resolved" && (

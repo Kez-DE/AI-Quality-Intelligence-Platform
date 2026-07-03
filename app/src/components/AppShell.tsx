@@ -61,7 +61,7 @@ const NAV: NavItem[] = [
 
   // 2. Vận hành — theo đúng luồng dữ liệu đi qua hệ thống.
   { to: "/feedback", label: "Phản hồi", icon: MessageSquare, roles: AUTHENTICATED_ROLES, group: "operations" },
-  { to: "/alerts", label: "Phân loại Ticket", icon: Bell, roles: AUTHENTICATED_ROLES, group: "operations" },
+  { to: "/alerts", label: "Phân loại Ticket", icon: Bell, roles: ["admin", "manager"], group: "operations" },
   { to: "/tasks", label: "Quản lý công việc", icon: Kanban, roles: AUTHENTICATED_ROLES, group: "operations" },
   { to: "/support", label: "Hỗ trợ CSKH", icon: Headphones, roles: AUTHENTICATED_ROLES, group: "operations" },
 

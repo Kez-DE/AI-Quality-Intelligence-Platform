@@ -9,6 +9,20 @@ from agents.common import get_db, log_agent_run
 from agents.common import call_llm
 from departments import alert_department
 
+def find_or_create_cluster_task(db, team, area, priority, title, summary=""):
+    """Tìm task 'open' cho (team, area) → trả id; chưa có → tạo mới (status open). Không LLM."""
+    try:
+        res = db.table("tasks").select("id").eq("assigned_team", team).eq("area", area).eq("status", "open").limit(1).execute()
+        if res.data:
+            return res.data[0]["id"]
+    except Exception:
+        pass
+    ins = db.table("tasks").insert({
+        "title": title, "summary": summary, "assigned_team": team, "area": area,
+        "topic": "General", "priority": priority or "P2", "status": "open",
+    }).execute()
+    return ins.data[0]["id"] if ins.data else None
+
 def cluster_alerts_into_tasks() -> Dict[str, Any]:
     """
     Thuật toán gom cụm Heuristic-First (Zero-LLM cho việc gom):
@@ -96,20 +110,14 @@ Trả về định dạng JSON:
                         "summary": "Nhiều sự cố được báo cáo tại khu vực này. Cần kiểm tra và xử lý."
                     }
                 
-                # Insert new task
-                # Find a user_id for owner_id to satisfy RLS if needed, or leave null
-                new_task = {
-                    "title": task_data.get("title", f"Vấn đề {team} tại {area}"),
-                    "summary": task_data.get("summary", ""),
-                    "assigned_team": team,
-                    "area": area,
-                    "topic": "General", # Can be extracted from LLM if needed
-                    "priority": cluster_priority.get((team, area), "P2"),  # ưu tiên do Router gán, fallback P2
-                    "status": "open"
-                }
-                insert_res = db.table("tasks").insert(new_task).execute()
-                if insert_res.data:
-                    task_id = insert_res.data[0]["id"]
+                # Find-or-create qua helper dùng chung (DRY với endpoint tiếp nhận ticket)
+                task_id = find_or_create_cluster_task(
+                    db, team, area,
+                    cluster_priority.get((team, area), "P2"),  # ưu tiên do Router gán, fallback P2
+                    task_data.get("title", f"Vấn đề {team} tại {area}"),
+                    task_data.get("summary", ""),
+                )
+                if task_id:
                     tasks_created += 1
             except Exception as e:
                 print(f"[TaskAgent] Lỗi tạo task mới: {e}")
