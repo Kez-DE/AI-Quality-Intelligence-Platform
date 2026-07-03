@@ -34,8 +34,22 @@ phải re-architect `task_agent`. Giữ nguyên link `task_id` và workflow task
   transition sai (400).
 - **RBAC:** admin mọi alert; manager/staff chỉ alert thuộc phòng mình
   (`alert_department(alert) == user.department`, tái dùng helper sẵn có) — khác phòng → 403.
-- Ghi audit vào bảng log sẵn có (`audit_logs`): ai đổi, alert id, status cũ→mới. KHÔNG
-  migration (dùng cột `status` sẵn có).
+- Ghi audit vào `audit_logs`: ai đổi, alert id, status cũ→mới.
+- **Timing cho SLA sâu (migration):** thêm cột `alerts.in_progress_at`, `resolved_at`,
+  `resolved_by` (uuid), `updated_at` (timestamptz). Endpoint set khi transition:
+  open→in_progress ⇒ `in_progress_at=now`; →resolved ⇒ `resolved_at=now, resolved_by=actor`;
+  mở lại ⇒ clear `resolved_at/resolved_by`. `updated_at=now` mỗi lần đổi.
+
+### 2b. Báo cáo SLA sâu
+- `GET /api/alerts/sla-summary` (RBAC như alerts; scope theo phòng cho ops): trả các chỉ số
+  trên tập alert trong phạm vi quyền:
+  - **Đúng hạn vs quá hạn:** resolved với `resolved_at <= sla_due_at` (đúng hạn) vs
+    `resolved_at > sla_due_at` (trễ); alert chưa resolved mà `sla_due_at < now` = đang quá hạn.
+  - **MTTA** (mean time to acknowledge): trung bình `in_progress_at - created_at`.
+  - **MTTR** (mean time to resolve): trung bình `resolved_at - created_at`.
+  - Đếm theo severity/phòng nếu rẻ (tái dùng loop sẵn có).
+- Frontend `/alerts`: thẻ tóm tắt SLA (đúng hạn / trễ / đang quá hạn, MTTA/MTTR) thay cho khối
+  đồng hồ timer cũ.
 
 ### 3. Frontend `/alerts`
 - Bỏ khối hiển thị timer (in_progress_after_seconds...).
@@ -58,9 +72,13 @@ phải re-architect `task_agent`. Giữ nguyên link `task_id` và workflow task
   staff phòng Y không có nút / 403.
 - Full pytest + tsc.
 
+## Validation (bổ sung SLA)
+- Migration áp: alert có cột `in_progress_at/resolved_at/resolved_by/updated_at`.
+- Sau khi resolve, `resolved_at`+`resolved_by` được set; `sla-summary` tính đúng đúng-hạn/trễ,
+  MTTA/MTTR khớp dữ liệu mẫu.
+
 ## Không đổi (ngoài phạm vi)
-- Schema (không migration; dùng `status` sẵn có). Workflow task, report→task, chat/RAG, MCP.
-- (Follow-up nếu cần báo cáo SLA sâu: thêm cột `resolved_at`/`resolved_by` — migration riêng.)
+- Workflow task, report→task, chat/RAG, MCP. Chỉ thêm cột vào `alerts` (không đụng bảng khác).
 
 ## Ghi chú quyết định
 - Chọn B (nút trên alert) thay vì A (alert bám theo task) vì tự chứa + đúng nghĩa trang
