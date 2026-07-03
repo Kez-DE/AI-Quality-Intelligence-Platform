@@ -338,3 +338,14 @@ Làm KB nội bộ chính xác hơn bằng chính sách công khai thật của 
 - **Guardrail:** liên hệ trong KB chỉ greensm (Hotline 1555, 1900 2097 DPO, support.vn@/DPOoffice@greensm.com — đều xác minh có trong scrape). Test `test_kb_no_competitor.py` chặn tên miền Be/Grab.
 - **Re-seed vector:** graph_nodes 128→140; hybrid search 2 phòng mới ra nội dung có nguồn.
 - **Verify:** test_kb_six_departments + test_kb_no_competitor pass; grep data/ sạch competitor.
+
+### KB nội bộ đủ 6 phòng — neo chính sách greensm thật (tiếp)
+
+Bổ sung nốt 4 phòng còn lại từ dữ liệu greensm đã cào (helps FAQ có answer thật inline).
+
+- **Vận hành:** `sop_su_co_hien_truong.md` — 6 bước xử lý tai nạn/sự cố thật (115/113/1555, bảo hiểm, giữ giấy tờ).
+- **Tài chính & Thanh toán:** `sla_cuoc_thanh_toan.md` — phương thức thanh toán, tính cước, thay đổi điểm đón, hủy chuyến (không ghi số phí cứng — tránh sai).
+- **Sản phẩm:** `sop_dat_xe_dich_vu.md` — loại dịch vụ (Green Premium/Car/Airport...), luồng đặt xe 8 bước thật.
+- **IT:** `tech_su_co_app_dat_xe.md` — GPS/định vị, phương thức thanh toán, điểm Xanh; phần backend nội bộ đánh dấu rõ "chưa có nguồn công khai".
+- Tất cả có `source:` URL greensm + liên hệ 1555. Guardrail competitor sạch.
+- Re-seed: graph_nodes 140→157. 6/6 phòng tra được KB đúng department.
