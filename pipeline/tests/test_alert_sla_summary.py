@@ -14,6 +14,9 @@ def test_sla_summary_counts_and_times():
         # chưa resolve mà đã quá hạn
         {"status": "open", "sla_due_at": "2000-01-01T00:00:00+00:00",
          "created_at": "2026-07-01T08:00:00+00:00"},
+        # resolved cũ (timer) không có resolved_at + quá hạn → KHÔNG tính overdue
+        {"status": "resolved", "sla_due_at": "2000-01-01T00:00:00+00:00",
+         "created_at": "2026-07-01T08:00:00+00:00"},
     ]
     s = _compute_sla_summary(alerts)
     assert s["on_time"] == 1

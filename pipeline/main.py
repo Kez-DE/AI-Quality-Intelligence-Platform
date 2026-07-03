@@ -503,7 +503,9 @@ def _compute_sla_summary(alerts: list) -> dict:
                     late += 1
             if created:
                 ttr.append((resolved - created).total_seconds())
-        elif due and now > due:
+        elif a.get("status") != "resolved" and due and now > due:
+            # Chỉ ticket CHƯA đóng mà quá hạn mới tính overdue. Alert "resolved" cũ (do timer
+            # cũ, không có resolved_at) không bị tính oan là quá hạn.
             overdue_open += 1
         if in_prog and created:
             tta.append((in_prog - created).total_seconds())
@@ -519,7 +521,7 @@ def _compute_sla_summary(alerts: list) -> dict:
 def alert_sla_summary(user: AuthUser = Depends(require_ops_staff)):
     db = get_supabase()
     rows = db.table("alerts").select(
-        "status,sla_due_at,created_at,in_progress_at,resolved_at,assigned_team,topic,severity,sentiment"
+        "status,sla_due_at,created_at,in_progress_at,resolved_at,assigned_team,topic,severity"
     ).order("created_at", desc=True).limit(1000).execute().data or []
     if user.role != "admin":
         rows = [a for a in rows if can_view_team(user, alert_department(a) or a.get("assigned_team"))]
