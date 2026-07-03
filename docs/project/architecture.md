@@ -20,10 +20,10 @@ Supabase là trục nối: pipeline Python **ghi** kết quả, frontend **đọ
 
 ```
 data/
-├── knowledge_base/       KB nội bộ cho RAG theo phòng ban (mock tự soạn)
-│   ├── sop/              5 quy trình xử lý (tai nạn, quấy rối, gian lận, mất đồ, thái độ)
-│   ├── sla/              1 file cam kết bồi thường chuẩn
-│   ├── tech/             2 file lỗi kỹ thuật (thanh toán, không nhận cước)
+├── knowledge_base/       KB nội bộ cho RAG theo phòng ban (SOP neo chính sách greensm thật + mock)
+│   ├── sop/              quy trình xử lý theo phòng (an toàn, gian lận, thái độ, khiếu nại NTD...)
+│   ├── sla/              cam kết bồi thường chuẩn
+│   ├── tech/             lỗi kỹ thuật + bảo mật dữ liệu (neo chính sách greensm)
 │   └── tickets/          1 file case study P5 làm few-shot cho AI
 ├── public_kb/            FAQ khách hàng cho chatbot guest (audience: public)
 ├── taxonomy/             routing_table.json, severity_rules.json
