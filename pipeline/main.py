@@ -440,7 +440,7 @@ def update_task_status(task_id: str, payload: StatusUpdateReq, user: AuthUser = 
 
 @app.patch("/api/alerts/{alert_id}/status")
 def update_alert_status(alert_id: str, payload: AlertStatusReq,
-                        user: AuthUser = Depends(require_ops_staff)):
+                        user: AuthUser = Depends(require_manager)):
     new_status = payload.status
     if new_status not in {"open", "in_progress", "resolved"}:
         raise HTTPException(status_code=400, detail="Invalid alert status")
@@ -465,6 +465,17 @@ def update_alert_status(alert_id: str, payload: AlertStatusReq,
         if new_status == "in_progress" and cur == "resolved":  # mở lại
             patch["resolved_at"] = None
             patch["resolved_by"] = None
+
+        # Tiếp nhận (open→in_progress): tạo/gắn task cho cụm (phòng, khu vực) để manager giao việc.
+        if new_status == "in_progress" and not alert.get("task_id"):
+            from agents.task_agent import find_or_create_cluster_task
+            team_for_task = team or "CSKH"
+            title = (alert.get("title") or f"Xử lý sự cố {alert.get('topic') or ''}").strip()[:80]
+            new_task_id = find_or_create_cluster_task(
+                db, team_for_task, alert.get("area"), alert.get("priority"),
+                title, (alert.get("description") or "")[:300])
+            if new_task_id:
+                patch["task_id"] = new_task_id
 
         data = db.table("alerts").update(patch).eq("id", alert_id).execute().data or []
         # audit
