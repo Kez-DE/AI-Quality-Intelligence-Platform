@@ -16,6 +16,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { MarkdownContent } from "@/components/MarkdownContent";
+import {
+  type ChatSource,
+  linkifyCitations,
+  makeCitationComponents,
+  srcContent,
+  srcTitle,
+} from "@/components/SourceCitation";
 import { apiFetch, useMe, type Role } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/chat")({
@@ -453,6 +460,7 @@ function ChatPage() {
               onEdit={m.role === "user" ? () => editMessage(i) : undefined}
               onCopy={m.role === "assistant" ? () => copyMessage(m.content, i) : undefined}
               copied={copiedIndex === i}
+              sources={m.sources}
             />
           ))}
 
@@ -511,9 +519,11 @@ function ChatPage() {
               ) : (
                 messages[messages.length - 1]?.sources?.map((s: any, idx: number) => (
                   <div key={idx} className="rounded-xl border border-border p-3 text-sm hover:border-xanh-green/50 transition-colors bg-card">
-                    <div className="font-semibold text-xanh-deep mb-1 line-clamp-1">{s.document_title} - {s.heading}</div>
-                    <div className="text-xs text-muted-foreground mb-2">Độ tương đồng: {Math.round(s.similarity * 100)}%</div>
-                    <p className="text-muted-foreground line-clamp-4 text-xs">{s.content}</p>
+                    <div className="font-semibold text-xanh-deep mb-1 line-clamp-1">{srcTitle(s)}{s.heading ? ` - ${s.heading}` : ""}</div>
+                    {typeof s.similarity === "number" && (
+                      <div className="text-xs text-muted-foreground mb-2">Độ tương đồng: {Math.round(s.similarity * 100)}%</div>
+                    )}
+                    <p className="text-muted-foreground line-clamp-4 text-xs">{srcContent(s)}</p>
                   </div>
                 ))
               )}
@@ -534,6 +544,7 @@ function Bubble({
   onEdit,
   onCopy,
   copied,
+  sources,
 }: {
   role: "user" | "assistant";
   content: string;
@@ -543,6 +554,7 @@ function Bubble({
   onEdit?: () => void;
   onCopy?: () => void;
   copied?: boolean;
+  sources?: ChatSource[];
 }) {
   const isUser = role === "user";
   const metaText = [meta?.provider, meta?.model, meta?.latency_ms ? `${meta.latency_ms}ms` : ""]
@@ -567,6 +579,7 @@ function Bubble({
             animate={!!isLast}
             copied={copied}
             onCopy={onCopy}
+            sources={sources}
           />
         )}
       </div>
@@ -601,14 +614,17 @@ function AssistantResponse({
   animate,
   onCopy,
   copied,
+  sources,
 }: {
   content: string;
   metaText: string;
   animate: boolean;
   onCopy?: () => void;
   copied?: boolean;
+  sources?: ChatSource[];
 }) {
   const blocks = splitAssistantBlocks(content);
+  const citationComponents = { ...markdownComponents, ...makeCitationComponents(sources) };
   const [visibleCount, setVisibleCount] = useState(
     animate ? Math.min(1, blocks.length) : blocks.length,
   );
@@ -645,7 +661,9 @@ function AssistantResponse({
               {block.title && (
                 <div className="mb-1 font-semibold text-xanh-deep">{block.title}</div>
               )}
-              <MarkdownContent components={markdownComponents}>{block.body}</MarkdownContent>
+              <MarkdownContent components={citationComponents}>
+                {sources?.length ? linkifyCitations(block.body) : block.body}
+              </MarkdownContent>
             </div>
           </div>
         </div>
