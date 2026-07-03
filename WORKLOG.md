@@ -262,3 +262,65 @@ Biến `action_items` AI sinh trong báo cáo thành task chính thức bằng m
 **Verify:** migration đã apply Supabase (verified cột + RPC); backend pytest 68 passed/3 skipped; frontend `tsc --noEmit` + `vite build` pass; E2E RPC trên DB thật (2 task `source=report` đúng `report_id`/`due_at`, gọi lần 2 → đã-duyệt, cleanup). Deploy 6 service Railway thành công qua GitHub Actions.
 
 Docs cập nhật theo luồng: `co_che.md` (mục 5, 7, 8, 10, phụ lục A), `agents-guide.md`, `architecture-diagram.md` (mục 5), `ai-systems.md`, `giai_thich.md`, `rbac-departments.md`, `README.md`.
+
+## 2026-07-02
+
+### MCP server (expose platform) + dev-env fix + KB 6 phòng ban
+
+Ba việc từ phiên brainstorm "cải thiện dự án + áp dụng MCP + chạy & chỉnh".
+
+**MCP server (hướng A — expose platform):**
+- `pipeline/mcp_server.py`: MCP server stdio (FastMCP) làm adapter mỏng bọc `agent/chat_tools.py`, KHÔNG sửa file đó. Danh tính cố định phía server qua env `MCP_ROLE`/`MCP_SCOPE_TEAM`.
+- Ranh giới bảo mật: `scope_team` luôn từ config server, không đọc từ tham số tool → client không leo ra khỏi phòng ban. Role quyết định tool nào tồn tại (`tools_for_role`); guest chỉ `submit_feedback`.
+- Wrapper có signature rõ để FastMCP sinh input schema đúng cho client.
+- Decision `docs/harness/decisions/0009`; doc kết nối `docs/project/mcp-server.md` (kèm mẫu `claude_desktop_config.json`).
+- **Verify:** 9 test `test_mcp_server.py` pass (role filtering + escalation guard + build guards); smoke stdio boot admin OK không traceback; staff thiếu `MCP_SCOPE_TEAM` → SystemExit đúng.
+
+**Dev-env fix (phát hiện khi chạy suite):**
+- Full `pytest` crash teardown (`ValueError: I/O operation on closed file`) — **không phải** do Python version (reproduce cả 3.12 lẫn 3.14). Root cause: `pipeline/test_hybrid_rag.py` là smoke script (không phải test) reassign `sys.stdout` + gọi Cohere ở module-level, pytest collect chạy side-effect làm hỏng capture. Fix: đưa toàn bộ vào `if __name__ == "__main__":`.
+- `scikit-learn` cap `<1.7` khớp model `.joblib` pickle 1.6.1 (trước đó `>=1.6.1` kéo 1.9.0 → cảnh báo "invalid results").
+- Venv dựng lại trên Python 3.12; README ghi pin 3.11/3.12.
+- **Verify:** `pytest -q` → 145 passed, 3 skipped, 2 xfailed (trước fix: crash trước cả dòng tổng kết).
+
+**KB 6 phòng ban:**
+- Thêm SOP cho `Tài chính & Thanh toán`, `Sản phẩm`, `Quản lý Rủi ro & Gian lận` dưới `data/knowledge_base/sop/`, frontmatter `department` khớp tên chuẩn.
+- Lớp keyword phủ ngay (load `.md` runtime). Lớp vector (`graph_nodes`) cần chạy `seed_graph_kb.py` với Cohere+Supabase env — **chưa chạy** vì mutation DB dùng chung, để người vận hành chạy.
+- **Verify:** `test_kb_six_departments.py` pass (3 phòng mới có tài liệu đúng department; KB legacy vẫn tra được).
+
+**Còn lại (cần người vận hành/kết nối thật):**
+- Chạy `seed_graph_kb.py` để hybrid search phủ vector cho 3 phòng mới.
+- Kết nối Claude Desktop thật gọi thử tool qua MCP server.
+
+### MCP HTTP + auth token→role/phòng (deploy Railway, multi-user)
+
+Mở rộng MCP server sang HTTP để nhiều người dùng qua URL, không cần local.
+
+- **Auth model:** bảng `mcp_tokens` (migration `20260702000000`), lưu SHA-256 token, RLS khóa service-role. Token → (role, scope_team). Không dùng Supabase JWT passthrough (JWT hết hạn 1h, Claude Desktop không refresh được). Quyết định `decisions/0010`.
+- **`pipeline/mcp_http.py`:** FastMCP streamable-http (stateless) + ASGI AuthMiddleware (Bearer→identity qua ContextVar). `scope_team` từ token không từ args; role gate ở `call_tool`. Tắt DNS-rebinding protection (Railway host bị 421; bearer là cổng gác). `/health` bypass cho Railway healthcheck.
+- **`mcp_auth.py`:** hash/verify/issue token (+ CLI `python mcp_auth.py <role> [team]`).
+- **Deploy Railway:** service thứ 7 `mcp-http`, `pipeline/Dockerfile.mcp` (chọn qua `RAILWAY_DOCKERFILE_PATH`). URL: `https://mcp-http-production-ffd0.up.railway.app/mcp`.
+- **Verify production (thật):** `/health` 200; `/mcp` không token → 401; token manager CSKH gọi `get_feedback_summary` ra "Phòng CSKH" (226 fb); hỏi task phòng "Safety" vẫn bị ép về CSKH (scope guard qua mạng). Đăng ký `claude mcp add --transport http xanhsm-quality-remote` → ✔ Connected.
+- **Test:** `test_mcp_auth.py` + `test_mcp_http.py` (14 test); full suite 159 passed local.
+- **Trả lời "nhiều người không cần local":** ĐƯỢC — mỗi người một token (role/phòng riêng), nối qua URL, không cần clone/chạy gì.
+
+### MCP token theo tài khoản — quyền resolve live + self-service
+
+Đáp yêu cầu: kết nối MCP phải theo phòng ban được gán, và tự cập nhật khi admin nâng quyền tài khoản.
+
+- **Token gắn `user_id`** (migration `20260702010000`), KHÔNG lưu role/phòng. `verify_token` đọc `profiles.role`+`department` LIVE mỗi request → identity. Admin nâng khách→nhân viên/gán phòng thì token cũ tự phản ánh, không cấp lại.
+- **Ánh xạ:** admin→toàn hệ thống; manager/staff+có phòng→scoped; manager/staff chưa gán phòng hoặc guest→chỉ `submit_feedback`. Nhân viên chưa gán phòng KHÔNG được toàn hệ thống (đóng an toàn).
+- **`POST /api/mcp/token`** (self-service): user đăng nhập tự lấy token + câu lệnh `claude mcp add` sẵn; quyền theo tài khoản họ.
+- **Verify production (thật):** token gắn tài khoản staff (Tài chính) → `search_knowledge_base` OK, `get_feedback_summary` bị chặn theo role; identity resolve đúng từ profile (admin/manager/staff/guest) qua DB thật. Token test đã revoke.
+- **Test:** `test_mcp_auth.py` viết lại cho live-resolution (10 test); full suite 163 passed.
+- **Lưu ý deploy:** đổi `mcp_auth`/`mcp_http` → `railway up --service mcp-http` (đã làm). Endpoint `/api/mcp/token` ở service `backend` (GitHub-linked) → cần merge main hoặc `railway up --service backend` mới live.
+
+### MCP OAuth tự động — Supabase là Authorization Server (bỏ token thủ công)
+
+Nhân viên kết nối MCP bằng đăng nhập tài khoản, không tạo/copy token nữa.
+
+- **Supabase OAuth 2.1 Server** bật qua Management API (`oauth_server_enabled` + dynamic registration, `authorization_path=/oauth/authorize`). Discovery live: issuer `.../auth/v1`, có registration_endpoint.
+- **`mcp_http.py`** → OAuth Resource Server của MCP SDK: `FastMCP(token_verifier=SupabaseTokenVerifier, auth=AuthSettings(issuer=Supabase, resource=Railway))`. Bỏ AuthMiddleware/ContextVar tự chế. `/health` qua custom_route. Khôi phục `transport_security(enable_dns_rebinding_protection=False)` (rewrite làm rơi → Railway host 421).
+- **`SupabaseTokenVerifier`** (mcp_auth.py): JWT Supabase → `auth.get_user` → profiles LIVE → identity; fallback bearer `mcp_tokens`; fail-closed (JWT không profile → từ chối). 14 test.
+- **Xóa self-service:** trang `/mcp-connect`, nav "Kết nối MCP", `POST /api/mcp/token`. Giữ CLI `mcp_auth.py` + bảng mcp_tokens cho đường máy-tới-máy.
+- **Verify production thật:** deploy Railway; `/mcp` no-token → 401 + WWW-Authenticate resource_metadata; `/.well-known/oauth-protected-resource/mcp` trỏ Supabase AS; E2E JWT thật (demo admin) → 6 tool + get_hot_areas OK; `claude mcp add` không header → "Needs authentication" (OAuth mode). Full pytest 166 pass, tsc 0.
+- Decision `decisions/0011`. Token nhân viên lộ trong chat trước đó đã revoke.

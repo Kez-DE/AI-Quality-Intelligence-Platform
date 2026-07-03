@@ -4,7 +4,7 @@ supabase
 pandas
 # Pinned to the version the .joblib models were trained on (avoids
 # sklearn InconsistentVersionWarning / silent prediction drift).
-scikit-learn>=1.6.1
+scikit-learn>=1.6.1,<1.7  # cap: model .joblib pickled ở 1.6.1, >=1.7 cảnh báo "invalid results"
 google-generativeai
 apscheduler
 python-dotenv
@@ -14,3 +14,4 @@ groq==0.8.0
 pydantic-settings>=2.0.0
 httpx>=0.27.0
 cohere
+mcp>=1.28.0

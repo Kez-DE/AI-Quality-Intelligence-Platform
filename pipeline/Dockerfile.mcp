@@ -1,0 +1,19 @@
+# MCP HTTP server — streamable-http + token auth. Build context = repo root.
+# Chọn Dockerfile này trên Railway bằng biến RAILWAY_DOCKERFILE_PATH=pipeline/Dockerfile.mcp
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY pipeline/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY pipeline/ .
+COPY data/ /app/data/
+COPY .env.example /app/.env.example
+
+# Railway inject $PORT; mcp_http.py bind 0.0.0.0:$PORT, phục vụ MCP tại /mcp, health tại /health
+CMD ["python", "mcp_http.py"]

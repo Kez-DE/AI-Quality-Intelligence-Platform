@@ -31,6 +31,7 @@ Mục tiêu: giúp đội ngũ vận hành nắm bắt nhanh vấn đề chất 
 | 9 | Streaming Realtime | Ingest phản hồi theo luồng thời gian thực |
 | 10 | RBAC 4 vai trò | Phân quyền admin, manager, staff, guest |
 | 11 | Khép kín Báo cáo → Task | HI-Loop Approval: Manager biên tập hành động AI đề xuất trong báo cáo rồi duyệt một nút để tự tạo task chính thức, có liên kết ngược về báo cáo gốc |
+| 12 | MCP Server | Expose tool nghiệp vụ qua MCP (stdio) cho agent ngoài (Claude Desktop...), identity + phân quyền cố định phía server — xem [`docs/project/mcp-server.md`](docs/project/mcp-server.md) |
 
 ---
 
@@ -71,7 +72,7 @@ LLM Providers: OpenRouter, OpenAI, Gemini, Groq (cấu hình qua `LLM_PROVIDER` 
 
 ### Yêu cầu
 
-- Python 3.10+
+- Python 3.11 hoặc 3.12 (production Docker pin `python:3.11-slim`; không dùng 3.13/3.14 cho venv)
 - Node.js 18+ (khuyên 20 LTS)
 - Tài khoản Supabase cloud
 - API key LLM (tùy chọn, cần cho agent)

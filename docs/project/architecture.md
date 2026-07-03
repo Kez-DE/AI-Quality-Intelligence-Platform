@@ -188,3 +188,7 @@ Rule engine bù phần model yếu (câu ngắn, từ khóa rõ).
 ## LLM provider — failover
 
 `pipeline/agent/model_router.py` hỗ trợ nhiều provider (OpenRouter, OpenAI, Gemini, Groq) + mock. `LLM_PROVIDER=auto` → dựng chuỗi mọi provider CÓ KEY, thử lần lượt; provider lỗi (key chết, hết credit) tự nhảy sang provider kế. Hết key thật → mock (vẫn sinh alert giả lập để demo luồng). Chat, spike, multi-agent đều hưởng failover này.
+
+## MCP server (expose ra ngoài)
+
+`pipeline/mcp_server.py` là MCP server stdio cho agent ngoài (Claude Desktop, ...) truy vấn platform. Nó là **adapter mỏng** bọc `agent/chat_tools.py` — không lặp logic. Danh tính (role + phòng ban) cố định phía server qua env `MCP_ROLE`/`MCP_SCOPE_TEAM`; `scope_team` không bao giờ đọc từ tham số tool nên client không leo được ra khỏi phòng ban. Chi tiết + cấu hình Claude Desktop: [mcp-server.md](mcp-server.md). Quyết định: [decisions/0009](../harness/decisions/0009-mcp-server-expose-platform.md).
