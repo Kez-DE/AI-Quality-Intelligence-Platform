@@ -432,6 +432,8 @@ def update_task_status(task_id: str, payload: StatusUpdateReq, user: AuthUser = 
             db, task_id=task_id, actor=user, team=task_team, action="status_changed",
             from_status=cur_status, to_status=new_status,
         )
+        if new_status == "resolved":
+            _resolve_alerts_for_task(db, task_id, user)
     except HTTPException:
         raise
     except Exception as exc:
@@ -528,6 +530,17 @@ def _compute_sla_summary(alerts: list) -> dict:
     }
 
 
+def _resolve_alerts_for_task(db, task_id: str, actor) -> None:
+    """Task resolved → đóng các alert liên kết (task_id) chưa resolved. Best-effort."""
+    try:
+        db.table("alerts").update({
+            "status": "resolved", "resolved_at": "now()",
+            "resolved_by": getattr(actor, "id", None), "updated_at": "now()",
+        }).eq("task_id", task_id).neq("status", "resolved").execute()
+    except Exception:
+        pass
+
+
 @app.get("/api/alerts/sla-summary")
 def alert_sla_summary(user: AuthUser = Depends(require_ops_staff)):
     db = get_supabase()
@@ -566,6 +579,7 @@ def support_resolve(task_id: str, payload: SupportResolveReq, user: AuthUser = D
             db, task_id=task_id, actor=user, team=task_team, action="support_resolved",
             from_status=cur_status, to_status="resolved", note=payload.reply[:500],
         )
+        _resolve_alerts_for_task(db, task_id, user)
     except HTTPException:
         raise
     except Exception as exc:
