@@ -49,6 +49,10 @@ class StatusUpdateReq(BaseModel):
     status: str
 
 
+class AlertStatusReq(BaseModel):
+    status: str
+
+
 class AssignTaskReq(BaseModel):
     owner_id: Optional[str] = None
     due_at: Optional[str] = None
@@ -115,6 +119,19 @@ def _assert_transition(from_status: str | None, to_status: str) -> None:
             status_code=400,
             detail=f"Chuyển trạng thái không hợp lệ: {from_status} -> {to_status}",
         )
+
+
+# Vòng đời alert (ticket) hợp lệ: open -> in_progress -> resolved, resolved -> in_progress (mở lại).
+_ALERT_TRANSITIONS = {
+    "open": {"in_progress"},
+    "in_progress": {"resolved"},
+    "resolved": {"in_progress"},   # mở lại
+}
+
+
+def _assert_alert_transition(cur: str, new: str) -> None:
+    if new not in _ALERT_TRANSITIONS.get(cur, set()):
+        raise HTTPException(status_code=400, detail=f"Không thể chuyển ticket {cur} → {new}")
 
 
 def _log_task_event(
@@ -420,6 +437,50 @@ def update_task_status(task_id: str, payload: StatusUpdateReq, user: AuthUser = 
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot update task: {str(exc)[:300]}") from exc
     return {"status": "success", "data": data[0]}
+
+@app.patch("/api/alerts/{alert_id}/status")
+def update_alert_status(alert_id: str, payload: AlertStatusReq,
+                        user: AuthUser = Depends(require_ops_staff)):
+    new_status = payload.status
+    if new_status not in {"open", "in_progress", "resolved"}:
+        raise HTTPException(status_code=400, detail="Invalid alert status")
+    try:
+        db = get_supabase()
+        rows = db.table("alerts").select("*").eq("id", alert_id).limit(1).execute().data or []
+        if not rows:
+            raise HTTPException(status_code=404, detail="Alert not found")
+        alert = rows[0]
+        team = alert_department(alert) or alert.get("assigned_team")
+        if not can_view_team(user, team):
+            raise HTTPException(status_code=403, detail="Bạn không có quyền xử lý ticket của phòng ban khác.")
+        cur = alert.get("status") or "open"
+        _assert_alert_transition(cur, new_status)
+
+        patch = {"status": new_status, "updated_at": "now()"}
+        if new_status == "in_progress" and not alert.get("in_progress_at"):
+            patch["in_progress_at"] = "now()"
+        if new_status == "resolved":
+            patch["resolved_at"] = "now()"
+            patch["resolved_by"] = user.id
+        if new_status == "in_progress" and cur == "resolved":  # mở lại
+            patch["resolved_at"] = None
+            patch["resolved_by"] = None
+
+        data = db.table("alerts").update(patch).eq("id", alert_id).execute().data or []
+        # audit
+        try:
+            db.table("audit_logs").insert({
+                "actor_id": user.id, "actor_email": user.email,
+                "action": "alert_status_changed", "target_id": alert_id,
+                "details": {"from": cur, "to": new_status, "team": team},
+            }).execute()
+        except Exception:
+            pass
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Cannot update alert: {str(exc)[:300]}") from exc
+    return {"status": "success", "data": data[0] if data else None}
 
 @app.post("/api/tasks/{task_id}/support-resolve")
 def support_resolve(task_id: str, payload: SupportResolveReq, user: AuthUser = Depends(require_ops_staff)):
