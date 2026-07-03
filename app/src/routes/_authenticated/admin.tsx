@@ -12,6 +12,8 @@ import {
   UserCheck,
   UserCog,
   Clock,
+  Search,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -51,6 +53,7 @@ function AdminPage() {
   const me = useMe();
   const qc = useQueryClient();
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const usersQuery = useQuery({
     queryKey: ["admin-users"],
@@ -130,6 +133,16 @@ function AdminPage() {
   const managerUsers = allUsers.filter((u) => u.role === "manager");
   const staffUsers = allUsers.filter((u) => u.role === "staff");
   const adminUsers = allUsers.filter((u) => u.role === "admin");
+
+  // Tìm toàn cục theo email + tên (không phụ thuộc tab). null = không đang tìm.
+  const q = search.trim().toLowerCase();
+  const searchResults = q
+    ? allUsers.filter(
+        (u) =>
+          (u.email ?? "").toLowerCase().includes(q) ||
+          (u.full_name ?? "").toLowerCase().includes(q),
+      )
+    : null;
 
   // --- Card-based pending user ---
   const renderPendingCards = () => (
@@ -362,6 +375,26 @@ function AdminPage() {
         </div>
       </div>
 
+      {/* Ô tìm kiếm — email hoặc tên, toàn cục */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Tìm người dùng theo email hoặc tên..."
+          className="w-full h-11 pl-10 pr-10 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-xanh-green/40"
+        />
+        {search && (
+          <button
+            onClick={() => setSearch("")}
+            title="Xóa tìm kiếm"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
       {/* Content */}
       {usersQuery.isLoading ? (
         <div className="flex items-center justify-center py-16">
@@ -372,6 +405,20 @@ function AdminPage() {
           {usersQuery.error instanceof Error
             ? usersQuery.error.message
             : "Không tải được danh sách"}
+        </div>
+      ) : searchResults !== null ? (
+        <div className="space-y-3">
+          <div className="text-sm text-muted-foreground">
+            Kết quả cho "<span className="font-medium text-foreground">{search.trim()}</span>":{" "}
+            {searchResults.length} người dùng
+          </div>
+          {searchResults.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-muted/30 py-12 text-center text-sm text-muted-foreground">
+              Không tìm thấy người dùng khớp email/tên.
+            </div>
+          ) : (
+            renderActiveTable(searchResults)
+          )}
         </div>
       ) : (
         <Tabs defaultValue="pending" className="w-full">
