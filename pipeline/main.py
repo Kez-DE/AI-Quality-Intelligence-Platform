@@ -1117,6 +1117,8 @@ def review_completion_report(
         if cur is not None and (cur, target) in ALLOWED_TASK_TRANSITIONS:
             db.table("tasks").update({"status": target, "updated_at": "now()"}).eq("id", rep_task_id).execute()
             to_status = target
+        if payload.status == "approved" and to_status == "resolved":
+            _resolve_alerts_for_task(db, rep_task_id, user)  # ticket liên kết tự tick 'Đã xong'
         _log_task_event(
             db, task_id=rep_task_id, actor=user, team=team, action=action,
             from_status=cur, to_status=to_status, completion_report_id=report_id,
