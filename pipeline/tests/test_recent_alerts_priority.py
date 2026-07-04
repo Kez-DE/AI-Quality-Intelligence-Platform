@@ -30,3 +30,28 @@ def test_all_actionable_when_no_resolved_needed():
     db = FakeDB(alerts=[{"id": "o1", "status": "open", "created_at": "2026-01-01T10:00:00"}])
     data = _fetch_board_alerts(db, 100)
     assert [a["id"] for a in data] == ["o1"]
+
+
+def test_non_admin_team_filtered_in_query():
+    # Phòng khác có ticket MỚI HƠN nhiều — không được đẩy ticket phòng mình ra khỏi cửa sổ.
+    alerts = (
+        [{"id": f"it{i}", "status": "open", "assigned_team": "IT",
+          "created_at": f"2026-01-01T00:{i:02d}"} for i in range(3)]
+        + [{"id": f"cs{i}", "status": "open", "assigned_team": "CSKH",
+            "created_at": f"2026-09-01T00:{i:02d}"} for i in range(50)]
+    )
+    db = FakeDB(alerts=alerts)
+    data = _fetch_board_alerts(db, 100, team="IT")
+    assert {a["id"] for a in data} == {"it0", "it1", "it2"}
+
+
+def test_non_admin_includes_alerts_linked_to_team_tasks():
+    alerts = [
+        {"id": "own", "status": "open", "assigned_team": "IT", "created_at": "2026-01-01T00:00"},
+        {"id": "linked", "status": "in_progress", "assigned_team": "CSKH",
+         "task_id": "t-it", "created_at": "2026-01-01T00:01"},
+        {"id": "other", "status": "open", "assigned_team": "CSKH", "created_at": "2026-01-01T00:02"},
+    ]
+    db = FakeDB(alerts=alerts)
+    data = _fetch_board_alerts(db, 100, team="IT", task_ids={"t-it"})
+    assert {a["id"] for a in data} == {"own", "linked"}  # 'other' bị loại

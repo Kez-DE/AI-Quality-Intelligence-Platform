@@ -18,6 +18,7 @@ from agent import chat_completion, get_agent_status, run_chat_agent
 from agent.rag_engine import rag_chat
 from auth_guard import AuthUser, can_view_team, get_current_user, require_admin, require_manager, require_ops_staff, scoped_team
 from dispatch_utils import parse_deadline
+from db_utils import fetch_paginated
 from users_admin import router as users_router, audit_router
 from rate_limiter import RateLimiter, check_rate_limit
 from clean import mask_pii
@@ -316,25 +317,32 @@ def recent_feedback(
         raise HTTPException(status_code=503, detail=f"Cannot read feedback: {str(exc)[:300]}") from exc
     return {"status": "success", "data": data}
 
-def _fetch_board_alerts(db, fetch_limit: int) -> list:
-    """Ticket cần xử lý (open/in_progress) luôn nổi lên trước, rồi mới lấp bằng 'resolved'
-    gần nhất. Nếu chỉ order theo created_at rồi cắt limit, hàng nghìn alert 'resolved' mới hơn
-    sẽ đẩy các ticket còn mở (nhưng cũ) ra khỏi cửa sổ → board 'Phân loại Ticket' rỗng oan."""
-    actionable = db.table("alerts") \
-        .select("*") \
-        .in_("status", ["open", "in_progress"]) \
-        .order("created_at", desc=True) \
-        .limit(fetch_limit) \
-        .execute().data or []
+def _fetch_board_alerts(db, fetch_limit: int, team: str | None = None, task_ids: set | None = None) -> list:
+    """Ticket cần xử lý (open/in_progress) luôn nổi lên trước, rồi mới lấp bằng 'resolved' gần nhất
+    (nếu chỉ order created_at rồi cắt limit, hàng nghìn 'resolved' mới hơn sẽ đẩy ticket còn mở ra
+    khỏi cửa sổ → board rỗng oan).
+
+    Non-admin: lọc theo phòng NGAY TRONG QUERY (assigned_team=team, cộng alert gắn task của phòng)
+    để ticket của phòng không bị volume phòng khác chiếm hết cửa sổ limit."""
+    def _actionable(q):
+        return q.in_("status", ["open", "in_progress"]).order("created_at", desc=True).limit(fetch_limit).execute().data or []
+
+    if team:
+        actionable = _actionable(db.table("alerts").select("*").eq("assigned_team", team))
+        seen = {a["id"] for a in actionable}
+        if task_ids:  # alert gắn task của phòng dù assigned_team khác
+            linked = _actionable(db.table("alerts").select("*").in_("task_id", list(task_ids)))
+            actionable += [a for a in linked if a["id"] not in seen]
+    else:
+        actionable = _actionable(db.table("alerts").select("*"))
+
     remaining = fetch_limit - len(actionable)
     if remaining <= 0:
         return actionable
-    resolved = db.table("alerts") \
-        .select("*") \
-        .eq("status", "resolved") \
-        .order("created_at", desc=True) \
-        .limit(remaining) \
-        .execute().data or []
+    q = db.table("alerts").select("*").eq("status", "resolved")
+    if team:
+        q = q.eq("assigned_team", team)
+    resolved = q.order("created_at", desc=True).limit(remaining).execute().data or []
     return actionable + resolved
 
 
@@ -342,16 +350,17 @@ def _fetch_board_alerts(db, fetch_limit: int) -> list:
 def recent_alerts(limit: int = Query(default=100, ge=1, le=500), user: AuthUser = Depends(require_ops_staff)):
     """Alerts chỉ dành cho ops staff (staff/manager/admin). Guest không được xem.
 
-    Admin xem tất cả; ops khác chỉ xem alert có assigned_team thuộc phòng mình.
-    Ticket cũ chưa có field này được fallback qua Markdown/task_id."""
+    Admin xem tất cả; ops khác chỉ xem alert có assigned_team thuộc phòng mình (hoặc gắn task
+    của phòng)."""
     try:
         db = get_supabase()
-        fetch_limit = limit if user.role == "admin" else 500
-        data = _fetch_board_alerts(db, fetch_limit)
-        if user.role != "admin":
+        if user.role == "admin":
+            data = _fetch_board_alerts(db, limit)
+        else:
             own_team = scoped_team(user, None)
             task_rows = db.table("tasks").select("id").eq("assigned_team", own_team).execute().data or []
             task_ids = {t["id"] for t in task_rows if t.get("id")}
+            data = _fetch_board_alerts(db, 500, team=own_team, task_ids=task_ids)
             data = [
                 alert for alert in data
                 if alert_department(alert) == own_team or alert.get("task_id") in task_ids
@@ -561,9 +570,12 @@ def _resolve_alerts_for_task(db, task_id: str, actor) -> None:
 @app.get("/api/alerts/sla-summary")
 def alert_sla_summary(user: AuthUser = Depends(require_ops_staff)):
     db = get_supabase()
-    rows = db.table("alerts").select(
-        "status,sla_due_at,created_at,in_progress_at,resolved_at,assigned_team,topic,severity"
-    ).order("created_at", desc=True).limit(1000).execute().data or []
+    # Phân trang: SLA phải tính trên TẤT CẢ alert, không bị cap 1000 làm lệch MTTA/MTTR.
+    rows = fetch_paginated(
+        lambda: db.table("alerts").select(
+            "status,sla_due_at,created_at,in_progress_at,resolved_at,assigned_team,topic,severity"
+        ).order("created_at", desc=True)
+    )
     if user.role != "admin":
         rows = [a for a in rows if can_view_team(user, alert_department(a) or a.get("assigned_team"))]
     return {"status": "success", "data": _compute_sla_summary(rows)}

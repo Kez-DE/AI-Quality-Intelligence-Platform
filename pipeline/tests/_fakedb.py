@@ -22,6 +22,7 @@ class _Query:
         self._filters = []       # (kind, col, val)
         self._limit = None
         self._order = None
+        self._range = None       # (start, end) inclusive — PostgREST .range()
 
     def eq(self, col, val):
         self._filters.append(("eq", col, val)); return self
@@ -40,6 +41,9 @@ class _Query:
 
     def order(self, col, desc=False):
         self._order = (col, desc); return self
+
+    def range(self, start, end):
+        self._range = (start, end); return self  # inclusive, tối đa PostgREST cap
 
     def _match(self, row):
         for kind, col, val in self._filters:
@@ -61,6 +65,9 @@ class _Query:
             if self._order:
                 col, desc = self._order
                 out.sort(key=lambda r: (r.get(col) is None, r.get(col)), reverse=desc)
+            if self._range is not None:
+                start, end = self._range
+                out = out[start : end + 1]  # PostgREST .range() inclusive
             if self._limit is not None:
                 out = out[: self._limit]
             return _Result(out)

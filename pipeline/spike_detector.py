@@ -6,6 +6,7 @@ from supabase import Client, create_client
 from agents.router_agent import route_ticket
 from agents.ticket_agent import create_or_update_ticket
 from clean import mask_pii
+from db_utils import fetch_paginated
 from departments import alert_department
 from env_config import get_settings, get_supabase_config, has_supabase_admin_key
 from llm_agent import analyze_spike
@@ -122,15 +123,14 @@ def detect_spikes(
     now = datetime.now(timezone.utc)
     since = (now - timedelta(hours=hours)).isoformat()
 
-    response = (
-        db.table("feedback")
+    # Phân trang: PostgREST cap 1000/response nên .limit(max_feedback>1000) sẽ quét thiếu data.
+    data = fetch_paginated(
+        lambda: db.table("feedback")
         .select("id,text,area,severity,overall_risk,topic,sentiment")
         .gte("created_at", since)
-        .order("created_at", desc=True)
-        .limit(max_feedback)
-        .execute()
+        .order("created_at", desc=True),
+        cap=max_feedback,
     )
-    data = response.data or []
     if not data:
         return {"spikes_detected": 0, "records_scanned": 0, "alerts_created": 0}
 

@@ -10,7 +10,7 @@ from spike_detector import _select_candidates, detect_spikes
 
 def _query(data):
     query = MagicMock()
-    for method in ("select", "gte", "order", "limit"):
+    for method in ("select", "gte", "order", "limit", "range"):
         getattr(query, method).return_value = query
     query.execute.return_value = MagicMock(data=data)
     return query
