@@ -1,7 +1,7 @@
 ---
 document_title: Lịch sử Ticket P5 đã xử lý thành công (CASE-P5-2026)
 category: case_study
-department: Safety
+department: Vận hành
 severity_scope: [P4, P5]
 source: mock
 tags: [case-study, few-shot, ticket-mau, p5, da-giai-quyet]

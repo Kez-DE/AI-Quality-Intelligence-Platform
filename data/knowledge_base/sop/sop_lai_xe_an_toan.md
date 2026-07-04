@@ -1,7 +1,7 @@
 ---
 document_title: Quy trình xử lý vi phạm An toàn Giao thông - Lái xe nguy hiểm (SOP-SAFETY-02)
 category: safety
-department: Safety
+department: Vận hành
 severity_scope: [P4, P5]
 source: mock
 tags: [chay-au, vuot-den-do, lang-lach, toc-do, an-toan, say-xin]

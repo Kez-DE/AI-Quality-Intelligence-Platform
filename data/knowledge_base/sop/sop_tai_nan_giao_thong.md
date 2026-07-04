@@ -1,7 +1,7 @@
 ---
 document_title: Quy trình xử lý Tai nạn Giao thông (SOP-SAFETY-01)
 category: safety
-department: Safety
+department: Vận hành
 severity_scope: [P5]
 source: mock
 tags: [tai-nan, khan-cap, cong-an, cap-cuu, bao-hiem]

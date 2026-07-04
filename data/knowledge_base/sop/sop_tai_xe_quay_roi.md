@@ -1,7 +1,7 @@
 ---
 document_title: Quy trình xử lý Quấy rối & Hành vi đe dọa an toàn (SOP-SAFETY-02)
 category: safety
-department: Safety
+department: Vận hành
 severity_scope: [P5]
 source: mock
 tags: [quay-roi, sam-so, de-doa, say-xin, khoa-tai-khoan]

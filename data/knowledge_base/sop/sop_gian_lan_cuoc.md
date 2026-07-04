@@ -1,7 +1,7 @@
 ---
 document_title: Quy trình xử lý Gian lận Cước & Vòi vĩnh (SOP-SAFETY-03)
 category: fraud
-department: Safety
+department: Quản lý Rủi ro & Gian lận
 severity_scope: [P4, P5]
 source: mock
 tags: [gian-lan, voi-vinh, thu-them-tien, doi-soat, khoa-tai-khoan]

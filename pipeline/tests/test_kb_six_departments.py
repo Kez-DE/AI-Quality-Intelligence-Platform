@@ -12,7 +12,9 @@ def test_each_new_department_has_kb_docs():
             f"Không có chunk gắn đúng department={dept}"
 
 
-def test_legacy_kb_still_searchable():
-    # phòng legacy vẫn ra kết quả — không làm hỏng KB cũ
-    results = search_knowledge("tai nạn giao thông", department="Safety", top_k=3)
-    assert results
+def test_safety_sops_searchable_under_van_hanh():
+    # SOP an toàn/tai nạn thuộc phòng Vận hành (topic Safety route về Vận hành).
+    # Trước đây bị gắn nhầm department="Safety" (không phải 1 trong 6 phòng) nên ops
+    # không tra cứu được — nay đã sửa.
+    results = search_knowledge("tai nạn giao thông", department="Vận hành", top_k=5)
+    assert any(r["doc_id"] == "sop_tai_nan_giao_thong.md" for r in results)
