@@ -518,12 +518,12 @@ def update_alert_status(alert_id: str, payload: AlertStatusReq,
             patch["resolved_at"] = None
             patch["resolved_by"] = None
 
-        # Tiếp nhận (open→in_progress): tạo/gắn task cho cụm (phòng, khu vực) để manager giao việc.
+        # Tiếp nhận (open→in_progress): tạo task DÀNH RIÊNG cho ticket (1:1) để manager giao việc.
         if new_status == "in_progress" and not alert.get("task_id"):
-            from agents.task_agent import find_or_create_cluster_task
+            from agents.task_agent import create_ticket_task
             team_for_task = team or "CSKH"
             title = (alert.get("title") or f"Xử lý sự cố {alert.get('topic') or ''}").strip()[:80]
-            new_task_id = find_or_create_cluster_task(
+            new_task_id = create_ticket_task(
                 db, team_for_task, alert.get("area"), alert.get("priority"),
                 title, (alert.get("description") or "")[:300])
             if new_task_id:
