@@ -316,6 +316,28 @@ def recent_feedback(
         raise HTTPException(status_code=503, detail=f"Cannot read feedback: {str(exc)[:300]}") from exc
     return {"status": "success", "data": data}
 
+def _fetch_board_alerts(db, fetch_limit: int) -> list:
+    """Ticket cần xử lý (open/in_progress) luôn nổi lên trước, rồi mới lấp bằng 'resolved'
+    gần nhất. Nếu chỉ order theo created_at rồi cắt limit, hàng nghìn alert 'resolved' mới hơn
+    sẽ đẩy các ticket còn mở (nhưng cũ) ra khỏi cửa sổ → board 'Phân loại Ticket' rỗng oan."""
+    actionable = db.table("alerts") \
+        .select("*") \
+        .in_("status", ["open", "in_progress"]) \
+        .order("created_at", desc=True) \
+        .limit(fetch_limit) \
+        .execute().data or []
+    remaining = fetch_limit - len(actionable)
+    if remaining <= 0:
+        return actionable
+    resolved = db.table("alerts") \
+        .select("*") \
+        .eq("status", "resolved") \
+        .order("created_at", desc=True) \
+        .limit(remaining) \
+        .execute().data or []
+    return actionable + resolved
+
+
 @app.get("/api/alerts/recent")
 def recent_alerts(limit: int = Query(default=100, ge=1, le=500), user: AuthUser = Depends(require_ops_staff)):
     """Alerts chỉ dành cho ops staff (staff/manager/admin). Guest không được xem.
@@ -325,12 +347,7 @@ def recent_alerts(limit: int = Query(default=100, ge=1, le=500), user: AuthUser 
     try:
         db = get_supabase()
         fetch_limit = limit if user.role == "admin" else 500
-        data = db.table("alerts") \
-            .select("*") \
-            .order("created_at", desc=True) \
-            .limit(fetch_limit) \
-            .execute() \
-            .data or []
+        data = _fetch_board_alerts(db, fetch_limit)
         if user.role != "admin":
             own_team = scoped_team(user, None)
             task_rows = db.table("tasks").select("id").eq("assigned_team", own_team).execute().data or []
