@@ -23,6 +23,16 @@ def find_or_create_cluster_task(db, team, area, priority, title, summary=""):
     }).execute()
     return ins.data[0]["id"] if ins.data else None
 
+def create_ticket_task(db, team, area, priority, title, summary=""):
+    """LUÔN tạo task MỚI dành riêng cho 1 ticket (source='ticket', gắn 1:1 với alert).
+    Khác find_or_create_cluster_task: không tái dùng task cụm."""
+    ins = db.table("tasks").insert({
+        "title": title, "summary": summary, "assigned_team": team, "area": area,
+        "topic": "General", "priority": priority or "P2", "status": "open",
+        "source": "ticket",
+    }).execute()
+    return ins.data[0]["id"] if ins.data else None
+
 def cluster_alerts_into_tasks() -> Dict[str, Any]:
     """
     Thuật toán gom cụm Heuristic-First (Zero-LLM cho việc gom):
