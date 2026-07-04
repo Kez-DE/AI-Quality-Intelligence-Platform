@@ -174,16 +174,23 @@ function AlertsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [stream, setStream] = useState<LiveStreamStatus | null>(null);
   const [sla, setSla] = useState<SlaSummary | null>(null);
+  const [counts, setCounts] = useState<{ open: number; in_progress: number; resolved: number } | null>(null);
 
   async function fetchAlerts(showLoading = false) {
     if (showLoading) setLoading(true);
     try {
+      // Lọc status ở SERVER: board mặc định ưu tiên actionable nên không tự trả 'resolved';
+      // chọn '🟢 Đã xong' sẽ nạp đúng ticket đã đóng để xem.
+      const statusParam = statusFilter !== "all" ? `&status=${statusFilter}` : "";
       const [alertsJson, statusJson, slaJson] = await Promise.all([
-        apiFetch<{ data?: Alert[] }>("/api/alerts/recent?limit=100"),
+        apiFetch<{ data?: Alert[]; counts?: { open: number; in_progress: number; resolved: number } }>(
+          `/api/alerts/recent?limit=100${statusParam}`,
+        ),
         apiFetch<{ data?: LiveStreamStatus }>("/api/live-stream/status"),
         apiFetch<{ data?: SlaSummary }>("/api/alerts/sla-summary"),
       ]);
       setAlerts(alertsJson.data ?? []);
+      setCounts(alertsJson.counts ?? null);
       setStream(statusJson.data ?? null);
       setSla(slaJson.data ?? null);
     } catch {
@@ -207,7 +214,8 @@ function AlertsPage() {
       window.clearInterval(polling);
       supabase.removeChannel(channel);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);  // đổi filter trạng thái → nạp lại đúng status ở server
 
   async function updateStatus(id: string, newStatus: string) {
     setUpdating(id);
@@ -250,10 +258,11 @@ function AlertsPage() {
     return true;
   });
 
-  // Thống kê nhanh
-  const openCount = alerts.filter((a) => a.status === "open").length;
-  const inProgressCount = alerts.filter((a) => a.status === "in_progress").length;
-  const resolvedCount = alerts.filter((a) => a.status === "resolved").length;
+  // Thống kê nhanh — ưu tiên count THẬT từ server (list bị cắt limit nên không suy được
+  // 'Đã xong' chính xác). Fallback về đếm trên list nếu backend chưa trả counts.
+  const openCount = counts?.open ?? alerts.filter((a) => a.status === "open").length;
+  const inProgressCount = counts?.in_progress ?? alerts.filter((a) => a.status === "in_progress").length;
+  const resolvedCount = counts?.resolved ?? alerts.filter((a) => a.status === "resolved").length;
   const teamCounts = Object.fromEntries(
     ALL_TEAMS.map((team) => [
       team,

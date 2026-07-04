@@ -346,30 +346,54 @@ def _fetch_board_alerts(db, fetch_limit: int, team: str | None = None, task_ids:
     return actionable + resolved
 
 
+def _alert_status_counts(db, team: str | None = None) -> dict:
+    """Đếm alert theo trạng thái NGAY TRÊN DB (không suy từ list bị cắt limit — nếu không,
+    'Đã xong' luôn = 0 khi actionable đã lấp đủ cửa sổ)."""
+    counts = {}
+    for st in ("open", "in_progress", "resolved"):
+        q = db.table("alerts").select("id", count="exact").eq("status", st)
+        if team:
+            q = q.eq("assigned_team", team)
+        counts[st] = q.limit(1).execute().count or 0
+    return counts
+
+
 @app.get("/api/alerts/recent")
-def recent_alerts(limit: int = Query(default=100, ge=1, le=500), user: AuthUser = Depends(require_ops_staff)):
+def recent_alerts(limit: int = Query(default=100, ge=1, le=500),
+                  status: str | None = Query(default=None),
+                  user: AuthUser = Depends(require_ops_staff)):
     """Alerts chỉ dành cho ops staff (staff/manager/admin). Guest không được xem.
 
-    Admin xem tất cả; ops khác chỉ xem alert có assigned_team thuộc phòng mình (hoặc gắn task
-    của phòng)."""
+    Admin xem tất cả; ops khác chỉ xem alert phòng mình (hoặc gắn task của phòng).
+    `status` (open/in_progress/resolved): lọc đúng trạng thái ở server để xem được cả 'resolved'
+    (board mặc định ưu tiên actionable nên không tự trả 'resolved'). `counts`: đếm thật trên DB."""
     try:
         db = get_supabase()
         if user.role == "admin":
-            data = _fetch_board_alerts(db, limit)
+            team, task_ids = None, None
         else:
-            own_team = scoped_team(user, None)
-            task_rows = db.table("tasks").select("id").eq("assigned_team", own_team).execute().data or []
+            team = scoped_team(user, None)
+            task_rows = db.table("tasks").select("id").eq("assigned_team", team).execute().data or []
             task_ids = {t["id"] for t in task_rows if t.get("id")}
-            data = _fetch_board_alerts(db, 500, team=own_team, task_ids=task_ids)
+        counts = _alert_status_counts(db, team)
+        fetch_limit = limit if user.role == "admin" else 500
+        if status in ("open", "in_progress", "resolved"):
+            q = db.table("alerts").select("*").eq("status", status)
+            if team:
+                q = q.eq("assigned_team", team)
+            data = q.order("created_at", desc=True).limit(fetch_limit).execute().data or []
+        else:
+            data = _fetch_board_alerts(db, fetch_limit, team=team, task_ids=task_ids)
+        if team:
             data = [
                 alert for alert in data
-                if alert_department(alert) == own_team or alert.get("task_id") in task_ids
+                if alert_department(alert) == team or alert.get("task_id") in task_ids
             ][:limit]
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot read alerts: {str(exc)[:300]}") from exc
-    return {"status": "success", "data": data}
+    return {"status": "success", "data": data, "counts": counts}
 
 @app.get("/api/tasks")
 def list_tasks(
