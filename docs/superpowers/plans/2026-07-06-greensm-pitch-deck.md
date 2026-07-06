@@ -13,7 +13,8 @@
 - Cấu trúc 10 phút: **3 phút bài toán (S1–S4) / 5 phút sản phẩm (S5–S10) / 2 phút kết (S11–S12)**. KHÔNG có slide gọi vốn.
 - Khổ slide 16:9 (13.333 × 7.5 inch), tiếng Việt, mỗi slide có speaker notes.
 - Thương hiệu: dùng tên **Green SM** (tên mới của Xanh SM); màu chủ đạo xanh `#0E7C55`, nền trắng `#FFFFFF`, chữ `#171D1A`, phụ `#5B655F`.
-- Số liệu chỉ dùng số THẬT đã kiểm chứng: App Store VN **4.8★ / 1,5 triệu đánh giá**; ra mắt 14/04/2023; 34 tỉnh thành; 4 quốc gia (VN, Lào, Philippines, Indonesia); pipeline: **77%** topic, **94%+** sentiment, **97%** recall negative, **~5.000 review < 2 phút**, **6/6** test case.
+- Số liệu chỉ dùng số THẬT đã kiểm chứng: App Store VN **4.8★ / 1,5 triệu đánh giá**; ra mắt 14/04/2023; 34 tỉnh thành; 4 quốc gia (VN, Lào, Philippines, Indonesia); pipeline: **77,1%** topic (test 932 mẫu), **94,3%** sentiment, **97%** recall negative, **4.837 review / 97 giây**, **6/6** test case; spike: P5 đơn lẻ → alert ngay, ≥3 ca P4 cùng khu vực → WARNING, ≥10 ca âm → CRITICAL, dedup cooldown 60 phút; SLA routing: Safety → Vận hành 1 giờ, App Issue → IT 12 giờ, Payment → CSKH 12 giờ.
+- **KHÔNG có slide phân quyền/role.** Mạch chính (yêu cầu bổ sung 2026-07-06, tham khảo `/Users/kenz_de/AI_20k slide /xanhQuocAnh.pptx`): bài toán tổng quan → quy trình sản phẩm → cơ chế con người / human-in-the-loop → vòng lặp vận hành khép kín. Trình bày ý chính, không sa đà chi tiết.
 - Ẩn dụ xuyên suốt phần sản phẩm: **phòng cấp cứu** (giữ nguyên từ kịch bản v4).
 - Output: `docs/project/slides/GreenSM-Pitch-10min.pptx`, `docs/project/slides/GreenSM-pitch-script.html`, ảnh trong `docs/project/slides/assets/pitch/`.
 - File tham chiếu CSS kịch bản: `/Users/kenz_de/AI_20k slide /xanhSM-presentation-script-v4.html` (chú ý dấu cách cuối tên thư mục `AI_20k slide `).
@@ -140,25 +141,26 @@ Cấu trúc file: giữ nguyên khung `<html lang="vi">`, khối `<style>` copy 
 > Nguyên tắc vận hành: phần rẻ và nhanh xử lý mọi ca; AI ngôn ngữ lớn chỉ được gọi khi cần suy luận sâu; **an toàn luôn thắng xác suất**; và một bộ phận trục trặc thì cả hệ thống vẫn đứng vững.
 
 **S6 · Chặng 1–3: Làm sạch → AI đọc lướt → Luật an toàn ghi đè (3:50–4:50)**
-> Bắt đầu từ cửa vào. Bước một: **che thông tin riêng tư** — số điện thoại, email, biển số — trước khi bất kỳ ai hay máy nào đọc. Bước hai: một **bộ phân loại AI nhanh và rẻ** gán chủ đề, cảm xúc, mức nghiêm trọng trong chưa đầy một phần mười giây — độ chính xác đo được: 77% chủ đề, hơn 94% cảm xúc. Bước ba: **tập luật an toàn** đóng vai bác sĩ trực, sẵn sàng ghi đè AI.
+> Bắt đầu từ cửa vào. Bước một: **che thông tin riêng tư** — số điện thoại, email, biển số — trước khi bất kỳ ai hay máy nào đọc. Bước hai: một **bộ phân loại AI nhanh và rẻ** gán chủ đề, cảm xúc, mức nghiêm trọng trong chưa đầy một phần mười giây — độ chính xác đo được: 77,1% chủ đề, 94,3% cảm xúc, và nó hiểu cả câu phủ định tiếng Việt. Bước ba: **tập luật an toàn** đóng vai bác sĩ trực, sẵn sàng ghi đè AI.
 > Ví dụ thật, không dàn dựng: *"Tài xế say xỉn gây tai nạn, xe tông người rồi bỏ chạy."* AI đọc lướt đoán mức trung bình. Luật an toàn bắt được "tai nạn", "bỏ chạy" — **ghi đè ngay thành mức khẩn cấp cao nhất**, bắt buộc người thật phải xem.
 > Điều quan trọng nhất của cả hệ thống: **khi nghi ngờ về an toàn, máy không được phép tự tin hơn sự thận trọng.**
 
 **S7 · Chặng 4–5: Ổ dịch → Báo động → Đúng chuyên khoa (4:50–5:40)**
-> Một ca đơn lẻ là cá biệt. Nhưng nhiều ca giống nhau dồn về cùng khu vực trong thời gian ngắn — đó là một **ổ dịch**. Hệ thống theo dõi liên tục: một ca khẩn cấp là báo ngay; nhiều ca cùng lúc là báo động đỏ; và nó tự biết chờ để không báo trùng lặp làm loãng tín hiệu.
-> Báo động nổi lên thì gọi ai? Một **bảng phân khoa** quyết định: an toàn về đội vận hành trong vòng một giờ, lỗi app về kỹ thuật, thanh toán về chăm sóc khách hàng — đủ **sáu phòng ban**.
-> Thực dụng nhất: đổi luật phân khoa chỉ cần sửa một tệp cấu hình — **không viết lại dòng code nào.**
+> Một ca đơn lẻ là cá biệt. Nhưng nhiều ca giống nhau dồn về cùng khu vực trong thời gian ngắn — đó là một **ổ dịch**. Hệ thống theo dõi liên tục, với ngưỡng rõ ràng: một ca khẩn cấp nhất — báo ngay lập tức; từ ba ca mức cao cùng khu vực — cảnh báo vàng; từ mười ca tiêu cực — báo động đỏ. Và nó tự biết chờ 60 phút trước khi báo lại cùng một chuyện — không làm loãng tín hiệu.
+> Báo động nổi lên thì gọi ai? Một **bảng phân khoa** quyết định kèm cam kết thời gian: an toàn về đội vận hành trong vòng **1 giờ**, lỗi app về kỹ thuật trong 12 giờ, thanh toán về chăm sóc khách hàng — đủ sáu phòng ban.
+> Thực dụng nhất: đổi luật phân khoa chỉ cần sửa một tệp cấu hình — **không viết lại dòng code nào, không triển khai lại.**
 
-**S8 · Chặng 6–7: Từ báo động đến việc thật — và con người quyết định (5:40–6:40)**
-> Có báo động rồi — ai biến nó thành việc phải làm? Hai con đường. Đường **tự động**: hệ thống gom báo động cùng loại, tự lập đầu việc, không trùng, không rơi rớt. Đường **có người kiểm soát**: AI viết báo cáo đề xuất, quản lý đọc, chỉnh, bấm duyệt — công việc xuất hiện ngay trên bảng theo dõi. **Máy đề xuất. Người quyết định.**
-> Và bốn tình huống bắt buộc người thật phải xem: mức khẩn cấp cao nhất, AI không chắc chắn, câu mập mờ, hoặc có người chủ động yêu cầu. Mỗi lần con người sửa AI đều được ghi sổ: ai sửa, sửa gì, lúc nào. **Sai một lần, sửa một lần, hệ thống thông minh hơn một chút.**
+**S8 · Chặng 6: Từ báo động đến việc thật (5:40–6:30)**
+> Có báo động rồi — ai biến nó thành việc phải làm? Hai con đường. Đường **tự động**: hệ thống gom các báo động cùng phòng ban, cùng khu vực; nếu chưa có ai xử lý, nó tự lập một đầu việc — mỗi cụm chỉ một việc đang mở, không trùng, không rơi rớt. Đường **có người kiểm soát**: AI viết bản báo cáo đề xuất — nguyên nhân gốc là gì, nên làm gì; quản lý đọc, thêm bớt chỉnh sửa từng đầu việc nháp, rồi bấm **một nút duyệt** — duyệt và tạo việc xảy ra trong cùng một hành động, việc xuất hiện ngay trên bảng theo dõi kèm đường link ngược về báo cáo gốc.
+> **Máy đề xuất. Người quyết định. Hệ thống thực thi trọn vẹn.**
 
-**S9 · Ai được thấy gì (6:40–7:20)**
-> Một hệ thống đọc được toàn bộ tiếng nói khách hàng thì phải cực kỳ nghiêm ngặt về chuyện ai thấy gì. Hai câu hỏi luôn đi cùng nhau: bạn là **ai** — để biết được làm gì; bạn thuộc **phòng nào** — để biết được thấy dữ liệu của ai.
-> Quản lý phòng kỹ thuật đăng nhập: thấy việc phòng mình, hỏi trợ lý AI cũng chỉ nhận câu trả lời trong phạm vi phòng mình. Cố mở dữ liệu phòng khác — kể cả gọi thẳng vào hệ thống, bỏ qua giao diện — câu trả lời luôn là: **không được phép**. Sự cho phép nằm ở lõi hệ thống, không phải cái nút bị ẩn đi.
+**S9 · Chặng 7: Con người trong vòng lặp (6:30–7:20)**
+> Chặng cuối là lý do chúng tôi dám tin hệ thống này: **con người luôn có tiếng nói cuối cùng.** Bốn tình huống bắt buộc người thật phải xem: mức khẩn cấp cao nhất hoặc chạm từ khóa an toàn; AI không chắc chắn về nhãn mình gán; câu quá ngắn, tín hiệu mơ hồ; hoặc có người chủ động yêu cầu xem lại.
+> Người duyệt có ba lựa chọn: đồng ý với AI, sửa lại nhãn nếu AI sai, hoặc đánh dấu đã xử lý. Và mỗi lần sửa đều được ghi sổ đầy đủ: ai sửa, sửa trường nào, từ nhãn gì thành nhãn gì, lúc nào. Cuốn sổ đó có hai vai trò: hồ sơ kiểm tra lại sau này — và dữ liệu để AI học lại.
+> **AI gán sai → người sửa → hệ thống ghi nhớ → AI giỏi hơn.** Sai một lần, sửa một lần, thông minh hơn một chút — vòng học không bao giờ dừng.
 
 **S10 · Bằng chứng — chạy thật, đo thật (7:20–8:00)**
-> Nói thì dễ, nên đây là số đo được: nhận diện chủ đề **77%**; cảm xúc **hơn 94%** — và gần như không bỏ sót phản hồi tiêu cực nào: **97%**. Gần **5.000 review xử lý trong chưa đầy 2 phút**. **6 trên 6** tình huống kiểm thử — ca an toàn, ca gian lận, ca mập mờ — đều ra đúng kết quả.
+> Nói thì dễ, nên đây là số đo được: nhận diện chủ đề **77,1%** — đo trên gần một nghìn mẫu kiểm thử độc lập; cảm xúc **94,3%** — và gần như không bỏ sót phản hồi tiêu cực nào: **97%**. **4.837 review xử lý trong 97 giây**. **6 trên 6** tình huống kiểm thử — ca an toàn, ca gian lận, ca phủ định, ca mập mờ — đều ra đúng kết quả.
 > Đây không phải số chọn lọc để trình diễn — mọi con số tái lập được bằng bộ kiểm thử nằm trong mã nguồn.
 
 **S11 · Chúng tôi biết mình đang ở đâu (8:00–8:50)**
@@ -167,12 +169,12 @@ Cấu trúc file: giữ nguyên khung `<html lang="vi">`, khối `<style>` copy 
 
 *Cue: giọng tự tin, không xin lỗi. Nhấn chậm câu "chỉ hiện trên màn hình web" — điểm chạm cảm xúc mạnh nhất.*
 
-**S12 · Kết — Tầm nhìn (8:50–10:00)**
-> Nhớ ca trực 2 giờ sáng đầu buổi không? Với hệ thống này: review vào, AI đọc và phân loại, báo động nổi đúng lúc, quản lý duyệt, nhân viên xử lý — vòng lặp khép kín, mỗi ngày, **không ai phải thức trắng đêm dò từng dòng review.**
+**S12 · Kết — Vòng lặp vận hành đã khép + Tầm nhìn (8:50–10:00)**
+> Nhớ ca trực 2 giờ sáng đầu buổi không? Đây là điều thay đổi: **review vào → AI phân loại → báo động nổi đúng lúc → quản lý duyệt → nhân viên xử lý → việc hoàn thành** — và vòng lặp quay lại từ đầu, mỗi ngày, tự động, có kiểm soát, **không ai phải thức trắng đêm dò từng dòng review.**
 > Tầm nhìn của chúng tôi không dừng ở một ứng dụng gọi xe. Mọi nền tảng tiêu dùng ở Việt Nam đều đang ngồi trên hàng triệu tiếng nói khách hàng chưa được lắng nghe. Trong 3 đến 5 năm tới, chúng tôi muốn hệ thống này trở thành **tầng lắng nghe tiêu chuẩn** cho các nền tảng ấy — nơi mọi lời phàn nàn đều được đọc, được định tuyến, và trở thành hành động.
 > Vì **một lời phàn nàn không được đọc là một sự cố đang chờ xảy ra lần nữa.** Với chúng tôi — nó sẽ được đọc. Cảm ơn hội đồng. Chúng tôi sẵn sàng cho phần hỏi đáp.
 
-Phần Q&A dự phòng: giữ nguyên 6 câu hỏi/đáp từ file v4 (bảo mật tầng dữ liệu, data thật/giả, vì sao ML nhỏ + LLM, luật vs AI mâu thuẫn, LLM sập, 6 test case có đủ không).
+Phần Q&A dự phòng: giữ nguyên 6 câu hỏi/đáp từ file v4 (bảo mật tầng dữ liệu, data thật/giả, vì sao ML nhỏ + LLM, luật vs AI mâu thuẫn, LLM sập, 6 test case có đủ không) — nhưng cập nhật số trong câu trả lời: 77,1% chủ đề (932 mẫu), 94,3% cảm xúc, tập dữ liệu 4.837 review.
 
 - [ ] **Step 2: Kiểm tra file mở được và khớp cấu trúc**
 
@@ -337,35 +339,36 @@ def split_slide(kick, ttl, items, img, note):
 
 split_slide("PHẦN 2 · SẢN PHẨM", "Chặng 1–3 · Làm sạch → AI đọc lướt → Luật ghi đè", [
     ("Che PII trước tiên.", "SĐT, email, biển số — trước khi người hay máy đọc."),
-    ("AI nhanh & rẻ, <0,1s/review.", "77% chủ đề · 94%+ cảm xúc."),
+    ("AI nhanh & rẻ, <0,1s/review.", "77,1% chủ đề · 94,3% cảm xúc · hiểu phủ định tiếng Việt."),
     ("Ví dụ thật:", "“Tài xế say xỉn gây tai nạn… bỏ chạy” — AI đoán mức trung bình, luật an toàn GHI ĐÈ → khẩn cấp cao nhất, bắt buộc người xem."),
     ("Nguyên tắc:", "khi nghi ngờ an toàn, máy không được tự tin hơn sự thận trọng."),
 ], f"{A}/ui-feedback.png", "3:50–4:50 · Đi chậm ở ví dụ thật; chỉ vào screenshot màn Phản hồi.")
 
 split_slide("PHẦN 2 · SẢN PHẨM", "Chặng 4–5 · Ổ dịch → Báo động → Đúng chuyên khoa", [
-    ("1 ca là cá biệt — nhiều ca cùng nơi, cùng lúc là Ổ DỊCH.", "Theo dõi liên tục, tự chờ để không báo trùng."),
-    ("Bảng phân khoa 6 phòng ban.", "An toàn → vận hành trong 1 giờ; lỗi app → kỹ thuật; thanh toán → CSKH."),
-    ("Đổi luật phân khoa = sửa 1 file cấu hình.", "Không viết lại dòng code nào."),
+    ("Ngưỡng rõ ràng:", "1 ca khẩn cấp nhất → báo NGAY · ≥3 ca mức cao cùng khu vực → cảnh báo · ≥10 ca tiêu cực → báo động đỏ · chờ 60 phút mới báo lại."),
+    ("Bảng phân khoa 6 phòng ban, kèm SLA.", "An toàn → vận hành trong 1 GIỜ; lỗi app → kỹ thuật 12h; thanh toán → CSKH 12h."),
+    ("Đổi luật phân khoa = sửa 1 file cấu hình.", "Không viết lại dòng code nào, không triển khai lại."),
 ], f"{A}/ui-ticket.png", "4:50–5:40 · Chỉ màn Phân loại ticket; nhấn câu 'không viết lại code'.")
 
-split_slide("PHẦN 2 · SẢN PHẨM", "Chặng 6–7 · Từ báo động đến việc thật — người quyết định", [
-    ("Đường tự động:", "gom báo động cùng loại → tự lập đầu việc, không trùng, không rơi rớt."),
-    ("Đường có kiểm soát:", "AI viết báo cáo đề xuất → quản lý sửa & bấm duyệt → việc xuất hiện trên bảng."),
-    ("MÁY ĐỀ XUẤT. NGƯỜI QUYẾT ĐỊNH.", "4 tình huống bắt buộc người xem; mọi lần sửa đều ghi sổ — hệ thống học từ từng lần sửa."),
-], f"{A}/ui-report.png", "5:40–6:40 · Màn Báo cáo AI + bảng công việc; câu đinh: máy đề xuất, người quyết định.")
+split_slide("PHẦN 2 · SẢN PHẨM", "Chặng 6 · Từ báo động đến việc thật", [
+    ("Đường tự động:", "gom báo động cùng phòng ban + khu vực → tự lập đầu việc; mỗi cụm chỉ 1 việc đang mở — không trùng, không rơi rớt."),
+    ("Đường có kiểm soát:", "AI viết báo cáo đề xuất (nguyên nhân gốc + việc nháp) → quản lý thêm/sửa/xóa → bấm 1 nút duyệt = duyệt + tạo việc trong cùng một hành động, kèm link ngược báo cáo gốc."),
+    ("MÁY ĐỀ XUẤT. NGƯỜI QUYẾT ĐỊNH.", "Hệ thống thực thi trọn vẹn."),
+], f"{A}/ui-report.png", "5:40–6:30 · Màn Báo cáo AI; câu đinh: máy đề xuất, người quyết định.")
 
-split_slide("PHẦN 2 · SẢN PHẨM", "Ai được thấy gì — phân quyền ở lõi hệ thống", [
-    ("Bạn là AI → được làm gì.", "4 vai trò: Khách · Nhân viên · Quản lý · Admin."),
-    ("Bạn thuộc PHÒNG NÀO → thấy dữ liệu của ai.", "Chatbot cũng chỉ trả lời trong phạm vi phòng."),
-    ("Đi vòng qua giao diện, gọi thẳng hệ thống?", "Vẫn: KHÔNG ĐƯỢC PHÉP. Quyền nằm ở lõi, không phải nút bị ẩn."),
-], f"{A}/ui-chat.png", "6:40–7:20 · Màn AI Chat 2 vai trò; nhấn 'quyền ở lõi hệ thống'.")
+split_slide("PHẦN 2 · SẢN PHẨM", "Chặng 7 · Con người trong vòng lặp", [
+    ("4 tình huống bắt buộc người xem:", "khẩn cấp nhất / từ khóa an toàn · AI không chắc · câu mơ hồ · có người yêu cầu."),
+    ("Người duyệt: đồng ý · sửa nhãn · đánh dấu xong.", "Mỗi lần sửa ghi sổ: ai, trường nào, nhãn cũ → mới, lúc nào."),
+    ("Cuốn sổ 2 vai trò:", "hồ sơ kiểm tra lại + dữ liệu cho AI học lại."),
+    ("VÒNG HỌC KHÉP KÍN:", "AI gán sai → người sửa → hệ thống ghi nhớ → AI giỏi hơn."),
+], f"{A}/ui-feedback.png", "6:30–7:20 · Chỉ vào hàng đợi 'Cần duyệt' + nút 'sửa nhãn' trên screenshot.")
 
 # ---- S10 BẰNG CHỨNG SỐ ----
 s = prs.slides.add_slide(BLANK)
 kicker(s, "PHẦN 2 · SẢN PHẨM"); title(s, "Chạy thật, đo thật — không phải số trình diễn")
 for i, (big, small) in enumerate([
-    ("77%", "đúng chủ đề"), ("94%+", "đúng cảm xúc"), ("97%", "không bỏ sót\nphản hồi tiêu cực"),
-    ("<2 phút", "xử lý ~5.000 review"), ("6/6", "kịch bản kiểm thử đạt"),
+    ("77,1%", "đúng chủ đề\n(test 932 mẫu)"), ("94,3%", "đúng cảm xúc"), ("97%", "không bỏ sót\nphản hồi tiêu cực"),
+    ("97 giây", "xử lý 4.837 review"), ("6/6", "kịch bản kiểm thử đạt"),
 ]):
     stat(s, 0.7 + (i % 3) * 4.2, 2.2 + (i // 3) * 2.3, big, small)
 txt(s, 0.7, 6.5, 12.0, 0.6, "Mọi con số tái lập được bằng bộ kiểm thử trong mã nguồn.", 16, INK, bold=True)
@@ -385,10 +388,11 @@ notes(s, "8:00–8:50 · Giọng tự tin, không xin lỗi. Ý 3 móc lại câ
 s = prs.slides.add_slide(BLANK)
 bg = s.shapes.add_shape(1, 0, 0, prs.slide_width, prs.slide_height)  # 1 = RECTANGLE
 bg.fill.solid(); bg.fill.fore_color.rgb = GREEN; bg.line.fill.background()
-txt(s, 0.9, 1.4, 11.5, 1.8, "Một lời phàn nàn không được đọc\nlà một sự cố đang chờ xảy ra lần nữa.", 34, WHITE, bold=True)
-txt(s, 0.9, 3.6, 11.5, 1.5, "Tầm nhìn 3–5 năm: tầng lắng nghe tiêu chuẩn cho mọi nền tảng tiêu dùng Việt Nam —\nnơi mọi lời phàn nàn được đọc, được định tuyến, và trở thành hành động.", 18, WHITE)
+txt(s, 0.9, 1.1, 11.5, 1.6, "Vòng lặp đã khép.", 40, WHITE, bold=True)
+txt(s, 0.9, 2.5, 11.5, 0.7, "📥 Review vào  →  🤖 AI phân loại  →  🔔 Báo động  →  ✅ Quản lý duyệt  →  💼 Nhân viên xử lý  →  📋 Hoàn thành  ↺", 17, WHITE, bold=True, align=PP_ALIGN.CENTER)
+txt(s, 0.9, 3.6, 11.5, 1.3, "Một lời phàn nàn không được đọc là một sự cố đang chờ xảy ra lần nữa.\nTầm nhìn 3–5 năm: tầng lắng nghe tiêu chuẩn cho mọi nền tảng tiêu dùng Việt Nam —\nnơi mọi lời phàn nàn được đọc, được định tuyến, và trở thành hành động.", 18, WHITE)
 txt(s, 0.9, 5.6, 11.5, 1.0, "Với chúng tôi — nó sẽ được đọc.   ·   Team 116 · AI20K Cohort 2 · Q&A", 20, WHITE, bold=True)
-notes(s, "8:50–10:00 · Callback 2 giờ sáng → vòng lặp khép kín → tầm nhìn → câu kết → mời Q&A.")
+notes(s, "8:50–10:00 · Callback 2 giờ sáng → đọc vòng lặp 6 bước → tầm nhìn → câu kết → mời Q&A.")
 
 out = "docs/project/slides/GreenSM-Pitch-10min.pptx"
 prs.save(out); print("saved", out, "slides:", len(prs.slides._sldIdLst))
