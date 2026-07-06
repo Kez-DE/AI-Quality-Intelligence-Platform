@@ -12,3 +12,11 @@ Chatbot phân tầng theo tài khoản → Tư duy sản phẩm → Kết quả 
 Phân loại Ticket, Báo cáo AI, Quản lý công việc, AI Chat) — không phải mockup.
 
 Thiết kế chi tiết: [`docs/superpowers/specs/2026-06-28-project-overview-slides-design.md`](../../superpowers/specs/2026-06-28-project-overview-slides-design.md).
+
+## Pitch 10 phút (demo day)
+
+- `GreenSM-Pitch-10min.pptx` — 12 slide, 16:9: 3' bài toán → 5' sản phẩm
+  (mạch kịch bản v4, ẩn dụ phòng cấp cứu) → 2' closing/vision. Không có slide gọi vốn.
+- `GreenSM-pitch-script.html` — kịch bản nói từng slide, mốc thời gian khớp speaker notes.
+- `assets/pitch/` — screenshot UI thật + ảnh Green SM (nguồn trong `SOURCES.md`).
+- Tái sinh deck: `uv run --with python-pptx python scripts/slides/build_greensm_pitch.py`.
