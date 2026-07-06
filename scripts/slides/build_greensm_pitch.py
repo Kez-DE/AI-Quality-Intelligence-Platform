@@ -178,7 +178,7 @@ s = prs.slides.add_slide(BLANK)
 bg = s.shapes.add_shape(1, 0, 0, prs.slide_width, prs.slide_height)  # 1 = RECTANGLE
 bg.fill.solid(); bg.fill.fore_color.rgb = GREEN; bg.line.fill.background()
 txt(s, 0.9, 1.1, 11.5, 1.6, "Vòng lặp đã khép.", 40, WHITE, bold=True)
-txt(s, 0.9, 2.5, 11.5, 0.7, "📥 Review vào  →  🤖 AI phân loại  →  🔔 Báo động  →  ✅ Quản lý duyệt  →  💼 Nhân viên xử lý  →  📋 Hoàn thành  ↺", 17, WHITE, bold=True, align=PP_ALIGN.CENTER)
+txt(s, 0.9, 2.5, 11.5, 0.7, "📥 Review vào  →  🤖 AI phân loại  →  🔔 Báo động  →  ✅ Quản lý duyệt  →  💼 Nhân viên xử lý  →  📋 Hoàn thành  ↺", 15, WHITE, bold=True, align=PP_ALIGN.CENTER)
 txt(s, 0.9, 3.6, 11.5, 1.3, "Một lời phàn nàn không được đọc là một sự cố đang chờ xảy ra lần nữa.\nTầm nhìn 3–5 năm: tầng lắng nghe tiêu chuẩn cho mọi nền tảng tiêu dùng Việt Nam —\nnơi mọi lời phàn nàn được đọc, được định tuyến, và trở thành hành động.", 18, WHITE)
 txt(s, 0.9, 5.6, 11.5, 1.0, "Với chúng tôi — nó sẽ được đọc.   ·   Team 116 · AI20K Cohort 2 · Q&A", 20, WHITE, bold=True)
 notes(s, "8:50–10:00 · Callback 2 giờ sáng → đọc vòng lặp 6 bước → tầm nhìn → câu kết → mời Q&A.")
