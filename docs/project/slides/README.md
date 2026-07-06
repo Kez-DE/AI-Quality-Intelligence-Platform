@@ -20,3 +20,12 @@ Thiết kế chi tiết: [`docs/superpowers/specs/2026-06-28-project-overview-sl
 - `GreenSM-pitch-script.html` — kịch bản nói từng slide, mốc thời gian khớp speaker notes.
 - `assets/pitch/` — screenshot UI thật + ảnh Green SM (nguồn trong `SOURCES.md`).
 - Tái sinh deck: `uv run --with python-pptx python scripts/slides/build_greensm_pitch.py`.
+
+## Master deck (~25 phút)
+
+- `GreenSM-Master-Deck.pptx` — 25 slide, 4 hồi: câu chuyện business (S1–5) →
+  sản phẩm thực tế (S6–16) → bằng chứng & kỹ thuật (S17–20) → giá trị & tầm nhìn (S21–25).
+  Design system: band/kicker/footer, card bo góc, bảng kẻ màu, chip pipeline.
+- `GreenSM-master-script.html` — kịch bản nói 25 section, thời lượng gợi ý khớp speaker notes.
+- Tái sinh: `uv run --with python-pptx python scripts/slides/build_greensm_master.py`.
+- Spec: `docs/superpowers/specs/2026-07-06-greensm-master-deck-design.md`.
