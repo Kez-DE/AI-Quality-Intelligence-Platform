@@ -6,3 +6,4 @@
   https://tuoitre.vn/taxi-xanh-sm-chinh-thuc-hoat-dong-tai-ha-noi-tu-ngay-14-04-20230408154906708.htm)
   — lưu ý: ứng viên đầu (hero banner xanhsm.com) bị loại vì có chú thích
   "Hình ảnh minh họa được tạo bởi AI, có thể khác với thực tế" — không phải ảnh thật.
+- "1000+ review mới mỗi ngày" (S2): số suy ra — 1,5 triệu đánh giá App Store / ~3 năm vận hành (từ 14/04/2023) ≈ 1.300+/ngày riêng App Store; chưa tính Google Play.

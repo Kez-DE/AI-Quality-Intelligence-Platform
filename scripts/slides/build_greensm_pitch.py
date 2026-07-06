@@ -35,7 +35,8 @@ def notes(slide, s):
     slide.notes_slide.notes_text_frame.text = s
 
 def pic_fit(slide, path, x, y, w):  # ảnh giữ tỉ lệ theo bề ngang
-    if os.path.exists(path): slide.shapes.add_picture(path, Inches(x), Inches(y), width=Inches(w))
+    assert os.path.exists(path), f"missing asset: {path} (chạy từ repo root?)"
+    slide.shapes.add_picture(path, Inches(x), Inches(y), width=Inches(w))
 
 def stat(slide, x, y, big, small):
     txt(slide, x, y, 3.0, 1.0, big, 44, GREEN, bold=True)
