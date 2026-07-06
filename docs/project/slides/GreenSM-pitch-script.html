@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Kịch bản pitch 10 phút — Green SM · Team 116</title>
+<style>
+  :root {
+    --bg: #F7F8F6;
+    --surface: #FFFFFF;
+    --text: #171D1A;
+    --text-muted: #5B655F;
+    --accent: #0E7C55;
+    --accent-soft: #E3F1EA;
+    --border: #E1E6E2;
+    --rule: #D8DED9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0D1210;
+      --surface: #121815;
+      --text: #E8EEEA;
+      --text-muted: #8FA098;
+      --accent: #33D98E;
+      --accent-soft: #132420;
+      --border: #22302A;
+      --rule: #1D2924;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0D1210;
+    --surface: #121815;
+    --text: #E8EEEA;
+    --text-muted: #8FA098;
+    --accent: #33D98E;
+    --accent-soft: #132420;
+    --border: #22302A;
+    --rule: #1D2924;
+  }
+  :root[data-theme="light"] {
+    --bg: #F7F8F6;
+    --surface: #FFFFFF;
+    --text: #171D1A;
+    --text-muted: #5B655F;
+    --accent: #0E7C55;
+    --accent-soft: #E3F1EA;
+    --border: #E1E6E2;
+    --rule: #D8DED9;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', Arial, sans-serif;
+    font-size: 17px;
+    line-height: 1.75;
+    margin: 0;
+    padding: 48px 22px 100px;
+  }
+
+  .doc {
+    max-width: 680px;
+    margin: 0 auto;
+  }
+
+  .mono {
+    font-family: ui-monospace, SFMono-Regular, 'Cascadia Code', Consolas, monospace;
+  }
+
+  h1 {
+    font-size: 28px;
+    line-height: 1.3;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0 0 8px;
+  }
+
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-bottom: 22px;
+  }
+  .subtitle .mono {
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12.5px;
+  }
+
+  .lede {
+    color: var(--text-muted);
+    font-size: 15px;
+    font-style: italic;
+    line-height: 1.6;
+    border-left: 3px solid var(--border);
+    padding-left: 14px;
+    margin: 0 0 14px;
+  }
+
+  .tagline {
+    font-size: 15.5px;
+    font-weight: 600;
+    margin: 0 0 8px;
+  }
+
+  .metaphor {
+    font-size: 14.5px;
+    color: var(--text-muted);
+    background: var(--accent-soft);
+    border-radius: 8px;
+    padding: 12px 15px;
+    margin: 18px 0 32px;
+    line-height: 1.6;
+  }
+  .metaphor b { color: var(--accent); }
+
+  nav.toc {
+    display: flex;
+    flex-wrap: wrap;
+    row-gap: 6px;
+    column-gap: 4px;
+    font-size: 13.5px;
+    color: var(--text-muted);
+    margin: 0 0 40px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--rule);
+  }
+  nav.toc a {
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  nav.toc a:hover, nav.toc a:focus-visible {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+  nav.toc .dot { color: var(--border); padding: 0 2px; }
+
+  h2 {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+    margin: 0 0 4px;
+    scroll-margin-top: 20px;
+  }
+
+  .meta-line {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    color: var(--text-muted);
+    font-size: 12.5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .meta-line .time {
+    color: var(--accent);
+  }
+
+  h3 {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 28px 0 10px;
+  }
+
+  p { margin: 0 0 16px; }
+
+  blockquote {
+    margin: 0 0 20px;
+    padding-left: 16px;
+    border-left: 3px solid var(--accent);
+    font-size: 17.5px;
+    line-height: 1.8;
+  }
+  blockquote p { margin: 0 0 14px; }
+  blockquote p:last-child { margin-bottom: 0; }
+
+  .cue {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 14.5px;
+    margin: 0 0 14px;
+  }
+
+  strong { font-weight: 700; }
+  em { font-style: italic; }
+
+  ul, ol {
+    margin: 0 0 16px;
+    padding-left: 22px;
+  }
+  li { margin-bottom: 8px; }
+
+  hr {
+    border: none;
+    border-top: 1px solid var(--rule);
+    margin: 36px 0;
+  }
+
+  .tip {
+    background: var(--accent-soft);
+    border-radius: 8px;
+    padding: 12px 15px;
+    font-size: 14.5px;
+    color: var(--text);
+    margin: 0 0 18px;
+    line-height: 1.6;
+  }
+  .tip b { color: var(--accent); }
+
+  .qa {
+    margin-bottom: 20px;
+  }
+  .qa .q {
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .qa .a {
+    color: var(--text-muted);
+    font-size: 15.5px;
+  }
+
+  footer {
+    color: var(--text-muted);
+    font-size: 13px;
+    text-align: center;
+    margin-top: 48px;
+  }
+
+  ::selection { background: var(--accent-soft); color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <h1>Kịch bản pitch 10 phút</h1>
+  <div class="subtitle">Green SM &middot; <span class="mono">AI Quality Intelligence Platform &middot; Team 116 &middot; 12 slide</span></div>
+
+  <p class="lede">Kịch bản nói cho 12 slide pitch Green SM, trình bày trong 10 phút. Viết cho hội đồng nghe lần đầu — ít thuật ngữ trần trụi, một ẩn dụ xuyên suốt, và móc nối phần kết về lại câu chuyện mở đầu.</p>
+
+  <p class="tagline">"Một lời phàn nàn không được đọc là một sự cố đang chờ xảy ra lần nữa."</p>
+
+  <div class="metaphor">
+    <b>Ẩn dụ xuyên suốt:</b> mỗi review giống một bệnh nhân bước vào phòng cấp cứu — không phải ai cũng cần bác sĩ trưởng khoa ngay, nhưng ai cũng phải được đánh giá mức độ khẩn cấp ngay khi bước vào cửa. Bảy chặng xử lý của sản phẩm chính là cơ chế đó.
+  </div>
+
+  <nav class="toc" aria-label="Mục lục">
+    <a href="#prep">Chuẩn bị</a><span class="dot">·</span>
+    <a href="#s1">1 Hook</a><span class="dot">·</span>
+    <a href="#s2">2 Bằng chứng</a><span class="dot">·</span>
+    <a href="#s3">3 Ba lỗ hổng</a><span class="dot">·</span>
+    <a href="#s4">4 Cần tồn tại</a><span class="dot">·</span>
+    <a href="#s5">5 Hành trình</a><span class="dot">·</span>
+    <a href="#s6">6 Chặng 1–3</a><span class="dot">·</span>
+    <a href="#s7">7 Chặng 4–5</a><span class="dot">·</span>
+    <a href="#s8">8 Chặng 6</a><span class="dot">·</span>
+    <a href="#s9">9 Chặng 7</a><span class="dot">·</span>
+    <a href="#s10">10 Bằng chứng</a><span class="dot">·</span>
+    <a href="#s11">11 Hạn chế</a><span class="dot">·</span>
+    <a href="#s12">12 Kết</a><span class="dot">·</span>
+    <a href="#qa">Q&amp;A</a>
+  </nav>
+
+  <h2 id="prep">Chuẩn bị trước khi lên</h2>
+  <ul>
+    <li>Mở sẵn bản trình chiếu Green SM, chế độ trình chiếu, đứng ở Slide 1.</li>
+    <li>Giọng chậm, dừng 2 giây sau câu hook mở đầu — đừng vội đọc tiếp, để khán giả "ngấm" con số 1,5 triệu.</li>
+    <li>Slide 11 (Chúng tôi biết mình đang ở đâu) là điểm khó nhất — đọc mẹo trình bày ở cuối bài trước khi lên.</li>
+    <li>Nguyên tắc chung: câu ngắn trước, số liệu sau. Đừng đọc thuật ngữ kỹ thuật một mình — luôn giải thích bằng lời thường ngay trước hoặc ngay sau.</li>
+  </ul>
+
+  <hr />
+
+  <h2 id="s1">1 · Hook</h2>
+  <div class="meta-line"><span class="time">0:00 – 0:40</span><span>Slide 1</span></div>
+  <blockquote>
+    <p><strong>2 giờ sáng.</strong> Một tài xế lái ẩu, gây nguy hiểm cho khách. Cùng lúc đó, hàng chục người đã viết review than phiền về đúng tài xế này — trong nhiều tuần. Không ai đọc. Không ai ghép các mảnh lại. <strong>Không ai biết.</strong></p>
+    <p>Đây không phải chuyện bịa. Trên App Store, ứng dụng Green SM — tên mới của Xanh SM — đang có <strong>4.8 sao với 1 triệu rưỡi lượt đánh giá</strong>. Một con số đẹp. Nhưng hãy hỏi ngược lại: <strong>một triệu rưỡi tiếng nói — ai đọc hết?</strong></p>
+    <p>Chúng tôi là team 116. Sản phẩm này được xây để ca trực 2 giờ sáng đó không bao giờ đơn độc nữa.</p>
+  </blockquote>
+  <p class="cue">Cue: im lặng 2 giây khi slide hiện, để khán giả đọc con số 1,5 triệu trước.</p>
+
+  <hr />
+
+  <h2 id="s2">2 · Bằng chứng thật</h2>
+  <div class="meta-line"><span class="time">0:40 – 1:40</span><span>Slide 2</span></div>
+  <blockquote>
+    <p>Đây là những review thật, đang nằm công khai trên App Store, ngay dưới điểm 4.8 sao ấy: một hành khách kể bị tài xế <strong>hành hung</strong>; một người khác không đăng nhập nổi app trên chính chiếc điện thoại của mình. Những dòng này không nằm trong báo cáo nào cả — chúng chìm giữa một triệu rưỡi đánh giá.</p>
+    <p>Và quy mô thì chỉ tăng lên: Green SM ra mắt tháng 4 năm 2023, nay đã phủ <strong>34 tỉnh thành, 4 quốc gia</strong>. Mỗi ngày, hàng nghìn review mới đổ về từ App Store và Google Play.</p>
+    <p>Điểm trung bình cao không có nghĩa là an toàn. <strong>Rủi ro nằm ở phần đuôi — những ca nghiêm trọng lẫn trong đám đông hài lòng.</strong></p>
+  </blockquote>
+
+  <hr />
+
+  <h2 id="s3">3 · Ba lỗ hổng</h2>
+  <div class="meta-line"><span class="time">1:40 – 2:30</span><span>Slide 3</span></div>
+  <blockquote>
+    <p>Tại sao chuyện đó xảy ra? Không phải thiếu dữ liệu — dữ liệu thừa mứa. Vấn đề là ba lỗ hổng.</p>
+    <p>Một: <strong>quá tải</strong> — hàng nghìn review mỗi ngày, không đội ngũ nào đọc xuể bằng tay.</p>
+    <p>Hai, nguy hiểm nhất: <strong>an toàn bị bỏ sót</strong> — review về tài xế say rượu trông y hệt review về app lag, cho đến khi có người đọc kỹ. Mà người đọc kỹ luôn đến sau.</p>
+    <p>Ba: <strong>sai địa chỉ</strong> — vấn đề rơi vào hộp thư chung, ai cũng thấy nhưng không ai chịu trách nhiệm.</p>
+  </blockquote>
+
+  <hr />
+
+  <h2 id="s4">4 · Điều cần tồn tại</h2>
+  <div class="meta-line"><span class="time">2:30 – 3:00</span><span>Slide 4</span></div>
+  <blockquote>
+    <p>Ba lỗ hổng, một kết luận. Cần một hệ thống <strong>đọc thay con người, phân loại đúng mức độ khẩn cấp, và giao đúng người xử lý</strong>. Và thời điểm là bây giờ: AI đọc hiểu tiếng Việt đã đủ tốt và đủ rẻ để đọc một triệu rưỡi review — điều mà ba năm trước còn là bất khả thi.</p>
+    <p>Đó chính xác là những gì chúng tôi đã xây. Và nó đang chạy thật.</p>
+  </blockquote>
+
+  <hr />
+
+  <h2 id="s5">5 · Hành trình 7 chặng</h2>
+  <div class="meta-line"><span class="time">3:00 – 3:50</span><span>Slide 5</span></div>
+  <blockquote>
+    <p>Hãy hình dung mỗi review như một <strong>bệnh nhân bước vào phòng cấp cứu</strong>. Không phải ai cũng cần bác sĩ trưởng khoa ngay, nhưng ai cũng phải được đánh giá ngay khi bước vào cửa.</p>
+    <p>Hệ thống làm đúng việc đó qua bảy chặng: làm sạch thông tin nhạy cảm, đo "dấu hiệu sinh tồn" bằng AI, bác sĩ trực ghi đè khi thấy dấu hiệu nguy hiểm, phát hiện khi nhiều ca giống nhau dồn về, gọi đúng chuyên khoa, tự lập hồ sơ công việc, và cuối cùng — người có chuyên môn ký xác nhận.</p>
+    <p>Nguyên tắc vận hành: phần rẻ và nhanh xử lý mọi ca; AI ngôn ngữ lớn chỉ được gọi khi cần suy luận sâu; <strong>an toàn luôn thắng xác suất</strong>; và một bộ phận trục trặc thì cả hệ thống vẫn đứng vững.</p>
+  </blockquote>
+
+  <hr />
+
+  <h2 id="s6">6 · Chặng 1–3: Làm sạch → AI đọc lướt → Luật an toàn ghi đè</h2>
+  <div class="meta-line"><span class="time">3:50 – 4:50</span><span>Slide 6</span></div>
+  <blockquote>
+    <p>Bắt đầu từ cửa vào. Bước một: <strong>che thông tin riêng tư</strong> — số điện thoại, email, biển số — trước khi bất kỳ ai hay máy nào đọc. Bước hai: một <strong>bộ phân loại AI nhanh và rẻ</strong> gán chủ đề, cảm xúc, mức nghiêm trọng trong chưa đầy một phần mười giây — độ chính xác đo được: 77,1% chủ đề, 94,3% cảm xúc, và nó hiểu cả câu phủ định tiếng Việt. Bước ba: <strong>tập luật an toàn</strong> đóng vai bác sĩ trực, sẵn sàng ghi đè AI.</p>
+    <p>Ví dụ thật, không dàn dựng: <em>"Tài xế say xỉn gây tai nạn, xe tông người rồi bỏ chạy."</em> AI đọc lướt đoán mức trung bình. Luật an toàn bắt được "tai nạn", "bỏ chạy" — <strong>ghi đè ngay thành mức khẩn cấp cao nhất</strong>, bắt buộc người thật phải xem.</p>
+    <p>Điều quan trọng nhất của cả hệ thống: <strong>khi nghi ngờ về an toàn, máy không được phép tự tin hơn sự thận trọng.</strong></p>
+  </blockquote>
+
+  <hr />
+
+  <h2 id="s7">7 · Chặng 4–5: Ổ dịch → Báo động → Đúng chuyên khoa</h2>
+  <div class="meta-line"><span class="time">4:50 – 5:40</span><span>Slide 7</span></div>
+  <blockquote>
+    <p>Một ca đơn lẻ là cá biệt. Nhưng nhiều ca giống nhau dồn về cùng khu vực trong thời gian ngắn — đó là một <strong>ổ dịch</strong>. Hệ thống theo dõi liên tục, với ngưỡng rõ ràng: một ca khẩn cấp nhất — báo ngay lập tức; từ ba ca mức cao cùng khu vực — cảnh báo vàng; từ mười ca tiêu cực — báo động đỏ. Và nó tự biết chờ 60 phút trước khi báo lại cùng một chuyện — không làm loãng tín hiệu.</p>
+    <p>Báo động nổi lên thì gọi ai? Một <strong>bảng phân khoa</strong> quyết định kèm cam kết thời gian: an toàn về đội vận hành trong vòng <strong>1 giờ</strong>, lỗi app về kỹ thuật trong 12 giờ, thanh toán về chăm sóc khách hàng — đủ sáu phòng ban.</p>
+    <p>Thực dụng nhất: đổi luật phân khoa chỉ cần sửa một tệp cấu hình — <strong>không viết lại dòng code nào, không triển khai lại.</strong></p>
+  </blockquote>
+
+  <hr />
+
+  <h2 id="s8">8 · Chặng 6: Từ báo động đến việc thật</h2>
+  <div class="meta-line"><span class="time">5:40 – 6:30</span><span>Slide 8</span></div>
+  <blockquote>
+    <p>Có báo động rồi — ai biến nó thành việc phải làm? Hai con đường. Đường <strong>tự động</strong>: hệ thống gom các báo động cùng phòng ban, cùng khu vực; nếu chưa có ai xử lý, nó tự lập một đầu việc — mỗi cụm chỉ một việc đang mở, không trùng, không rơi rớt. Đường <strong>có người kiểm soát</strong>: AI viết bản báo cáo đề xuất — nguyên nhân gốc là gì, nên làm gì; quản lý đọc, thêm bớt chỉnh sửa từng đầu việc nháp, rồi bấm <strong>một nút duyệt</strong> — duyệt và tạo việc xảy ra trong cùng một hành động, việc xuất hiện ngay trên bảng theo dõi kèm đường link ngược về báo cáo gốc.</p>
+    <p><strong>Máy đề xuất. Người quyết định. Hệ thống thực thi trọn vẹn.</strong></p>
+  </blockquote>
+
+  <hr />
+
+  <h2 id="s9">9 · Chặng 7: Con người trong vòng lặp</h2>
+  <div class="meta-line"><span class="time">6:30 – 7:20</span><span>Slide 9</span></div>
+  <blockquote>
+    <p>Chặng cuối là lý do chúng tôi dám tin hệ thống này: <strong>con người luôn có tiếng nói cuối cùng.</strong> Bốn tình huống bắt buộc người thật phải xem: mức khẩn cấp cao nhất hoặc chạm từ khóa an toàn; AI không chắc chắn về nhãn mình gán; câu quá ngắn, tín hiệu mơ hồ; hoặc có người chủ động yêu cầu xem lại.</p>
+    <p>Người duyệt có ba lựa chọn: đồng ý với AI, sửa lại nhãn nếu AI sai, hoặc đánh dấu đã xử lý. Và mỗi lần sửa đều được ghi sổ đầy đủ: ai sửa, sửa trường nào, từ nhãn gì thành nhãn gì, lúc nào. Cuốn sổ đó có hai vai trò: hồ sơ kiểm tra lại sau này — và dữ liệu để AI học lại.</p>
+    <p><strong>AI gán sai → người sửa → hệ thống ghi nhớ → AI giỏi hơn.</strong> Sai một lần, sửa một lần, thông minh hơn một chút — vòng học không bao giờ dừng.</p>
+  </blockquote>
+
+  <hr />
+
+  <h2 id="s10">10 · Bằng chứng — chạy thật, đo thật</h2>
+  <div class="meta-line"><span class="time">7:20 – 8:00</span><span>Slide 10</span></div>
+  <blockquote>
+    <p>Nói thì dễ, nên đây là số đo được: nhận diện chủ đề <strong>77,1%</strong> — đo trên gần một nghìn mẫu kiểm thử độc lập; cảm xúc <strong>94,3%</strong> — và gần như không bỏ sót phản hồi tiêu cực nào: <strong>97%</strong>. <strong>4.837 review xử lý trong 97 giây</strong>. <strong>6 trên 6</strong> tình huống kiểm thử — ca an toàn, ca gian lận, ca phủ định, ca mập mờ — đều ra đúng kết quả.</p>
+    <p>Đây không phải số chọn lọc để trình diễn — mọi con số tái lập được bằng bộ kiểm thử nằm trong mã nguồn.</p>
+  </blockquote>
+
+  <hr />
+
+  <h2 id="s11">11 · Chúng tôi biết mình đang ở đâu</h2>
+  <div class="meta-line"><span class="time">8:00 – 8:50</span><span>Slide 11</span></div>
+  <blockquote>
+    <p>Phần này chúng tôi nói thẳng, vì biết rõ giới hạn là dấu hiệu của sự nghiêm túc. Một: quyền truy cập đang được khóa ở cửa chính — tầng ứng dụng; lớp khóa sâu ở tầng dữ liệu là bước tiếp theo, chúng tôi biết chính xác cần làm gì. Hai: dữ liệu hiện là tập cố định gần 5.000 review thật từ các cửa hàng ứng dụng — bước tiếp theo là nối ống dữ liệu sống hằng ngày, giữ nguyên phần xử lý.</p>
+    <p>Ba — và đau nhất khi nhìn lại câu chuyện mở đầu: <strong>báo động khẩn cấp hiện chỉ hiện trên màn hình web.</strong> Người trực không mở máy lúc 2 giờ sáng thì vẫn lỡ. Bước tiếp theo: đẩy thẳng báo động vào điện thoại.</p>
+  </blockquote>
+  <p class="cue">Cue: giọng tự tin, không xin lỗi. Nhấn chậm câu "chỉ hiện trên màn hình web" — điểm chạm cảm xúc mạnh nhất.</p>
+
+  <hr />
+
+  <h2 id="s12">12 · Kết — Vòng lặp vận hành đã khép + Tầm nhìn</h2>
+  <div class="meta-line"><span class="time">8:50 – 10:00</span><span>Slide 12</span></div>
+  <blockquote>
+    <p>Nhớ ca trực 2 giờ sáng đầu buổi không? Đây là điều thay đổi: <strong>review vào → AI phân loại → báo động nổi đúng lúc → quản lý duyệt → nhân viên xử lý → việc hoàn thành</strong> — và vòng lặp quay lại từ đầu, mỗi ngày, tự động, có kiểm soát, <strong>không ai phải thức trắng đêm dò từng dòng review.</strong></p>
+    <p>Tầm nhìn của chúng tôi không dừng ở một ứng dụng gọi xe. Mọi nền tảng tiêu dùng ở Việt Nam đều đang ngồi trên hàng triệu tiếng nói khách hàng chưa được lắng nghe. Trong 3 đến 5 năm tới, chúng tôi muốn hệ thống này trở thành <strong>tầng lắng nghe tiêu chuẩn</strong> cho các nền tảng ấy — nơi mọi lời phàn nàn đều được đọc, được định tuyến, và trở thành hành động.</p>
+    <p>Vì <strong>một lời phàn nàn không được đọc là một sự cố đang chờ xảy ra lần nữa.</strong> Với chúng tôi — nó sẽ được đọc. Cảm ơn hội đồng. Chúng tôi sẵn sàng cho phần hỏi đáp.</p>
+  </blockquote>
+
+  <hr />
+
+  <h2>Mẹo trình bày slide 11</h2>
+  <ul>
+    <li>Đừng đọc như đang xin lỗi. Giọng phải giữ tự tin — đây là phần thể hiện hiểu hệ thống sâu hơn giám khảo, không phải phần thú nhận lỗi.</li>
+    <li>Câu "báo động chỉ hiện trên web" cố ý móc lại câu chuyện mở đầu — nhấn nhá chậm lại, đây là điểm chạm cảm xúc mạnh nhất của cả bài.</li>
+    <li>Nếu giám khảo hỏi xoáy ngay sau slide này: đừng né, xác nhận lại đúng những gì đã nói, không thêm cam kết ngoài phạm vi.</li>
+    <li>Giữ mạch nhanh — ba ý, không lan man thêm ví dụ ngoài slide.</li>
+  </ul>
+
+  <h2>Mẹo trình bày chung</h2>
+  <ul>
+    <li><strong>Câu ngắn trước, số liệu sau.</strong> Nói ý nghĩa của một con số bằng một câu đời thường trước khi đọc phần trăm.</li>
+    <li><strong>Không thả thuật ngữ một mình.</strong> Mọi khái niệm kỹ thuật đã được bọc bằng một câu giải thích đời thường ngay trước hoặc ngay sau — giữ đúng thứ tự đó.</li>
+    <li><strong>Dùng ẩn dụ phòng cấp cứu để trả lời câu hỏi khó.</strong> Nếu giám khảo hỏi sâu, có thể quay lại ẩn dụ trước khi thêm chi tiết kỹ thuật.</li>
+    <li><strong>Giữ callback mở–kết.</strong> Câu mở đầu và câu ở slide 11 + 12 tạo thành một vòng khép — đừng bỏ qua dù đang vội về thời gian.</li>
+  </ul>
+
+  <hr />
+
+  <h2 id="qa">Q&amp;A dự phòng</h2>
+
+  <div class="qa">
+    <div class="q">Vì sao chưa khóa chặt tầng dữ liệu mà vẫn tự tin về bảo mật?</div>
+    <div class="a">Cửa chính — tầng ứng dụng — đã được gate đủ chặt cho cách người dùng thực tế sử dụng hệ thống; lớp khóa sâu hơn ở tầng dữ liệu là bước phòng thủ tiếp theo, đã nêu rõ trong roadmap (slide 11), không che giấu.</div>
+  </div>
+  <div class="qa">
+    <div class="q">Data thật hay giả?</div>
+    <div class="a">Nội dung review là thật, từ App Store/Google Play tiếng Việt. Đang chạy trên tập cố định 4.837 review, chưa nối trực tiếp tới dữ liệu sống mỗi ngày.</div>
+  </div>
+  <div class="qa">
+    <div class="q">Vì sao dùng cả mô hình nhỏ lẫn AI ngôn ngữ lớn, không dùng AI cho tất cả?</div>
+    <div class="a">Chi phí và tốc độ. Mô hình nhỏ rẻ, nhanh, xử lý toàn bộ lưu lượng; AI ngôn ngữ lớn chỉ được gọi ở bước cần suy luận sâu.</div>
+  </div>
+  <div class="qa">
+    <div class="q">Nếu luật an toàn và AI mâu thuẫn thì sao?</div>
+    <div class="a">Luật an toàn luôn thắng — minh hoạ trực tiếp ở slide 6: AI đoán mức trung bình, luật ghi đè thành mức khẩn cấp cao nhất.</div>
+  </div>
+  <div class="qa">
+    <div class="q">Điều gì đảm bảo demo không lỗi vì một nhà cung cấp AI sập?</div>
+    <div class="a">Hệ thống tự động chuyển sang nhà cung cấp khác theo chuỗi dự phòng, đến khi có một cái chạy được.</div>
+  </div>
+  <div class="qa">
+    <div class="q">Sao chỉ 6 tình huống kiểm thử, có đủ tin cậy không?</div>
+    <div class="a">6 tình huống đại diện các nhánh quan trọng nhất. Độ chính xác tổng thể được đo riêng trên 932 mẫu kiểm thử độc lập (77,1% chủ đề, 94,3% cảm xúc) — hai con số phục vụ hai mục đích khác nhau.</div>
+  </div>
+
+  <footer>Green SM · AI Quality Intelligence Platform · Team 116</footer>
+
+</div>
+</body>
+</html>
