@@ -1,0 +1,8 @@
+- App Store VN (Green SM: Electric Mobility, id6446425595): 4.8★, 1.5M ratings — truy cập 2026-07-06
+  https://apps.apple.com/vn/app/green-sm-electric-mobility/id6446425595
+- Ra mắt 14/04/2023; 34 tỉnh thành; 4 quốc gia (VN, Lào, Philippines, Indonesia) — xanhsm.com
+- greensm-photo.jpg tải từ: https://cdn.tuoitre.vn/471584752817336320/2023/4/8/taxi-xanh-sm6-16809432795061009639820.jpg
+  (Báo Tuổi Trẻ, bài "Taxi Xanh SM chính thức hoạt động tại Hà Nội từ ngày 14-4",
+  https://tuoitre.vn/taxi-xanh-sm-chinh-thuc-hoat-dong-tai-ha-noi-tu-ngay-14-04-20230408154906708.htm)
+  — lưu ý: ứng viên đầu (hero banner xanhsm.com) bị loại vì có chú thích
+  "Hình ảnh minh họa được tạo bởi AI, có thể khác với thực tế" — không phải ảnh thật.
