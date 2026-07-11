@@ -48,7 +48,7 @@
 
 ### Task 3: Targeted logic read of core-flow modules
 
-**Skills:** find-bugs
+**Skills:** find-bugs, variant-analysis, fastapi-pro
 
 - [ ] Step 1: `codegraph impact` / `codegraph callers` on the entry points used by the flow (ingest endpoint, classify service, ticket workflow, report generator) to map the exact call graph
 - [ ] Step 2: Read, in order: `pipeline/services/` (ticket workflow, live stream), `pipeline/worker_ticket.py`, `pipeline/worker_ingest.py`, `pipeline/worker_ml.py`, `pipeline/worker_agent.py`, `data/taxonomy/routing_table.json` + `severity_rules.json` consumers, spike detection module — hunting: off-by-one, timezone/schedule bugs, race between web-API scheduler and workers, dedup logic, error swallowing, unchecked LLM output parsing, Supabase write failures ignored
