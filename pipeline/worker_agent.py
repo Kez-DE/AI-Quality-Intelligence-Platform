@@ -61,6 +61,9 @@ def build_scheduler() -> BackgroundScheduler:
         "cron",
         hour="9,14",
         minute="0",
+        # Railway containers run UTC; without this the 09:00/14:00 schedule
+        # drifts to 16:00/21:00 VN in production while local (GMT+7) is correct.
+        timezone="Asia/Ho_Chi_Minh",
         id="report_pipeline",
         max_instances=1,
         coalesce=True,

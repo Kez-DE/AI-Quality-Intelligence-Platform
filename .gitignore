@@ -52,3 +52,8 @@ scripts/bin/harness-cli.exe
 
 # Office (Word/PowerPoint/Excel) lock/temp files
 ~$*
+.codegraph/
+.harness-backup/
+scratchpad/audit/mk_admin.py
+scratchpad/audit/check_rbac.py
+scratchpad/audit/admin_token.json

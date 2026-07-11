@@ -204,3 +204,19 @@ def test_risk_distribution_missing_scores_fill_zero():
     assert dist[-1]["count"] == 1
     assert dist[0]["score"] == 1
     assert dist[0]["count"] == 0
+
+
+def test_risk_distribution_excludes_sentinel_zero():
+    """overall_risk=0 là sentinel 'LLM chấm fail, chờ người' của worker_ml —
+    không được đếm vào bucket 1 (báo sai 'rủi ro thấp đã xác minh')."""
+    feedback = [
+        {"id": "1", "topic": "App Issue", "sentiment": "negative", "severity": "P3",
+         "area": "HCM", "created_at": _now_iso(), "needs_review": True, "overall_risk": 0},
+        {"id": "2", "topic": "App Issue", "sentiment": "negative", "severity": "P2",
+         "area": "HN", "created_at": _now_iso(), "needs_review": False, "overall_risk": 2},
+    ]
+    with patch("main.get_supabase", return_value=_database(feedback, [], [], corrections=[])):
+        result = cockpit_overview(days=14, user=_user("admin"))
+    dist = {d["score"]: d["count"] for d in result["data"]["risk_distribution"]}
+    assert dist[1] == 0          # sentinel không rơi vào bucket 1
+    assert dist[2] == 1

@@ -92,28 +92,28 @@ def _process_and_insert_batch(
             # score_feedback_batch sẽ sửa trực tiếp vào các dict trong chunks
             list(executor.map(score_feedback_batch, chunks))
             
-        # Cập nhật lại Cache sau khi LLM xử lý xong
+        # Cập nhật lại Cache sau khi LLM xử lý xong. Item scoring FAIL (không có
+        # overall_risk — fallback needs_review) KHÔNG được cache: memoize điểm
+        # bịa overall_risk=3 sẽ gắn dữ liệu giả cho mọi text trùng về sau.
         for p in to_score_llm:
+            if "overall_risk" not in p:
+                continue
             h = get_hash(p["text"])
-            if "overall_risk" in p:
-                p["severity"] = f"P{p['overall_risk']}"
-                
+            p["severity"] = f"P{p['overall_risk']}"
             _llm_cache[h] = {
                 "risk_safety": p.get("risk_safety", 0),
                 "risk_fraud": p.get("risk_fraud", 0),
                 "risk_attitude": p.get("risk_attitude", 0),
                 "risk_vehicle": p.get("risk_vehicle", 0),
                 "risk_compliance": p.get("risk_compliance", 0),
-                "overall_risk": p.get("overall_risk", 3),
-                "severity": p.get("severity", "P3"),
+                "overall_risk": p["overall_risk"],
+                "severity": p["severity"],
                 "needs_review": p.get("needs_review", False),
                 "review_reason": p.get("review_reason", None),
             }
 
-    # Đảm bảo không truyền overall_risk vào DB nếu cột đó ko tồn tại (chúng ta chỉ dùng 5 cột vector + severity)
-    # Tuy nhiên, nếu cột ko có trong schema Supabase thì nó có thể bị lỗi, nên ta pop nó ra.
-    for p in payload_batch:
-        p.pop("overall_risk", None)
+    # overall_risk có cột thật từ migration 20260617. Trước đây pop ra khiến
+    # DB luôn NULL → ml-worker chấm LLM lần 2 cho mọi negative (phí gấp đôi).
 
     # 4. Lưu toàn bộ lô (cả positive, neutral, negative) vào DB
     db.table("feedback").insert(payload_batch).execute()
@@ -161,37 +161,35 @@ def ingest_dataset(
     failed_count = 0
     batch_count = 0
 
+    def _flush_batch(batch: list[dict]) -> None:
+        """Insert one batch; a failed batch counts every row and is dropped so
+        one poison batch cannot cascade into every later insert attempt."""
+        nonlocal inserted_count, failed_count, batch_count
+        if not batch:
+            return
+        try:
+            _process_and_insert_batch(db, batch, defer_llm_scoring=defer_llm_scoring)
+            inserted_count += len(batch)
+            batch_count += 1
+        except Exception as e:
+            print(f"Error inserting batch of {len(batch)}: {e}")
+            failed_count += len(batch)
+
     for row in records_to_process:
         try:
             payload = build_feedback_payload(row, mock_user_id)
-            if not payload:
-                continue
-            payload_batch.append(payload)
-            if len(payload_batch) >= batch_size:
-                _process_and_insert_batch(
-                    db,
-                    payload_batch,
-                    defer_llm_scoring=defer_llm_scoring,
-                )
-                inserted_count += len(payload_batch)
-                batch_count += 1
-                payload_batch = []
         except Exception as e:
-            print(f"Error inserting row: {e}")
+            print(f"Error building payload: {e}")
             failed_count += 1
+            continue
+        if not payload:
+            continue
+        payload_batch.append(payload)
+        if len(payload_batch) >= batch_size:
+            _flush_batch(payload_batch)
+            payload_batch = []
 
-    if payload_batch:
-        try:
-            _process_and_insert_batch(
-                db,
-                payload_batch,
-                defer_llm_scoring=defer_llm_scoring,
-            )
-            inserted_count += len(payload_batch)
-            batch_count += 1
-        except Exception as e:
-             print(f"Error inserting final batch: {e}")
-             failed_count += len(payload_batch)
+    _flush_batch(payload_batch)
 
     duration_seconds = perf_counter() - started_at
     print(f"Successfully processed and inserted {inserted_count} records into Supabase!")
