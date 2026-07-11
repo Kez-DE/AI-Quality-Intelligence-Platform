@@ -24,3 +24,16 @@
 - Approve-and-dispatch: 2 tasks, report_id backlink, due_at=deadline 24h, double-approve 409, no-auth 401 — GREEN
 - RBAC matrix (guest/staff/manager/admin): 6/6 PASS
 - Frontend dev server: loads HTTP 200
+
+## Task 3 — Confirmed logic bugs (fix wave)
+
+| # | Sev | File | Bug |
+|---|-----|------|-----|
+| 4 | HIGH | worker_agent.py:59 | Report cron hour=9,14 uses container-local tz — Railway UTC fires 16:00/21:00 VN (local GMT+7 correct) → prod≠local |
+| 5 | HIGH | worker_ml.py:48 + scoring_agent fallback | LLM-fail rows keep overall_risk NULL → re-fetched every 30s forever (LLM cost burn, queue blocked) |
+| 6 | HIGH | worker_ml.py:28 | SELECT lacks needs_review → scoring writes False, wiping ingest's HITL flag (P5/safety) |
+| 7 | HIGH | ingest.py:116 | pops overall_risk before insert though column exists → ml-worker re-scores every negative via LLM (double cost); evidence: 3 neg rows severity=P1 (scored) but overall_risk NULL |
+| 8 | MED | ingest.py:179 | batch-insert failure: payload_batch not cleared (poison batch cascades), failed_count counts 1 instead of batch size |
+| 8b | MED | ingest.py:101-111 | LLM cache stores fabricated overall_risk=3/severity P3 for failed-scoring items |
+
+Non-bugs → backlog: calculate_overall_risk dead condition (fraud>=8 subsumed) + comment drift; _llm_cache unbounded; 5 exhaustive-deps warnings are intentional patterns.
