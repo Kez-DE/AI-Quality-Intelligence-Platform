@@ -54,3 +54,6 @@ scripts/bin/harness-cli.exe
 ~$*
 .codegraph/
 .harness-backup/
+scratchpad/audit/mk_admin.py
+scratchpad/audit/check_rbac.py
+scratchpad/audit/admin_token.json
