@@ -13,3 +13,14 @@
 - eslint (app): see #2/#3
 - vitest (app): 2 FAIL → #1 → fixed, 11/11 pass
 - vite build (app): success — GREEN
+
+## Task 2 — Real flow results (30 records, real Supabase + LLM)
+
+- Ingest: 30/30 inserted, 0 failed (offset 900) — GREEN
+- PII: no phone/email/plate leaked in stored text — GREEN
+- Classification: all rows have topic/severity/area/confidence in range; P5⇒needs_review consistent — GREEN
+- Spike detect: 30 records/24 groups → 0 spikes (correct for diverse small batch; thresholds reviewed in T3)
+- Report (CSKH, real LLM): stored, 8 sections incl. Vấn đề/Phân tích/Đề xuất — GREEN
+- Approve-and-dispatch: 2 tasks, report_id backlink, due_at=deadline 24h, double-approve 409, no-auth 401 — GREEN
+- RBAC matrix (guest/staff/manager/admin): 6/6 PASS
+- Frontend dev server: loads HTTP 200
