@@ -25,7 +25,10 @@ def score_pending():
         db = get_supabase()
         rows = (
             db.table("feedback")
-            .select("id,text,sentiment,topic,severity")
+            # needs_review must ride along: scoring preserves the row's own
+            # value, and omitting it here silently wiped the HITL flag set
+            # at ingest (P5/safety) on every scoring pass.
+            .select("id,text,sentiment,topic,severity,needs_review")
             .is_("overall_risk", "null")
             .eq("sentiment", "negative")
             .limit(BATCH_SIZE)
@@ -45,7 +48,10 @@ def score_pending():
                 "risk_attitude":   item.get("risk_attitude", 0),
                 "risk_vehicle":    item.get("risk_vehicle", 0),
                 "risk_compliance": item.get("risk_compliance", 0),
-                "overall_risk":    item.get("overall_risk"),
+                # LLM-failure fallback carries no overall_risk; writing NULL
+                # would re-queue the row every INTERVAL forever. Sentinel 0 =
+                # "attempted, needs human" — consumers guard 1<=risk<=5.
+                "overall_risk":    item.get("overall_risk") or 0,
                 "needs_review":    item.get("needs_review", False),
             }).eq("id", item["id"]).execute()
 
