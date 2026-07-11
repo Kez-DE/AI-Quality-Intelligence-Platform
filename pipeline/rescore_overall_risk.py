@@ -80,9 +80,11 @@ def rescore_feedback(db, apply: bool) -> dict:
     changed = []
     for r in rows:
         dims = [int(r.get(f) or 0) for f in RISK_FIELDS]
-        # Chỉ đụng row ĐÃ chấm (có overall_risk hoặc ít nhất 1 điểm risk > 0) —
-        # tránh ép feedback negative chưa chấm về P1.
-        scored = r.get("overall_risk") is not None or any(d > 0 for d in dims)
+        # Chỉ đụng row ĐÃ chấm (overall_risk 1-5 hoặc ít nhất 1 điểm risk > 0) —
+        # tránh ép feedback negative chưa chấm về P1. overall_risk=0 là sentinel
+        # "LLM chấm fail" của worker_ml: chưa chấm, không được rescore thành P1.
+        raw_risk = r.get("overall_risk")
+        scored = (raw_risk is not None and int(raw_risk) >= 1) or any(d > 0 for d in dims)
         if not scored:
             continue
         new_risk = calculate_overall_risk(*dims)

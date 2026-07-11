@@ -1854,12 +1854,16 @@ def cockpit_overview(
             hb = _hour_bucket(dt)
             heat[(area, hb)] = heat.get((area, hb), 0) + 1
             area_neg_total[area] = area_neg_total.get(area, 0) + 1
-        # risk distribution
+        # risk distribution — 0 là sentinel "chấm fail, chờ người duyệt"
+        # (worker_ml), không phải điểm thật; đếm vào bucket 1 sẽ báo sai
+        # feedback chưa chấm thành rủi ro thấp đã xác minh.
         risk_raw = r.get("overall_risk")
         if risk_raw is not None:
             try:
-                score = max(1, min(10, int(risk_raw)))
-                risk_counter[score] = risk_counter.get(score, 0) + 1
+                score = int(risk_raw)
+                if score >= 1:
+                    score = min(10, score)
+                    risk_counter[score] = risk_counter.get(score, 0) + 1
             except (ValueError, TypeError):
                 pass
         # sankey layer1: sentiment × severity
