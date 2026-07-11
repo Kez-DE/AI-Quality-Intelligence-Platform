@@ -52,3 +52,5 @@ scripts/bin/harness-cli.exe
 
 # Office (Word/PowerPoint/Excel) lock/temp files
 ~$*
+.codegraph/
+.harness-backup/
