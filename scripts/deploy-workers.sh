@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 echo "=== 1. Syntax check ==="
-cd /Users/kenz_de/projects/C2-App-116/pipeline
+cd "$REPO_ROOT/pipeline"
 python3 -m py_compile worker_ticket.py worker_ingest.py worker_ml.py worker_agent.py main.py
 echo "All files compile OK."
 
 echo ""
 echo "=== 2. Railway service variables ==="
-cd /Users/kenz_de/projects/C2-App-116
+cd "$REPO_ROOT"
 
 # backend-worker → ticket workflow
 railway variables --service backend-worker --set RAILWAY_DOCKERFILE_PATH=pipeline/Dockerfile.workers --set WORKER_MODULE=worker_ticket
@@ -32,7 +34,7 @@ echo "✓ backend NIXPACKS_CONFIG_FILE removed"
 
 echo ""
 echo "=== 3. Git commit & push ==="
-cd /Users/kenz_de/projects/C2-App-116
+cd "$REPO_ROOT"
 git add pipeline/worker_ticket.py pipeline/worker_ingest.py pipeline/worker_ml.py pipeline/worker_agent.py pipeline/Dockerfile.workers pipeline/main.py .github/workflows/railway.yml
 git status --short
 git commit -m "Split 4 worker services with distinct roles + fix double-scheduling
