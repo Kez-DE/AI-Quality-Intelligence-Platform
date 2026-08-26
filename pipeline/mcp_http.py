@@ -20,7 +20,7 @@ from mcp_auth import SupabaseTokenVerifier
 from mcp_server import make_tool_handlers, _description_for
 
 SUPABASE_ISSUER = (os.environ.get("SUPABASE_URL", "").rstrip("/") or
-                   "https://fkopgtacyuejfzzfgtau.supabase.co") + "/auth/v1"
+                   "https://gvtoqbowulwmpzfogjwp.supabase.co") + "/auth/v1"
 PUBLIC_URL = os.environ.get(
     "MCP_PUBLIC_URL", "https://mcp-http-production-ffd0.up.railway.app/mcp")
 
