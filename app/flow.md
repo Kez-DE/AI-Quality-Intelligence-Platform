@@ -5,9 +5,7 @@ C2-App-116/
 ├── 🔒 [KHUNG COHORT — KHÔNG ĐỘNG]
 │   ├── scripts/                    # logging AI usage — giữ nguyên
 │   │   ├── _pyrun.sh / .cmd
-│   │   ├── setup_hooks.sh / .ps1
 │   │   ├── log_hook.py / log_antigravity.py / log_manual.py
-│   │   └── submit_log.py
 │   ├── .claude/ .codex/ .cursor/ .gemini/ .github/hooks/  # hook configs
 │   ├── .agents/                    # Antigravity rules
 │   ├── .env.example                # mở rộng thêm key dự án (xem dưới)

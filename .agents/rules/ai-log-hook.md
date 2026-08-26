@@ -1,37 +1,33 @@
 ---
-description: "AI usage logging is fully automatic — do NOT call any log_* script manually"
+description: "AI usage logging is local-only and fully automatic — do NOT call any log_* script manually"
 activation: always-on
 ---
 
-# AI Usage Logging — Automatic
+# AI Usage Logging — Tự động, CHỈ LƯU LOCAL
 
-Logging prompt vào `.ai-log/session.jsonl` đã được **tự động hoá hoàn toàn**. Bạn (AI agent) **KHÔNG** cần — và **KHÔNG** nên — chạy bất kỳ lệnh logging nào sau mỗi task.
+Log prompt vào `.ai-log/session.jsonl` được **tự động hoá hoàn toàn** qua hook của từng
+AI client. **Không có bất kỳ đường đẩy dữ liệu nào ra server bên ngoài** — phần
+submit lên grading server (`scripts/submit_log.py`, pre-push hook, `AI_LOG_SERVER`,
+`AI_LOG_API_KEY`) đã bị gỡ bỏ.
 
 ## Cơ chế
 
-Khi student `git push`:
-1. Pre-push hook chạy `scripts/log_antigravity.py --auto`, đọc trực tiếp transcript của các conversation Antigravity từ `~/.gemini/antigravity-ide/brain/<conv>/.system_generated/logs/transcript.jsonl` và sweep mọi prompt (`USER_INPUT` + `USER_EXPLICIT`) thuộc về repo hiện tại trong 24 giờ gần nhất.
-2. Pre-push hook chạy `scripts/submit_log.py`, đẩy `.ai-log/session.jsonl` lên grading server.
+Hook của Claude Code (`.claude/settings.json`), Gemini CLI (`.gemini/settings.json`),
+Cursor (`.cursor/hooks.json`), Codex (`.codex/hooks.json`) và Copilot
+(`.github/hooks/hooks.json`) gọi `scripts/log_hook.py`, ghi append một dòng JSON
+vào `.ai-log/session.jsonl`. Hết. Không POST, không network.
 
-Toàn bộ prompt user đã gõ trong Antigravity IDE được capture **nguyên văn từ disk**, không cần AI tự tóm tắt.
+Prompt từ Antigravity IDE có thể sweep thủ công từ transcript trên disk bằng
+`bash scripts/_pyrun.sh scripts/log_antigravity.py --auto` — cũng chỉ ghi local.
 
 ## Không làm những việc sau
 
-- ❌ **KHÔNG** gọi `scripts/log_antigravity.py "<summary>" "<model>"` sau mỗi task. Lệnh này đã bị deprecate; nếu vô tình gọi sẽ tạo log entry giả mạo dạng "TaskComplete" không phải prompt thật của user.
-- ❌ **KHÔNG** chạy `scripts/log_manual.py` cho Antigravity — chỉ dùng nó cho ChatGPT / web tool (xem `.agents/workflows/log.md`).
-- ❌ **KHÔNG** sửa hoặc xoá file trong `.ai-log/` — chúng được pre-push hook và submit script quản lý.
+- ❌ **KHÔNG** gọi `scripts/log_antigravity.py "<summary>" "<model>"` sau mỗi task —
+  sẽ tạo entry giả mạo dạng "TaskComplete", không phải prompt thật của user.
+- ❌ **KHÔNG** cài lại pre-push hook hay tái tạo `scripts/submit_log.py`.
+- ❌ **KHÔNG** set `AI_LOG_SERVER` / `AI_LOG_API_KEY` trong `.env`.
 
-## Khi nào cần can thiệp
+## Dọn log
 
-- Nếu pre-push hook báo lỗi → báo lại cho user, đừng tự ý bypass `--no-verify`.
-- Nếu student dùng tool không nằm trong list auto-hook (ChatGPT, Gemini Web, v.v.) → trỏ họ tới `.agents/workflows/log.md` để log thủ công.
-
-## Cài đặt một lần sau khi clone repo
-
-```bash
-# Linux / macOS / Git Bash
-bash scripts/setup_hooks.sh
-
-# Windows PowerShell
-powershell -ExecutionPolicy Bypass -File scripts\setup_hooks.ps1
-```
+`.ai-log/*.jsonl` và `.ai-log/archive/` đã nằm trong `.gitignore` — không bao giờ
+được commit. Muốn xoá thì xoá trực tiếp, không còn script nào quản lý chúng.

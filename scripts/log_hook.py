@@ -7,7 +7,6 @@ import json
 import os
 import sys
 import subprocess
-import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional
@@ -22,36 +21,6 @@ def git(cmd):
     except Exception:
         return ""
 
-
-def _auto_submit(log_dir: Path) -> None:
-    """Best-effort background submit so hooks reach the server without git push."""
-    if os.environ.get("AI_LOG_AUTO_SUBMIT", "true").lower() in {"0", "false", "no", "off"}:
-        return
-
-    # A hook can fire many times during a single AI turn. Throttle background
-    # submits so we do not spawn a POST for every Bash/Edit/Read tool event.
-    interval = int(os.environ.get("AI_LOG_AUTO_SUBMIT_INTERVAL_SECONDS", "15"))
-    marker = log_dir / ".last-submit"
-    now = time.time()
-    try:
-        last = float(marker.read_text(encoding="utf-8")) if marker.exists() else 0
-        if now - last < interval:
-            return
-        marker.write_text(str(now), encoding="utf-8")
-    except Exception:
-        return
-
-    try:
-        subprocess.Popen(
-            [sys.executable, str(REPO_ROOT / "scripts" / "submit_log.py")],
-            cwd=str(REPO_ROOT),
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            close_fds=True,
-        )
-    except Exception:
-        pass
 
 
 def detect_tool(data: dict) -> str:
@@ -217,8 +186,6 @@ def main():
 
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-
-    _auto_submit(log_dir)
 
     # Output valid JSON (required by some tools like Gemini)
     print(json.dumps({"status": "logged"}))

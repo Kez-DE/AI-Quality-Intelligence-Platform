@@ -4,7 +4,7 @@ description: "Ghi log AI thủ công — CHỈ dùng cho web tool (ChatGPT, Gemi
 
 # Ghi log AI thủ công (chỉ web tool)
 
-Antigravity IDE, Claude Code, Cursor, Codex, Copilot, Gemini CLI đã **tự động log** qua hook hoặc qua `log_antigravity.py` chạy trong pre-push. **Không cần** chạy lệnh dưới đây cho các tool đó.
+Claude Code, Cursor, Codex, Copilot, Gemini CLI đã **tự động log** qua hook; Antigravity sweep bằng `log_antigravity.py --auto`. **Không cần** chạy lệnh dưới đây cho các tool đó. Mọi log chỉ lưu local trong `.ai-log/`.
 
 Workflow này chỉ dành cho khi bạn dùng **tool web không có hook** — ví dụ ChatGPT, Gemini Web, Claude.ai, Perplexity, v.v.
 
