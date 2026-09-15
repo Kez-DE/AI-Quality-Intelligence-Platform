@@ -1,7 +1,7 @@
 # Advanced Analytics Charts — Design Spec
 
 **Date:** 2026-06-23  
-**Project:** C2-App-116 · AI Quality Intelligence Platform (xanhSM)  
+**Project:** AI-Quality-Intelligence-Platform · AI Quality Intelligence Platform (xanhSM)  
 **Scope:** Thêm section "Phân tích nâng cao" vào tab Cockpit với 4 biểu đồ mới.  
 **Status:** Approved, pending implementation.
 

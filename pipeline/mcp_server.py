@@ -34,7 +34,8 @@ def registered_tool_names(role: str | None) -> list[str]:
     return []
 
 
-def call_tool(role: str | None, scope_team: str | None, name: str, args: dict) -> str:
+def call_tool(role: str | None, scope_team: str | None, name: str, args: dict,
+              user_id: str | None = None) -> str:
     """Route một tool call. scope_team LUÔN từ config server, không bao giờ từ args.
 
     Gate quyền theo role ngay tại đây (defense in depth): dù HTTP server đăng ký sẵn
@@ -43,7 +44,7 @@ def call_tool(role: str | None, scope_team: str | None, name: str, args: dict) -
     if name not in registered_tool_names(role):
         return f"❌ Vai trò '{role}' không có quyền dùng tool '{name}'."
     if role == "guest":
-        return execute_guest_tool(name, args, user_id=None)
+        return execute_guest_tool(name, args, user_id=user_id)
     # admin: scope_team=None (toàn hệ thống). ops (staff/manager): ép về phòng của server.
     effective_scope = None if role == "admin" else scope_team
     return execute_tool(name, args, scope_team=effective_scope)
@@ -51,32 +52,33 @@ def call_tool(role: str | None, scope_team: str | None, name: str, args: dict) -
 
 def make_tool_handlers(identity):
     """Dựng 6 wrapper tool, mỗi cái resolve identity qua callable `identity()` →
-    (role, scope_team). Dùng chung cho stdio (identity cố định) và HTTP (identity
-    theo từng request qua token). scope_team KHÔNG bao giờ nằm trong args tool."""
+    (role, scope_team, user_id). Dùng chung cho stdio (identity cố định) và HTTP
+    (identity theo từng request qua token). scope_team và user_id KHÔNG bao giờ
+    nằm trong args tool."""
     def get_feedback_summary(days: int = 7) -> str:
-        role, scope = identity()
-        return call_tool(role, scope, "get_feedback_summary", {"days": days})
+        role, scope, uid = identity()
+        return call_tool(role, scope, "get_feedback_summary", {"days": days}, user_id=uid)
 
     def get_hot_areas(hours: int = 24, limit: int = 5) -> str:
-        role, scope = identity()
-        return call_tool(role, scope, "get_hot_areas", {"hours": hours, "limit": limit})
+        role, scope, uid = identity()
+        return call_tool(role, scope, "get_hot_areas", {"hours": hours, "limit": limit}, user_id=uid)
 
     def get_sla_tickets() -> str:
-        role, scope = identity()
-        return call_tool(role, scope, "get_sla_tickets", {})
+        role, scope, uid = identity()
+        return call_tool(role, scope, "get_sla_tickets", {}, user_id=uid)
 
     def get_team_priority_tasks(team_name: str) -> str:
-        role, scope = identity()
-        return call_tool(role, scope, "get_team_priority_tasks", {"team_name": team_name})
+        role, scope, uid = identity()
+        return call_tool(role, scope, "get_team_priority_tasks", {"team_name": team_name}, user_id=uid)
 
     def search_knowledge_base(query: str) -> str:
-        role, scope = identity()
-        return call_tool(role, scope, "search_knowledge_base", {"query": query})
+        role, scope, uid = identity()
+        return call_tool(role, scope, "search_knowledge_base", {"query": query}, user_id=uid)
 
     def submit_feedback(content: str, topic: str = "Other", sentiment: str = "negative") -> str:
-        role, scope = identity()
+        role, scope, uid = identity()
         return call_tool(role, scope, "submit_feedback",
-                         {"content": content, "topic": topic, "sentiment": sentiment})
+                         {"content": content, "topic": topic, "sentiment": sentiment}, user_id=uid)
 
     return {
         "get_feedback_summary": get_feedback_summary,
@@ -111,8 +113,9 @@ def build_server():
     role, scope_team = _resolve_identity()
     server = FastMCP("xanhsm-quality")
 
-    # stdio: identity cố định từ env cho cả tiến trình.
-    handlers = make_tool_handlers(lambda: (role, scope_team))
+    # stdio: identity cố định từ env cho cả tiến trình. Không có chủ token nên
+    # user_id = None; submit_feedback sẽ từ chối, đúng như mong đợi cho stdio.
+    handlers = make_tool_handlers(lambda: (role, scope_team, None))
 
     for name in registered_tool_names(role):
         fn = handlers.get(name)

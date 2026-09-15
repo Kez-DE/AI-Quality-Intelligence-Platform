@@ -33,4 +33,4 @@ bash scripts/_pyrun.sh scripts/log_manual.py --tool gemini-web --prompt "Researc
 bash scripts/_pyrun.sh scripts/log_manual.py --tool claude-web --prompt "Explain OAuth2 PKCE flow"
 ```
 
-Entry sẽ được append vào `.ai-log/session.jsonl` và submit cùng các log auto khác trong lần `git push` kế tiếp.
+Entry sẽ được append vào `.ai-log/session.jsonl` — chỉ lưu local, không gửi đi đâu.

@@ -39,23 +39,23 @@ def test_hash_deterministic():
 
 def test_admin_profile_is_system_wide():
     db = _db([{"id": "t1", "user_id": "u1"}], [{"role": "admin", "department": None}])
-    assert a.verify_token("raw", db=db) == {"role": "admin", "scope_team": None}
+    assert a.verify_token("raw", db=db) == {"role": "admin", "scope_team": None, "user_id": "u1"}
 
 
 def test_staff_with_department_is_scoped():
     db = _db([{"id": "t1", "user_id": "u1"}], [{"role": "staff", "department": "CSKH"}])
-    assert a.verify_token("raw", db=db) == {"role": "staff", "scope_team": "CSKH"}
+    assert a.verify_token("raw", db=db) == {"role": "staff", "scope_team": "CSKH", "user_id": "u1"}
 
 
 def test_staff_without_department_downgrades_to_guest():
     # nhân viên chưa được admin gán phòng → chỉ submit_feedback, KHÔNG toàn hệ thống
     db = _db([{"id": "t1", "user_id": "u1"}], [{"role": "staff", "department": None}])
-    assert a.verify_token("raw", db=db) == {"role": "guest", "scope_team": None}
+    assert a.verify_token("raw", db=db) == {"role": "guest", "scope_team": None, "user_id": "u1"}
 
 
 def test_guest_profile_only_submit():
     db = _db([{"id": "t1", "user_id": "u1"}], [{"role": "guest", "department": None}])
-    assert a.verify_token("raw", db=db) == {"role": "guest", "scope_team": None}
+    assert a.verify_token("raw", db=db) == {"role": "guest", "scope_team": None, "user_id": "u1"}
 
 
 def test_unknown_token_returns_none():
@@ -115,7 +115,7 @@ def test_verifier_supabase_jwt_maps_profile():
     v = a.SupabaseTokenVerifier(db=db)
     at = _verify(v, "jwt-good")
     assert at is not None
-    assert at.claims == {"role": "staff", "scope_team": "CSKH"}
+    assert at.claims == {"role": "staff", "scope_team": "CSKH", "user_id": "u1"}
     assert at.client_id == "supabase-user:u1"
 
 
@@ -126,7 +126,7 @@ def test_verifier_falls_back_to_bearer_table():
     })  # jwt_uid=None → get_user luôn raise → rơi xuống bearer
     v = a.SupabaseTokenVerifier(db=db)
     at = _verify(v, "raw-bearer")
-    assert at is not None and at.claims == {"role": "admin", "scope_team": None}
+    assert at is not None and at.claims == {"role": "admin", "scope_team": None, "user_id": "u1"}
 
 
 def test_verifier_rejects_garbage():

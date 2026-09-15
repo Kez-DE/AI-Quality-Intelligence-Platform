@@ -17,13 +17,24 @@ from departments import normalize_department
 ROUTING_TABLE_PATH = TAXONOMY_DIR / "routing_table.json"
 
 
+# Cache theo mtime: giữ được tính config-driven (sửa JSON là ăn ngay, không cần restart)
+# mà không phải đọc + parse file mỗi lần route. insight_agent gọi route_ticket một lần
+# cho MỖI feedback của MỖI phòng — 6 phòng x 2000 bản ghi là 12.000 lượt đọc đĩa mỗi chu kỳ.
+_routing_cache: tuple[float, Dict[str, Any]] | None = None
+
+
 def load_routing_table() -> Dict[str, Any]:
+    global _routing_cache
     if not ROUTING_TABLE_PATH.exists():
         raise FileNotFoundError(f"Routing taxonomy not found: {ROUTING_TABLE_PATH}")
+    mtime = ROUTING_TABLE_PATH.stat().st_mtime
+    if _routing_cache is not None and _routing_cache[0] == mtime:
+        return _routing_cache[1]
     with open(ROUTING_TABLE_PATH, "r", encoding="utf-8") as f:
         config = json.load(f)
     if not config.get("routes"):
         raise ValueError(f"Routing taxonomy has no routes: {ROUTING_TABLE_PATH}")
+    _routing_cache = (mtime, config)
     return config
 
 

@@ -9,8 +9,8 @@ Accepted
 ## Context
 
 The platform stored all data in Supabase project `metadata_xanhsm`
-(`fkopgtacyuejfzzfgtau`), which lived in a third-party organization
-(`mnguyn203's Org`). As of 2026-08-26 that project no longer resolves in DNS
+(`fkopgtacyuejfzzfgtau`), which lived in a third-party organization we do not
+own. As of 2026-08-26 that project no longer resolves in DNS
 (`db.fkopgtacyuejfzzfgtau.supabase.co: no such host`) and reports `INACTIVE`,
 so every local and Railway service that reads Supabase was already failing. We
 could neither dump nor restore its data without dashboard access to an

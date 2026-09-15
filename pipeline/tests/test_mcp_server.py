@@ -64,12 +64,29 @@ def test_guest_routes_to_guest_tool(monkeypatch):
 
     def fake_guest(name, args, user_id=None):
         captured["name"] = name
+        captured["user_id"] = user_id
         return "ok"
 
     monkeypatch.setattr(m, "execute_guest_tool", fake_guest)
     m.call_tool(role="guest", scope_team=None,
-                name="submit_feedback", args={"content": "test"})
+                name="submit_feedback", args={"content": "test"}, user_id="u1")
     assert captured["name"] == "submit_feedback"
+    # feedback.user_id là NOT NULL: nuốt user_id ở đây thì submit_feedback luôn
+    # từ chối, im lặng, và chỉ lộ ra khi có client MCP thật gọi trên production.
+    assert captured["user_id"] == "u1"
+
+
+def test_handlers_pass_identity_user_id_to_call_tool(monkeypatch):
+    captured = {}
+
+    def fake_guest(name, args, user_id=None):
+        captured["user_id"] = user_id
+        return "ok"
+
+    monkeypatch.setattr(m, "execute_guest_tool", fake_guest)
+    handlers = m.make_tool_handlers(lambda: ("guest", None, "u1"))
+    handlers["submit_feedback"](content="test")
+    assert captured["user_id"] == "u1"
 
 
 def test_build_server_ops_requires_scope(monkeypatch):

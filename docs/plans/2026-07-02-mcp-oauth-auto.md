@@ -22,7 +22,7 @@
 **Step 1:** Thử qua CLI/Management API:
 
 ```bash
-cd /Users/kenz_de/projects/C2-App-116
+cd /Users/kenz_de/projects/AI-Quality-Intelligence-Platform
 supabase config --help          # xem có push config auth không
 # Nếu CLI hỗ trợ: thêm vào supabase/config.toml mục oauth server rồi `supabase config push`
 # Song song: thử Management API
@@ -353,7 +353,7 @@ git commit -m "feat(mcp)!: bỏ luồng token self-service — OAuth thay thế 
 
 ## Task 4: Deploy Railway + E2E remote
 
-**Step 1:** `cd /Users/kenz_de/projects/C2-App-116 && railway up --service mcp-http --ci`
+**Step 1:** `cd /Users/kenz_de/projects/AI-Quality-Intelligence-Platform && railway up --service mcp-http --ci`
 (Biến env đã có sẵn trên service; `MCP_PUBLIC_URL` mặc định trong code đã đúng URL production.)
 
 **Step 2:** Verify remote:

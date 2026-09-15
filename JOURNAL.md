@@ -1,6 +1,6 @@
-# JOURNAL — C2-App-116
+# JOURNAL — AI-Quality-Intelligence-Platform
 
-Nhật ký học tập & hành trình sản phẩm của team 116.
+Nhật ký học tập & hành trình sản phẩm.
 
 ## Tuần 1 (12/06/2026)
 
@@ -8,7 +8,7 @@ Nhật ký học tập & hành trình sản phẩm của team 116.
 - Chốt đề tài **AI Quality Intelligence Platform** (Quality Operation Cockpit):
   phân tích phản hồi khách hàng smart mobility, phát hiện spike sự cố theo khu
   vực, agent LLM định tuyến ticket cho phòng ban.
-- Di trú dự án nguồn `xanh_iu` (build sẵn ~90% qua Lovable) vào repo team theo
+- Di trú dự án nguồn `xanh_iu` (build sẵn ~90% qua Lovable) vào repo chính theo
   layout chuẩn: `app/` (frontend) + `pipeline/` (Python) + `supabase/` + `data/`
   + `docs/`.
 - Nối classifier với model ML thật (TF-IDF + LinearSVC), sửa 3 bug (mock
@@ -16,7 +16,7 @@ Nhật ký học tập & hành trình sản phẩm của team 116.
 - Thêm dữ liệu canonical kèm tài liệu provenance, đặt backend về chế độ batch.
 
 ### Khó nhất
-Hiểu đúng trạng thái thực tế của repo. Ban đầu tưởng repo team trống, nhưng hóa
+Hiểu đúng trạng thái thực tế của repo. Ban đầu tưởng repo trống, nhưng hóa
 ra backend+UI đã được commit lên `main` ở layout cũ (`UI/` + `backend/pipeline/`).
 Phải đọc kỹ git history + so từng nguồn (xanh_iu, dataset crawl, blueprint) trước
 khi quyết, tránh build trùng hoặc build mù. Bug khó phát hiện nhất là **đảo ngược
@@ -47,4 +47,4 @@ Kiểm tra trạng thái cả `main` và các branch ngay từ đầu (không ch
 - Kiểm frontend build được + kết nối Supabase, chạy thử luồng demo "bấm nút 150
   review → dashboard đỏ → agent sinh ticket".
 - Thêm auth/role (Admin/Manager/Staff/Guest) + deploy frontend (Vercel) và
-  backend (Railway/Render) theo yêu cầu BTC.
+  backend (Railway/Render).

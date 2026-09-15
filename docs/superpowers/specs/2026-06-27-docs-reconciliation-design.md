@@ -7,7 +7,7 @@
 
 ## 1. Mục tiêu & bối cảnh
 
-Dự án **C2-App-116 (xanhSM AI Quality Intelligence Platform)** đã hoàn thiện. Trong quá
+Dự án **AI-Quality-Intelligence-Platform (xanhSM AI Quality Intelligence Platform)** đã hoàn thiện. Trong quá
 trình phát triển, code đã tiến hoá nhiều (6 phòng ban, RAG hybrid, multi-agent, task loop,
 HI-loop) trong khi `docs/project` bị **drift** so với code thực tế. Mục tiêu: đối soát toàn
 bộ `docs/project` với code đã hoàn thành, **chạy e2e thật** để lấy bằng chứng, rồi **sửa

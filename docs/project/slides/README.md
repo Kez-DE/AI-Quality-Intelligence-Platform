@@ -1,7 +1,7 @@
 # Slides — Tổng quan dự án
 
 `AI-Quality-Intelligence-Platform-Overview.pptx` — bản thuyết trình tổng quan dự án
-(20 slide, 16:9, tiếng Việt, có speaker notes), dành cho hội đồng AI20K / demo day.
+(20 slide, 16:9, tiếng Việt, có speaker notes), dành cho buổi demo tổng quan dự án.
 
 Mạch trình bày: **Vấn đề → Bài toán → Giải pháp → Kiến trúc → Luồng E2E →
 6 năng lực hoạt động → Vòng đời task (5 trạng thái) → Vận hành giao việc

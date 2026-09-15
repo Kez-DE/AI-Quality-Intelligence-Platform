@@ -19,7 +19,7 @@ về mặt kinh doanh lẫn kỹ thuật.
 
 ## Khán giả và bối cảnh
 
-- **Khán giả**: ban giám khảo cohort và nhà đầu tư. Họ thông minh nhưng không có
+- **Khán giả**: hội đồng đánh giá và nhà đầu tư. Họ thông minh nhưng không có
   thời gian; họ quan tâm bài toán thật, giá trị thật, và tư duy đằng sau giải pháp
   hơn là chi tiết code.
 - **Sản phẩm**: AI Quality Intelligence Platform — "Quality Operation Cockpit" cho
@@ -90,7 +90,7 @@ Không viết đoạn văn dài trên slide. Slide là điểm tựa cho ngườ
 Bám sát dàn ý này về thứ tự và thông điệp. Làm giàu nội dung từ tài liệu nguồn.
 
 **Slide 1 — Bìa.** Tên sản phẩm và một câu định vị: "Quality Operation Cockpit cho
-xanhSM — AI đọc phản hồi khách hàng thay con người." Tên đội, cohort.
+xanhSM — AI đọc phản hồi khách hàng thay con người." Tên sản phẩm.
 
 **Slide 2 — Bài toán.** Mỗi ngày hàng nghìn phản hồi về dịch vụ gọi xe. Con người
 không đọc xuể. Vấn đề nghiêm trọng bị chìm trong khối lượng.

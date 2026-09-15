@@ -60,18 +60,66 @@ const NAV: NavItem[] = [
   { to: "/dashboard", label: "Tổng quan", icon: Gauge, roles: ALL_ROLES, group: "overview" },
 
   // 2. Vận hành — theo đúng luồng dữ liệu đi qua hệ thống.
-  { to: "/feedback", label: "Phản hồi", icon: MessageSquare, roles: AUTHENTICATED_ROLES, group: "operations" },
-  { to: "/alerts", label: "Phân loại Ticket", icon: Bell, roles: ["admin", "manager"], group: "operations" },
-  { to: "/tasks", label: "Quản lý công việc", icon: Kanban, roles: AUTHENTICATED_ROLES, group: "operations" },
-  { to: "/support", label: "Hỗ trợ CSKH", icon: Headphones, roles: AUTHENTICATED_ROLES, group: "operations" },
+  {
+    to: "/feedback",
+    label: "Phản hồi",
+    icon: MessageSquare,
+    roles: AUTHENTICATED_ROLES,
+    group: "operations",
+  },
+  {
+    to: "/alerts",
+    label: "Phân loại Ticket",
+    icon: Bell,
+    roles: ["admin", "manager"],
+    group: "operations",
+  },
+  {
+    to: "/tasks",
+    label: "Quản lý công việc",
+    icon: Kanban,
+    roles: AUTHENTICATED_ROLES,
+    group: "operations",
+  },
+  {
+    to: "/support",
+    label: "Hỗ trợ CSKH",
+    icon: Headphones,
+    roles: AUTHENTICATED_ROLES,
+    group: "operations",
+  },
 
   // 3. Phân tích & Báo cáo — đầu ra của luồng.
-  { to: "/insights", label: "Phân tích phòng ban", icon: Building2, roles: ["admin", "manager"], group: "analytics" },
-  { to: "/reports", label: "Báo cáo AI", icon: FileText, roles: ["admin", "manager"], group: "analytics" },
-  { to: "/completion-reports", label: "Báo cáo hoàn thành", icon: ClipboardCheck, roles: ["admin", "manager"], group: "analytics" },
+  {
+    to: "/insights",
+    label: "Phân tích phòng ban",
+    icon: Building2,
+    roles: ["admin", "manager"],
+    group: "analytics",
+  },
+  {
+    to: "/reports",
+    label: "Báo cáo AI",
+    icon: FileText,
+    roles: ["admin", "manager"],
+    group: "analytics",
+  },
+  {
+    to: "/completion-reports",
+    label: "Báo cáo hoàn thành",
+    icon: ClipboardCheck,
+    roles: ["admin", "manager"],
+    group: "analytics",
+  },
 
   // 4. Trợ lý AI.
-  { to: "/chat", label: "Trợ lý AI", icon: Sparkles, roles: AUTHENTICATED_ROLES, group: "assistant" },
+  {
+    to: "/chat",
+    label: "Trợ lý AI",
+    icon: Sparkles,
+    roles: AUTHENTICATED_ROLES,
+    group: "assistant",
+  },
 
   // 5. Quản trị — chỉ admin.
   { to: "/live-stream", label: "Luồng trực tiếp", icon: Radio, roles: ["admin"], group: "admin" },
@@ -85,7 +133,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { data: me } = useMe();
 
   const role = me?.role || "guest";
-  const { notifications, unreadCount, markAsRead, markAllRead } = useRealtimeNotifications(me?.id);
+  const { notifications, unreadCount, markAsRead, markAllRead } = useRealtimeNotifications(
+    me?.id,
+    me?.role,
+    me?.department,
+  );
   const { theme, toggleTheme } = useTheme();
 
   const navItems = NAV.filter((n) => n.roles.includes(role)).map((n) => {
@@ -248,7 +300,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 key={n.to}
                 to={n.to}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs whitespace-nowrap ${
-                  active ? "bg-xanh-mint text-xanh-deep font-semibold" : "bg-muted text-muted-foreground"
+                  active
+                    ? "bg-xanh-mint text-xanh-deep font-semibold"
+                    : "bg-muted text-muted-foreground"
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" />

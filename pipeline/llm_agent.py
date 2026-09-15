@@ -1,13 +1,22 @@
-import time
 from agent.model_router import chat_completion, parse_json_response, provider_has_key, resolve_provider
 
 def mock_spike_response(area: str, feedback_texts: list[str]) -> dict:
-    print(f"[{area}] Chưa có LLM API key. Đang dùng chế độ giả lập (Mock AI)...")
-    time.sleep(1)
+    """Mô tả suy diễn khi không có LLM — chỉ nhắc lại dữ liệu thật, KHÔNG bịa nguyên nhân.
+
+    Bản cũ trả một đoạn cố định về "thái độ phục vụ nhân viên và chất lượng sản phẩm
+    giảm sút trong giờ cao điểm" cho MỌI alert, bất kể nội dung phản hồi. Không có LLM
+    key là mọi ticket trong hệ mang cùng một nguyên nhân bịa.
+    """
+    print(f"[{area}] Chưa có LLM API key. Mô tả lấy trực tiếp từ dữ liệu (không suy luận).")
+    samples = [t.strip() for t in feedback_texts if t and t.strip()][:3]
+    quoted = "; ".join(f"\"{s[:120]}\"" for s in samples) or "không có mẫu văn bản"
     return {
-        "title": f"Bùng nổ phàn nàn tại {area}",
-        "description": f"Tổng hợp {len(feedback_texts)} review: Khách hàng phản ánh gay gắt về thái độ phục vụ của nhân viên và chất lượng sản phẩm giảm sút trong giờ cao điểm.",
-        "action": "Yêu cầu Quản lý khu vực xuống trực tiếp chi nhánh kiểm tra camera và chấn chỉnh đội ngũ ngay lập tức.",
+        "title": f"Cụm phản hồi tiêu cực tại {area}",
+        "description": (
+            f"{len(feedback_texts)} phản hồi cùng nhóm tại {area}. Trích mẫu: {quoted}. "
+            "Chưa có phân tích nguyên nhân (không khả dụng LLM) — cần người phụ trách đọc và kết luận."
+        ),
+        "action": "Phân công người phụ trách đọc cụm phản hồi này và xác định nguyên nhân.",
     }
 
 def build_spike_prompt(area: str, feedback_texts: list[str]) -> str:
@@ -40,8 +49,9 @@ def analyze_spike(area: str, feedback_texts: list[str]) -> dict:
         return mock_spike_response(area, feedback_texts)
 
     try:
+        # Bỏ sleep(2) demo: model_router đã có retry + backoff cho 429, còn 20 spike/lượt
+        # nhân 2 giây là 40 giây chờ trắng mỗi chu kỳ pipeline.
         print(f"[{area}] Đang gọi AI provider={provider} phân tích...")
-        time.sleep(2)
         response = chat_completion(
             [{"role": "user", "content": build_spike_prompt(area, feedback_texts)}],
             response_json=True,

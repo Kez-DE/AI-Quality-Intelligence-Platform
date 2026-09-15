@@ -10,7 +10,7 @@ import time
 from datetime import datetime, timezone, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Any, Optional
 
 from ingest import ingest_dataset
 from ingest import get_supabase
@@ -27,7 +27,7 @@ from core.paths import DEFAULT_DATA_FILE
 from departments import alert_department
 from agents.router_agent import route_ticket
 from services.agent_context import AGENT_SYSTEM_PROMPT, GUEST_SYSTEM_PROMPT, build_agent_data_context, build_agent_system_prompt
-from services.live_stream import get_live_stream_status, set_scheduler, start_live_stream, stop_live_stream
+from services.live_stream import DEFAULT_MAX_SPIKES, get_live_stream_status, set_scheduler, start_live_stream, stop_live_stream
 from services.ticket_workflow import ticket_workflow_state
 
 START_TIME = time.time()
@@ -73,12 +73,34 @@ class ReviewReportReq(BaseModel):
     review_note: Optional[str] = Field(default=None, max_length=2000)
 
 
+class DraftTaskItem(BaseModel):
+    """Một Draft Task manager biên tập trong báo cáo trước khi triển khai.
+
+    Có schema thật vì payload này đi thẳng vào bảng `tasks` qua RPC: trước đây
+    `list[dict]` chấp nhận mọi thứ, nên priority tự do ("khẩn") lọt vào DB rồi biến
+    task thành tàng hình với mọi bộ lọc, và deadline sai kiểu làm endpoint 500.
+    """
+
+    action: str = Field(..., min_length=1, max_length=300)
+    priority: str = Field(default="P3", pattern=r"^P[1-5]$")
+    # Chỉ nhận token parse_deadline hiểu được (24h / 7d / 2w). Trước đây deadline lạ
+    # bị âm thầm quy về +48h, nên báo cáo in "trong 2 tuần" còn task hết hạn sau 2 ngày.
+    deadline: Optional[str] = Field(default=None, pattern=r"^\s*\d{1,4}\s*[hdwHDW]\s*$")
+    owner: Optional[str] = Field(default=None, max_length=120)
+    success_metric: Optional[str] = Field(default=None, max_length=500)
+
+
+# Trần số draft task mỗi lần triển khai. Một báo cáo sinh quá số này là dấu hiệu
+# prompt hỏng hoặc client sai, không phải nhu cầu vận hành thật.
+MAX_DRAFT_TASKS = 20
+
+
 class DraftTasksReq(BaseModel):
-    suggested_tasks: list[dict]
+    suggested_tasks: list[DraftTaskItem] = Field(default_factory=list, max_length=MAX_DRAFT_TASKS)
 
 
 class ApproveDispatchReq(BaseModel):
-    suggested_tasks: list[dict]
+    suggested_tasks: list[DraftTaskItem] = Field(..., min_length=1, max_length=MAX_DRAFT_TASKS)
 
 
 _s = get_settings()
@@ -257,6 +279,31 @@ def whoami(user: AuthUser = Depends(get_current_user)):
 def read_root():
     return {"message": "Welcome to AI Quality Intelligence API"}
 
+_HEALTH_DB_TTL_SECONDS = 15
+_health_db_cache: tuple[float, bool, int | None] = (0.0, False, None)
+
+
+def _probe_supabase() -> tuple[bool, int | None]:
+    """Cheap Supabase reachability probe for the public /health endpoint.
+
+    Result is cached for _HEALTH_DB_TTL_SECONDS so an unauthenticated caller
+    cannot turn /health into a query amplifier against the database.
+    """
+    global _health_db_cache
+    cached_at, ok, latency_ms = _health_db_cache
+    now = time.time()
+    if now - cached_at < _HEALTH_DB_TTL_SECONDS:
+        return ok, latency_ms
+    t0 = time.perf_counter()
+    try:
+        get_supabase().table("feedback").select("id").limit(1).execute()
+        ok, latency_ms = True, round((time.perf_counter() - t0) * 1000)
+    except Exception:
+        ok, latency_ms = False, None
+    _health_db_cache = (now, ok, latency_ms)
+    return ok, latency_ms
+
+
 @app.get("/health")
 def health_check():
     from core.paths import DEFAULT_DATA_FILE
@@ -267,8 +314,11 @@ def health_check():
         routing_routes = len(load_routing_table().get("routes", []))
     except (FileNotFoundError, ValueError):
         routing_routes = 0
+    db_ok, db_latency_ms = _probe_supabase()
     return {
-        "status": "ok",
+        # "degraded" when Supabase is unreachable. Still HTTP 200 so a database
+        # outage does not make Railway restart an otherwise healthy container.
+        "status": "ok" if db_ok else "degraded",
         "message": "Backend service is running",
         "version": "1.0.0",
         "uptime_seconds": int(time.time() - START_TIME),
@@ -277,6 +327,9 @@ def health_check():
         "routing_routes": routing_routes,
         "llm_provider": agent_info.get("provider"),
         "llm_has_key": agent_info.get("has_key"),
+        # No error text here: /health is public, and driver errors can carry the DSN.
+        # Ops staff get the message from GET /api/health/services.
+        "database": {"status": "ok" if db_ok else "error", "latency_ms": db_latency_ms},
     }
 
 @app.get("/api/feedback/recent")
@@ -405,11 +458,15 @@ def list_tasks(
     overdue: bool = Query(default=False),
     mine: bool = Query(default=False),
     assigned: bool | None = Query(default=None),
+    source: str | None = Query(default=None, pattern=r"^(agent|report|ticket)$"),
+    report_id: str | None = Query(default=None),
     user: AuthUser = Depends(require_ops_staff),
 ):
     """Liệt kê task. mine=true -> chỉ task giao cho user hiện tại ("Việc của tôi").
 
     assigned=true/false -> lọc task đã/chưa có người nhận (dùng cho hàng đợi dispatch).
+    source -> tách ba nguồn việc: agent (gom alert), report (manager duyệt), ticket (CSKH).
+    report_id -> đường back-link báo cáo → các task nó đã sinh ra (trước đây chỉ có chiều ngược).
     """
     # scoped_team có thể raise 403 (ops chưa gán phòng) — gọi NGOÀI try để không bị
     # except Exception bọc nhầm thành 503.
@@ -425,6 +482,10 @@ def list_tasks(
             q = q.eq("priority", priority)
         if area:
             q = q.eq("area", area)
+        if source:
+            q = q.eq("source", source)
+        if report_id:
+            q = q.eq("report_id", report_id)
         if mine:
             q = q.eq("owner_id", user.id)
         if assigned is True:
@@ -581,14 +642,20 @@ def _compute_sla_summary(alerts: list) -> dict:
 
 
 def _resolve_alerts_for_task(db, task_id: str, actor) -> None:
-    """Task resolved → đóng các alert liên kết (task_id) chưa resolved. Best-effort."""
+    """Task resolved → đóng các alert liên kết (task_id) chưa resolved.
+
+    Best-effort nhưng KHÔNG im lặng: nuốt lỗi ở đây tạo ra trạng thái task đã xong mà
+    ticket khách vẫn mở, không dấu vết nào để lần ra.
+    """
     try:
         db.table("alerts").update({
             "status": "resolved", "resolved_at": "now()",
             "resolved_by": getattr(actor, "id", None), "updated_at": "now()",
         }).eq("task_id", task_id).neq("status", "resolved").execute()
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001 — không chặn nghiệp vụ, nhưng phải thấy được
+        logging.getLogger("alerts").warning(
+            "Task %s đã resolved nhưng không đóng được alert liên kết: %s", task_id, str(exc)[:200]
+        )
 
 
 @app.get("/api/alerts/sla-summary")
@@ -614,13 +681,21 @@ def support_resolve(task_id: str, payload: SupportResolveReq, user: AuthUser = D
     """
     try:
         db = get_supabase()
-        rows = db.table("tasks").select("assigned_team,status").eq("id", task_id).limit(1).execute().data or []
+        rows = db.table("tasks").select("assigned_team,status,source").eq("id", task_id).limit(1).execute().data or []
         if not rows:
             raise HTTPException(status_code=404, detail="Task not found")
         task_team = rows[0].get("assigned_team")
         cur_status = rows[0].get("status")
         if not can_view_team(user, task_team):
             raise HTTPException(status_code=403, detail="Bạn không thể đóng ticket của phòng ban khác.")
+        # Đường tắt này CHỈ dành cho ticket khách (source='ticket'). Nếu mở cho mọi task,
+        # bất kỳ staff nào cũng đóng được task từ báo cáo bằng 2 click, vượt qua toàn bộ
+        # chuỗi giao việc → nhận → báo cáo → manager duyệt.
+        if (rows[0].get("source") or "agent") != "ticket":
+            raise HTTPException(
+                status_code=409,
+                detail="Chỉ ticket khách mới đóng trực tiếp được. Task nội bộ phải qua báo cáo hoàn thành và duyệt.",
+            )
         if cur_status == "resolved":
             raise HTTPException(status_code=409, detail="Ticket đã được đóng.")
         if cur_status not in {"open", "assigned", "in_progress", "pending_review"}:
@@ -758,10 +833,12 @@ def list_reports(
     limit: int = Query(default=50, ge=1, le=100),
     user: AuthUser = Depends(require_ops_staff),
 ):
+    # scoped_team raise 403 cho ops chưa gán phòng — phải gọi NGOÀI try, nếu không
+    # `except Exception` bên dưới nuốt mất và đổi thành 503 (đo được khi test RBAC thật).
+    effective_team = scoped_team(user, team)
     try:
         db = get_supabase()
         q = db.table("department_reports").select("*", count="exact")
-        effective_team = scoped_team(user, team)
         if effective_team:
             q = q.eq("team", effective_team)
         offset = (page - 1) * limit
@@ -780,24 +857,39 @@ def list_reports(
 
 
 @app.patch("/api/reports/{report_id}/approve")
-def approve_report(report_id: str, user: AuthUser = Depends(require_ops_staff)):
-    """Trưởng phòng duyệt báo cáo trước khi chia việc."""
+def approve_report(report_id: str, user: AuthUser = Depends(require_manager)):
+    """Duyệt báo cáo KHÔNG kèm chia việc. Chỉ hợp lệ khi báo cáo không có Draft Task.
+
+    Đường này từng là bẫy: duyệt trơn một báo cáo còn Draft Task sẽ khoá vĩnh viễn
+    `approve-and-dispatch` (RPC yêu cầu `approved = false`), báo cáo hiện "đã duyệt"
+    mà không sinh task nào và không có nút gỡ. Nay chặn ngay tại nguồn.
+    """
     db = get_supabase()
-    existing = db.table("department_reports").select("team").eq("id", report_id).limit(1).execute().data or []
+    existing = (
+        db.table("department_reports").select("team,approved,suggested_tasks")
+        .eq("id", report_id).limit(1).execute().data or []
+    )
     if not existing:
         raise HTTPException(status_code=404, detail="Report not found")
     if not can_view_team(user, existing[0].get("team")):
         raise HTTPException(status_code=403, detail="Bạn không có quyền duyệt báo cáo của phòng ban khác.")
+    if existing[0].get("approved"):
+        raise HTTPException(status_code=409, detail="Báo cáo đã được duyệt.")
+    if existing[0].get("suggested_tasks"):
+        raise HTTPException(
+            status_code=409,
+            detail="Báo cáo còn Draft Task — dùng 'Duyệt và triển khai task' để vừa duyệt vừa tạo task.",
+        )
     try:
         data = db.table("department_reports").update({
             "approved": True,
             "approved_by": user.id,
             "approved_at": datetime.now(timezone.utc).isoformat()
-        }).eq("id", report_id).execute().data or []
+        }).eq("id", report_id).eq("approved", False).execute().data or []
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot approve report: {str(exc)[:300]}") from exc
     if not data:
-        raise HTTPException(status_code=404, detail="Report not found")
+        raise HTTPException(status_code=409, detail="Báo cáo đã được duyệt.")
     return {"status": "success", "data": data[0]}
 
 
@@ -805,7 +897,7 @@ def approve_report(report_id: str, user: AuthUser = Depends(require_ops_staff)):
 def update_draft_tasks(
     report_id: str,
     payload: DraftTasksReq,
-    user: AuthUser = Depends(require_ops_staff),
+    user: AuthUser = Depends(require_manager),
 ):
     """Manager lưu nháp danh sách Draft Task. 409 nếu báo cáo đã duyệt."""
     db = get_supabase()
@@ -818,7 +910,7 @@ def update_draft_tasks(
         raise HTTPException(status_code=409, detail="Báo cáo đã duyệt, không thể sửa.")
     try:
         data = db.table("department_reports").update(
-            {"suggested_tasks": payload.suggested_tasks}
+            {"suggested_tasks": [t.model_dump() for t in payload.suggested_tasks]}
         ).eq("id", report_id).eq("approved", False).execute().data or []
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Cannot save draft: {str(exc)[:300]}") from exc
@@ -831,21 +923,30 @@ def update_draft_tasks(
 def approve_and_dispatch(
     report_id: str,
     payload: ApproveDispatchReq,
-    user: AuthUser = Depends(require_ops_staff),
+    user: AuthUser = Depends(require_manager),
 ):
-    """Duyệt báo cáo + tạo task chính thức (atomic qua RPC)."""
+    """Duyệt báo cáo + tạo task chính thức (atomic qua RPC).
+
+    Chỉ manager/admin: đây là thao tác tạo hàng loạt task cho cả phòng và khoá báo cáo
+    vĩnh viễn, không phải việc hàng ngày của staff.
+    """
     db = get_supabase()
-    existing = db.table("department_reports").select("team,approved").eq("id", report_id).limit(1).execute().data or []
+    existing = (
+        db.table("department_reports").select("team,approved,report_date")
+        .eq("id", report_id).limit(1).execute().data or []
+    )
     if not existing:
         raise HTTPException(status_code=404, detail="Report not found")
-    if not can_view_team(user, existing[0].get("team")):
+    report_team = existing[0].get("team")
+    if not can_view_team(user, report_team):
         raise HTTPException(status_code=403, detail="Bạn không có quyền duyệt báo cáo của phòng ban khác.")
     if existing[0].get("approved"):
         raise HTTPException(status_code=409, detail="Báo cáo đã được duyệt.")
 
-    enriched = []
-    for t in payload.suggested_tasks:
-        item = dict(t)
+    # deadline đã được DraftTaskItem validate về token hợp lệ, nên due_at luôn đúng ý
+    # người duyệt. Thiếu deadline -> parse_deadline trả mặc định +48h (có chủ ý).
+    enriched: list[dict] = []
+    for item in (t.model_dump() for t in payload.suggested_tasks):
         item["due_at"] = parse_deadline(item.get("deadline")).isoformat()
         enriched.append(item)
 
@@ -960,13 +1061,26 @@ def submit_completion_report(
         raise HTTPException(status_code=400, detail="completion_level không hợp lệ")
     try:
         db = get_supabase()
-        rows = db.table("tasks").select("assigned_team,status").eq("id", task_id).limit(1).execute().data or []
+        rows = db.table("tasks").select("assigned_team,status,owner_id").eq("id", task_id).limit(1).execute().data or []
         if not rows:
             raise HTTPException(status_code=404, detail="Task not found")
         task_team = rows[0].get("assigned_team")
         cur_status = rows[0].get("status")
         if not can_view_team(user, task_team):
             raise HTTPException(status_code=403, detail="Bạn không thể báo cáo task của phòng ban khác.")
+        # Chỉ người được giao mới báo cáo được — cùng luật với accept_task. Thiếu chốt này
+        # thì A báo cáo hộ task của B, leaderboard và audit đều ghi sai người làm.
+        owner_id = rows[0].get("owner_id")
+        if user.role != "admin" and owner_id and owner_id != user.id:
+            raise HTTPException(status_code=403, detail="Chỉ người được giao mới gửi được báo cáo cho task này.")
+        # Một task chỉ có một báo cáo đang chờ duyệt. Không chặn thì nhân viên gửi trùng
+        # N lần (UI không có dấu hiệu đã gửi) và manager duyệt nhầm bản cũ.
+        pending = (
+            db.table("task_completion_reports").select("id")
+            .eq("task_id", task_id).eq("status", "submitted").limit(1).execute().data or []
+        )
+        if pending:
+            raise HTTPException(status_code=409, detail="Task này đã có báo cáo đang chờ quản lý duyệt.")
         record = {
             "task_id": task_id,
             "staff_id": user.id,
@@ -1091,30 +1205,57 @@ def review_completion_report(
         raise HTTPException(status_code=403, detail="Chỉ quản lý hoặc admin được duyệt báo cáo.")
     try:
         db = get_supabase()
-        rows = db.table("task_completion_reports").select("team,task_id").eq("id", report_id).limit(1).execute().data or []
+        rows = (
+            db.table("task_completion_reports").select("team,task_id,status,completion_level")
+            .eq("id", report_id).limit(1).execute().data or []
+        )
         if not rows:
             raise HTTPException(status_code=404, detail="Report not found")
         team = rows[0].get("team")
         rep_task_id = rows[0].get("task_id")
+        completion_level = rows[0].get("completion_level") or "completed"
         if not can_view_team(user, team):
             raise HTTPException(status_code=403, detail="Không có quyền duyệt báo cáo phòng ban khác.")
-        # NOTE: report update and task transition below are intentionally non-atomic
-        # (Supabase REST has no transaction here; acceptable — partial failure is
-        # surfaced via audit log and retry is safe).
+        # Duyệt lại một báo cáo đã xử lý sẽ ghi đè reviewed_by/reviewed_at trong khi task
+        # không chuyển được nữa -> hai nguồn sự thật lệch nhau vĩnh viễn.
+        if rows[0].get("status") in {"approved", "rejected"}:
+            raise HTTPException(status_code=409, detail="Báo cáo hoàn thành này đã được xử lý.")
+        # Quyết định trạng thái đích TRƯỚC khi ghi gì cả — hai bảng này không nằm chung
+        # transaction (Supabase REST), nên phải kiểm tra xong mới ghi, đừng ghi rồi mới
+        # phát hiện không chuyển được.
+        #   approved + completed -> task xong.
+        #   approved + partial/blocked -> manager ghi nhận vướng mắc, task Ở NGUYÊN chỗ cũ.
+        #     (trước đây vẫn nhắm 'resolved', transition không hợp lệ nên bị bỏ qua IM LẶNG:
+        #      manager thấy "đã duyệt", task kẹt in_progress mãi, ticket khách vẫn mở.)
+        #   rejected -> trả việc lại cho nhân viên.
+        task_rows = db.table("tasks").select("status").eq("id", rep_task_id).limit(1).execute().data or []
+        cur = task_rows[0].get("status") if task_rows else None
+        if payload.status == "rejected":
+            target = "in_progress"
+        elif completion_level == "completed":
+            target = "resolved"
+        else:
+            target = None
+        needs_move = bool(target and cur is not None and cur != target)
+        if needs_move and (cur, target) not in ALLOWED_TASK_TRANSITIONS:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Không thể chuyển task {cur} → {target}. Kiểm tra lại trạng thái task trước khi duyệt.",
+            )
+
         data = db.table("task_completion_reports").update({
             "status": payload.status,
             "review_note": payload.review_note,
             "reviewed_by": user.id,
             "reviewed_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": "now()",
-        }).eq("id", report_id).execute().data or []
-        # Lái trạng thái task theo kết quả duyệt.
-        task_rows = db.table("tasks").select("status").eq("id", rep_task_id).limit(1).execute().data or []
-        cur = task_rows[0].get("status") if task_rows else None
-        target = "resolved" if payload.status == "approved" else "in_progress"
+        }).eq("id", report_id).eq("status", "submitted").execute().data or []
+        if not data:
+            raise HTTPException(status_code=409, detail="Báo cáo hoàn thành này đã được xử lý.")
+
         action = "completion_approved" if payload.status == "approved" else "completion_rejected"
         to_status = cur
-        if cur is not None and (cur, target) in ALLOWED_TASK_TRANSITIONS:
+        if needs_move:
             db.table("tasks").update({"status": target, "updated_at": "now()"}).eq("id", rep_task_id).execute()
             to_status = target
         if payload.status == "approved" and to_status == "resolved":
@@ -1452,7 +1593,7 @@ def start_live_feedback_stream(
     reset: bool = Query(default=False),
     auto_ticket: bool = Query(default=True),
     ticket_every_batches: int = Query(default=2, ge=1, le=100),
-    ticket_max_spikes: int = Query(default=6, ge=1, le=10),
+    ticket_max_spikes: int = Query(default=DEFAULT_MAX_SPIKES, ge=1, le=20),
     _: AuthUser = Depends(require_admin),
 ):
     """
@@ -1486,7 +1627,7 @@ def run_real_pipeline(
     limit: int | None = Query(default=None, ge=1),
     batch_size: int = Query(default=150, ge=1, le=500),
     max_feedback: int = Query(default=1000, ge=1, le=5000),
-    max_spikes: int = Query(default=3, ge=1, le=20),
+    max_spikes: int = Query(default=DEFAULT_MAX_SPIKES, ge=1, le=20),
     _: AuthUser = Depends(require_admin),
 ):
     """
@@ -1515,7 +1656,7 @@ def run_real_pipeline(
 @app.post("/api/trigger-spike-detect")
 def trigger_spike_detect(
     max_feedback: int = Query(default=1000, ge=1, le=5000),
-    max_spikes: int = Query(default=3, ge=1, le=20),
+    max_spikes: int = Query(default=DEFAULT_MAX_SPIKES, ge=1, le=20),
     _: AuthUser = Depends(require_admin),
 ):
     """
@@ -1598,6 +1739,10 @@ def correct_feedback_label(
     if not rows:
         raise HTTPException(status_code=404, detail="Feedback not found")
     current = rows[0]
+    # Đường ĐỌC feedback đã lọc theo phòng (_feedback_team), đường GHI thì chưa —
+    # nên staff phòng khác vẫn sửa được nhãn của phòng mình không sở hữu.
+    if not can_view_team(user, _feedback_team(current)):
+        raise HTTPException(status_code=403, detail="Bạn không thể sửa nhãn phản hồi của phòng ban khác.")
 
     # Ghi audit cho từng field thực sự đổi.
     log_entries = []
@@ -1640,9 +1785,12 @@ def review_feedback(
     action='handled'  -> như approve (đã xử lý xong). Giữ đơn giản cho demo.
     """
     db = get_supabase()
-    rows = db.table("feedback").select("id").eq("id", feedback_id).limit(1).execute().data or []
+    rows = db.table("feedback").select("*").eq("id", feedback_id).limit(1).execute().data or []
     if not rows:
         raise HTTPException(status_code=404, detail="Feedback not found")
+    # Cùng luật scope với sửa nhãn: dọn hàng đợi duyệt của phòng khác cũng là ghi chéo phòng.
+    if not can_view_team(user, _feedback_team(rows[0])):
+        raise HTTPException(status_code=403, detail="Bạn không thể duyệt phản hồi của phòng ban khác.")
     try:
         updated = db.table("feedback").update(
             {"reviewed": True, "needs_review": False}
@@ -1706,20 +1854,28 @@ def list_department_insights(
     hours: int = Query(default=24, ge=1, le=720),
     user: AuthUser = Depends(require_ops_staff),
 ):
-    """Chạy orchestrator: tổng hợp insight + root-cause cho mọi phòng ban.
+    """Số liệu insight của các phòng ban. CHỈ ĐỌC.
 
-    Admin thấy mọi phòng; ops khác chỉ thấy phòng của mình (chưa gán phòng -> 403)."""
-    from agents.orchestrator import run_agent_pipeline
-    try:
-        result = run_agent_pipeline(hours=hours)
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Agent pipeline error: {str(exc)[:300]}") from exc
-    if user.role != "admin":
-        own_team = scoped_team(user, None)  # raise 403 nếu chưa gán phòng
-        data = result.get("data") if isinstance(result, dict) else None
-        if isinstance(data, dict):
-            result["data"] = {k: v for k, v in data.items() if k == own_team}
-    return {"status": "success", "data": result}
+    Trước đây endpoint này gọi `run_agent_pipeline()` với mặc định
+    `run_alert=True, run_report=True`, nên một request GET tạo alert, ticket, task và
+    chèn báo cáo — side effect ghi trên đường đọc, trùng lịch với agent-worker, và tốn
+    LLM mỗi lần ai đó mở trang. Muốn CHẠY pipeline thì dùng `POST /api/agent/run`.
+
+    Admin thấy mọi phòng; ops khác chỉ thấy phòng của mình (chưa gán phòng -> 403).
+    """
+    from agents.insight_agent import generate_department_insights
+    from departments import DEPARTMENTS
+
+    teams = list(DEPARTMENTS) if user.role == "admin" else [scoped_team(user, None)]
+    data: dict[str, Any] = {}
+    for team in teams:
+        if not team:
+            continue
+        try:
+            data[team] = generate_department_insights(team, hours=hours)
+        except Exception as exc:  # một phòng lỗi không được làm hỏng cả trang
+            data[team] = {"team": team, "total_feedback": 0, "error": str(exc)[:200]}
+    return {"status": "success", "data": {"data": data, "departments_processed": len(data)}}
 
 @app.get("/api/insights/departments/{team}")
 def get_department_insights(

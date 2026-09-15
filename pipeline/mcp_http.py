@@ -33,8 +33,9 @@ _ALL_TOOLS = [
 def _current_identity():
     at = get_access_token()
     if at is None or not getattr(at, "claims", None):
-        return (None, None)
-    return (at.claims.get("role"), at.claims.get("scope_team"))
+        return (None, None, None)
+    return (at.claims.get("role"), at.claims.get("scope_team"),
+            at.claims.get("user_id"))
 
 
 def build_app():

@@ -1,13 +1,16 @@
 import os
 from datetime import datetime, timezone
 
+from env_config import get_settings
 from ingest import get_supabase
+
+_s = get_settings()
 
 ticket_workflow_state = {
     # Mặc định TẮT: alert chuyển trạng thái bằng workflow THẬT (nút ops), không auto theo tuổi.
-    "enabled": os.getenv("AUTO_TICKET_WORKFLOW_ENABLED", "false").lower() == "true",
-    "in_progress_after_seconds": int(os.getenv("AUTO_TICKET_IN_PROGRESS_AFTER_SECONDS", "10")),
-    "resolved_after_seconds": int(os.getenv("AUTO_TICKET_RESOLVED_AFTER_SECONDS", "30")),
+    "enabled": _s.auto_ticket_workflow_enabled,
+    "in_progress_after_seconds": _s.auto_ticket_in_progress_after_seconds,
+    "resolved_after_seconds": _s.auto_ticket_resolved_after_seconds,
     "last_run_at": None,
     "moved_to_in_progress": 0,
     "moved_to_resolved": 0,

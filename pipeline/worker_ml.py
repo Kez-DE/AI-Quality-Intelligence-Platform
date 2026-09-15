@@ -13,10 +13,15 @@ import time
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from agents.scoring_agent import score_feedback_batch
+from env_config import get_settings
 from ingest import get_supabase
 
-BATCH_SIZE = int(os.getenv("WORKER_ML_BATCH_SIZE", "50"))
-INTERVAL   = int(os.getenv("WORKER_ML_INTERVAL_SECONDS", "30"))
+# Đọc qua env_config để chỉ có MỘT nguồn mặc định. Trước đây os.getenv ở đây
+# khai 30s còn env_config khai 60s -> tiến trình tốn LLM nhất chạy gấp đôi tần suất
+# so với tài liệu.
+_settings = get_settings()
+BATCH_SIZE = _settings.worker_ml_batch_size
+INTERVAL   = _settings.worker_ml_interval_seconds
 
 
 def score_pending():

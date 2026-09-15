@@ -33,7 +33,7 @@ Bốn nguyên tắc chi phối toàn bộ thiết kế. Nắm bốn cái này th
 Một repo, ba tầng. Supabase là trục nối: pipeline Python ghi kết quả, frontend đọc ra để hiển thị realtime.
 
 ```
-C2-App-116/
+AI-Quality-Intelligence-Platform/
 ├── app/        Frontend TanStack Start + React 19 (Cockpit, auth, chat, admin)
 ├── pipeline/   Python FastAPI: clean → classify → ingest → spike → LLM → multi-agent
 ├── supabase/   PostgreSQL + RBAC + RLS (migration)
@@ -117,7 +117,7 @@ Chi tiết từng chặng và "đúng phải thế nào":
 
 **[1] clean.py — che PII và chuẩn hóa.** Mask số điện thoại, email, biển số xe. Đầu vào lẫn đầu ra của mọi lời gọi LLM về sau đều phải đi qua mask này. Đúng phải thế nào: không có PII thô nào lọt vào bảng `feedback` hay vào prompt LLM.
 
-**[2] classifier.py — model TF-IDF + LinearSVC.** Đoán topic (7 lớp) và sentiment. Đây là tầng đoán nền, rẻ, chạy trên toàn bộ data. Độ chính xác trên test 932 mẫu: topic 77.1%, sentiment 94.3%. Model yếu ở câu ngắn (ít token, hay ngả về lớp tiêu cực đa số), nên cần tầng rule bù vào.
+**[2] classifier.py — model TF-IDF + LinearSVC.** Đoán topic (7 lớp) và sentiment. Đây là tầng đoán nền, rẻ, chạy trên toàn bộ data. Độ chính xác trên **holdout 968 mẫu** (tập model chưa từng thấy): topic 75.0%, department 71.1%, macro-F1 0.674/0.698 (baseline lớp đa số ~33%). (Con số 77.1% cũ đo trên `test_split.json` — tập nhiễm 79% với train — và thuộc model đời trước; đã loại bỏ.) Model yếu ở câu ngắn (ít token, hay ngả về lớp tiêu cực đa số), nên cần tầng rule bù vào.
 
 **[3] rules.py — rule keyword và lưới Safety.** Chạy SAU model, ghi đè khi tín hiệu rõ. Thứ tự ưu tiên: Safety > Driver-positive > Payment-fraud > App > Map > Payment > Supply > Driver-negative > Pricing > Delay > Positive chung. Có negation guard (từ phủ định ngay trước keyword chặn gán sai, ví dụ "app không thân thiện" không phải positive) và confidence band thật (rule mạnh 80-88%, mơ hồ 50-65%, câu ngắn ≤50%). Lưới Safety: review chứa keyword nguy hiểm (tai nạn, xe tông, bỏ chạy, say xỉn, cướp, hành hung, sàm sỡ) bị ép `Safety / negative / P5 / needs_review=true`. Đúng phải thế nào: rule luôn thắng model. Câu ví dụ ở trên rơi vào lưới Safety, thành P5, cần duyệt.
 
@@ -205,7 +205,15 @@ flowchart TD
     I -->|approved| J[Task khép vòng]
 ```
 
-Cơ chế gom task (`task_agent.cluster_alerts_into_tasks`): đọc `alerts` có `task_id` null và `status=open`, gom theo `(assigned_team, area)`. Mỗi cụm tìm task open cùng team và area, chưa có thì gọi LLM sinh title và summary rồi INSERT (`source=agent`). Đúng phải thế nào: một cụm `(team, area)` chỉ có một task open tại một thời điểm, để tránh phòng nhận trùng việc.
+Cơ chế gom task (`task_agent.cluster_alerts_into_tasks`): đọc `alerts` có `task_id` null và `status` thuộc `open`/`in_progress`, gom theo `(assigned_team, area, topic)`. Mỗi cụm tìm task còn hút được (`open`/`assigned`/`in_progress`) cùng bộ ba đó; có thì gán alert vào và nâng ưu tiên nếu alert mới nặng hơn; chưa có thì gọi LLM đặt title/summary rồi INSERT với `topic`, `due_at` theo SLA routing và `source=agent`.
+
+Đúng phải thế nào (hợp đồng, xem quyết định `0014`):
+
+- Khoá cụm phải có **chủ đề**. Bỏ chủ đề ra khỏi khoá là lý do một alert Safety P5 bị nhập vào task Delay P2 cùng khu vực.
+- Task đã giao (`assigned`) vẫn hút alert mới. Chỉ khớp `open` sẽ đẻ task trùng ngay sau khi manager giao việc.
+- Ưu tiên **chỉ đi lên**, không bao giờ hạ.
+- LLM chỉ đặt tên. Hỏng LLM thì dùng tiêu đề suy diễn từ dữ liệu đếm được — **không alert nào bị bỏ lại**.
+- Cụm lỗi phải hiện ra (`clusters_failed`, `status='partial_success'`, `agent_run_logs` ghi `fallback`), không được báo `success` trơn.
 
 Vòng đời ticket (`backend-worker`, mỗi 5 giây): đẩy `open → in_progress → resolved` theo rule, không tốn LLM. SLA quá hạn được `ticket_agent.get_overdue_tickets(sla_hours=24)` quét ra.
 

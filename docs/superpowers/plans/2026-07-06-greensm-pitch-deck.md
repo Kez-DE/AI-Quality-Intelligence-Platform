@@ -115,7 +115,7 @@ Cấu trúc file: giữ nguyên khung `<html lang="vi">`, khối `<style>` copy 
 **S1 · Hook (0:00–0:40)**
 > **2 giờ sáng.** Một tài xế lái ẩu, gây nguy hiểm cho khách. Cùng lúc đó, hàng chục người đã viết review than phiền về đúng tài xế này — trong nhiều tuần. Không ai đọc. Không ai ghép các mảnh lại. **Không ai biết.**
 > Đây không phải chuyện bịa. Trên App Store, ứng dụng Green SM — tên mới của Xanh SM — đang có **4.8 sao với 1 triệu rưỡi lượt đánh giá**. Một con số đẹp. Nhưng hãy hỏi ngược lại: **một triệu rưỡi tiếng nói — ai đọc hết?**
-> Chúng tôi là team 116. Sản phẩm này được xây để ca trực 2 giờ sáng đó không bao giờ đơn độc nữa.
+> Sản phẩm này được xây để ca trực 2 giờ sáng đó không bao giờ đơn độc nữa.
 
 *Cue: im lặng 2 giây khi slide hiện, để khán giả đọc con số 1,5 triệu trước.*
 
@@ -262,12 +262,12 @@ def bullets(slide, items, x=0.7, y=1.9, w=12.0, size=20, gap=None):
 # ---- S1 HOOK ----
 s = prs.slides.add_slide(BLANK)
 pic_fit(s, f"{A}/greensm-photo.jpg", 6.9, 0, 6.45)          # ảnh phải, full-bleed dọc
-txt(s, 0.6, 0.5, 6.0, 0.5, "AI20K · COHORT 2 · TEAM 116", 13, GREEN, bold=True)
+txt(s, 0.6, 0.5, 6.0, 0.5, "AI QUALITY INTELLIGENCE PLATFORM", 13, GREEN, bold=True)
 txt(s, 0.6, 1.3, 6.1, 2.2, "2 GIỜ SÁNG.\nAI ĐANG ĐỌC\nREVIEW CỦA BẠN?", 40, INK, bold=True)
 stat(s, 0.6, 4.0, "4.8★", "App Store Việt Nam")
 stat(s, 3.4, 4.0, "1,5 TRIỆU", "lượt đánh giá — ai đọc hết?")
 txt(s, 0.6, 5.6, 6.1, 1.2, "AI Quality Intelligence Platform cho Green SM\nBiến 1,5 triệu tiếng nói thành hành động — tự động, có kiểm soát.", 16, MUTED)
-notes(s, "0:00–0:40 · Im lặng 2s. Câu chuyện 2 giờ sáng → con số 4.8★/1,5 triệu → 'ai đọc hết?' → giới thiệu team 116.")
+notes(s, "0:00–0:40 · Im lặng 2s. Câu chuyện 2 giờ sáng → con số 4.8★/1,5 triệu → 'ai đọc hết?' → giới thiệu sản phẩm.")
 
 # ---- S2 BẰNG CHỨNG THẬT ----
 s = prs.slides.add_slide(BLANK)
@@ -387,7 +387,7 @@ bg = s.shapes.add_shape(1, 0, 0, prs.slide_width, prs.slide_height)  # 1 = RECTA
 bg.fill.solid(); bg.fill.fore_color.rgb = GREEN; bg.line.fill.background()
 txt(s, 0.9, 1.4, 11.5, 1.8, "Một lời phàn nàn không được đọc\nlà một sự cố đang chờ xảy ra lần nữa.", 34, WHITE, bold=True)
 txt(s, 0.9, 3.6, 11.5, 1.5, "Tầm nhìn 3–5 năm: tầng lắng nghe tiêu chuẩn cho mọi nền tảng tiêu dùng Việt Nam —\nnơi mọi lời phàn nàn được đọc, được định tuyến, và trở thành hành động.", 18, WHITE)
-txt(s, 0.9, 5.6, 11.5, 1.0, "Với chúng tôi — nó sẽ được đọc.   ·   Team 116 · AI20K Cohort 2 · Q&A", 20, WHITE, bold=True)
+txt(s, 0.9, 5.6, 11.5, 1.0, "Với chúng tôi — nó sẽ được đọc.   ·   Q&A", 20, WHITE, bold=True)
 notes(s, "8:50–10:00 · Callback 2 giờ sáng → vòng lặp khép kín → tầm nhìn → câu kết → mời Q&A.")
 
 out = "docs/project/slides/GreenSM-Pitch-10min.pptx"

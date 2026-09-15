@@ -44,8 +44,12 @@ def run_chat_agent(
     """
     active_tools = tools_override if tools_override is not None else TOOLS_DEFINITIONS
     collected_sources: list = []
+    # Ghi lại tool đã THỰC SỰ chạy. Không có vết này thì không thể chứng minh
+    # phạm vi bị ép ở tầng thực thi công cụ — chỉ suy đoán từ câu trả lời.
+    tools_used: list[dict] = []
 
     def _execute(name: str, args: dict) -> str:
+        tools_used.append({"name": name, "scope_team": scope_team})
         if execute_fn is not None:
             return execute_fn(name, args)
         return execute_tool(name, args, scope_team=scope_team, sources_out=collected_sources)
@@ -90,6 +94,7 @@ def run_chat_agent(
                 result["message"]["content"] = _fill_contact_placeholders(mask_pii(result["message"]["content"]))
             if collected_sources:
                 result["sources"] = collected_sources
+            result["tools_used"] = tools_used
             return result
             
         # Có tool calls -> thực thi các tools
@@ -125,5 +130,6 @@ def run_chat_agent(
         "provider": "system",
         "model": "agent_loop",
         "sources": collected_sources,
+        "tools_used": tools_used,
     }
 

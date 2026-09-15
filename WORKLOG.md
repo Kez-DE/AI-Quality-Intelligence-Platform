@@ -1,25 +1,19 @@
-# WORKLOG — C2-App-116
+# WORKLOG — AI-Quality-Intelligence-Platform
 
-Nhật ký quyết định kỹ thuật, phân công và bug quan trọng của team 116.
+Nhật ký quyết định kỹ thuật và bug quan trọng của dự án.
 
 ## 2026-05-31
 
 ### Đề tài & stack
-Chưa chốt. Team chưa thống nhất sản phẩm App-116 sẽ xây và ngôn ngữ/framework dùng.
-TODO: ghi lại quyết định + lý do khi nhóm chốt (why approach này thay vì cái khác).
+Chưa chốt sản phẩm sẽ xây và ngôn ngữ/framework dùng.
+TODO: ghi lại quyết định + lý do khi chốt (why approach này thay vì cái khác).
 
-### Phân công
-Chưa phân công. TODO: ai làm module nào, deadline nội bộ.
-
-### Quy ước đang áp dụng (đề xuất của Kez, chờ nhóm xác nhận)
-- Đặt tên branch theo dạng `<tên>/<task>`, mỗi branch một việc, xóa sau khi merge.
-  Ví dụ: `kez/fix-codex-hooks`, `kez/init-docs`.
-- Không push thẳng `main`. Mỗi thay đổi đi qua branch → PR → review → merge.
-  (`main` hiện chưa bật branch protection; cần admin repo bật để ép luật này.)
-- AI logging gắn theo từng cá nhân: mỗi thành viên tự `cp .env.example .env`
-  + `bash scripts/setup_hooks.sh` trên máy mình và tự push phần của mình.
-  Log stamp theo email git của từng người — nếu một người push hộ cả nhóm
-  thì chỉ usage của người đó được ghi nhận.
+### Quy ước đang áp dụng
+- Đặt tên branch theo dạng `<scope>/<task>`, mỗi branch một việc, xóa sau khi merge.
+  Ví dụ: `fix/codex-hooks`, `chore/init-docs`.
+- Không push thẳng `main`. Mỗi thay đổi đi qua branch → PR → self-review → merge.
+- AI logging chạy local qua hook: `cp .env.example .env`
+  + `bash scripts/setup_hooks.sh`.
 
 ### Bug quan trọng — `.codex/hooks.json` thiếu field `type`
 - Triệu chứng: chạy `codex` trong repo báo lỗi
@@ -29,7 +23,6 @@ Chưa phân công. TODO: ai làm module nào, deadline nội bộ.
   `.claude/settings.json` (chạy bình thường) thì mỗi handler đều có `"type": "command"`.
 - Fix: thêm `"type": "command"` vào cả 2 handler (`log-prompt`, `log-stop`),
   theo schema chính thức tại developers.openai.com/codex/hooks → PR #1.
-- Ghi chú: BTC đã cho phép team chủ động sửa scripts.
 
 ## 2026-06-12
 
@@ -108,7 +101,7 @@ Chưa phân công. TODO: ai làm module nào, deadline nội bộ.
   lỗi LLM: 401 User not found". Spike detect + severity ĐÚNG, chỉ mắt xích LLM hỏng.
 - Root cause: OpenRouter key cũ (từ xanh_iu/.env) hết hạn/hết credit; OpenAI key
   cũng 401; 9router local không chạy.
-- Fix: Kez cấp key OpenRouter mới → test `/auth/key` HTTP 200 + chat completion thật
+- Fix: cấp key OpenRouter mới → test `/auth/key` HTTP 200 + chat completion thật
   trả nội dung → restart backend (env chỉ đọc lúc khởi động) → spike lại sinh alert
   phân tích thật. Bài học: env đổi phải restart server; verify key sống TRƯỚC khi chạy luồng.
 

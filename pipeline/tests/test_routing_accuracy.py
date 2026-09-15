@@ -14,6 +14,14 @@ from eval.splits import golden_split
 # worst single misroute  : ~74  (Vận hành → IT)  → aspirational target 30  (FAILS)
 # worst workload skew    : ~0.531 (IT: gold=207, pred=317)  → aspirational target 0.35  (FAILS)
 #
+# RE-MEASURED 2026-08-27 on the current 6-dept holdout (n=968):
+#   dept_accuracy         : 0.7107  (gate 0.70 — margin 0.011, INSIDE the 95% CI
+#                           [0.681, 0.738], so this gate does not discriminate)
+#   worst single misroute : 74   (Vận hành → IT)          vs target 30   → +147%
+#   worst workload skew   : 0.594 (IT: gold=180, pred=287) vs target 0.35 → +70%
+#   macro-F1 dept 0.698 / topic 0.674; majority baseline 0.331 / 0.334
+#   Reproduce: .venv/bin/python -m eval.holdout_report
+#
 # RECALIBRATED 2026-06-27 for the 4→6 department migration (decision 0008).
 # Routing now splits Payment→"Tài chính & Thanh toán" and Pricing→"Quản lý Rủi ro
 # & Gian lận" (both used to route to CSKH). Finer routing exposes the model's

@@ -34,7 +34,7 @@ comment on column public.alerts.resolved_at is
 ```
 
 **Step 2: Áp**
-Run: `cd /Users/kenz_de/projects/C2-App-116 && supabase db push` (xác nhận Y).
+Run: `cd /Users/kenz_de/projects/AI-Quality-Intelligence-Platform && supabase db push` (xác nhận Y).
 Expected: "Applying migration 20260703120000_alerts_workflow_timing.sql".
 
 **Step 3: Verify cột**

@@ -7,6 +7,7 @@ import hashlib
 
 from agents.common import call_llm, parse_json_response, log_agent_run
 from agents.schemas import AnalystOutput, AnalystAnalysis, ActionItem
+from dispatch_utils import normalize_deadline
 
 
 # Persona chuyên biệt theo phòng ban: mỗi phòng phân tích root-cause qua một
@@ -200,7 +201,9 @@ Trả về JSON đúng cấu trúc:
             for index, action in enumerate(analysis.action_items[:5], start=1):
                 action.priority = action.priority or f"P{min(index, 3)}"
                 action.owner = action.owner or team
-                action.deadline = action.deadline or "48h"
+                # LLM hay trả '7 ngày', '2 tuần'. Chuẩn hoá tại đây để manager
+                # lưu/duyệt được ngay; cổng duyệt vẫn từ chối token lạ do người gõ.
+                action.deadline = normalize_deadline(action.deadline)
                 action.success_metric = action.success_metric or "Hoàn thành và ghi nhận kết quả"
             analysis.action_items = analysis.action_items[:5]
                 

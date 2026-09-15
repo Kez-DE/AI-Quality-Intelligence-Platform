@@ -37,8 +37,9 @@ pipeline/logs/
 .ai-log/archive/
 .ai-logs/
 
-# Model backups (local only, không commit)
+# Model backups và ứng viên chưa promote (local only, không commit)
 pipeline/ml/_backup_*/
+pipeline/ml/*.candidate.joblib
 
 # Supabase CLI temp
 supabase/.temp/
@@ -54,6 +55,5 @@ scripts/bin/harness-cli.exe
 ~$*
 .codegraph/
 .harness-backup/
-scratchpad/audit/mk_admin.py
-scratchpad/audit/check_rbac.py
-scratchpad/audit/admin_token.json
+# Local audit scripts, run logs and screenshots — touch live Supabase, never commit
+scratchpad/

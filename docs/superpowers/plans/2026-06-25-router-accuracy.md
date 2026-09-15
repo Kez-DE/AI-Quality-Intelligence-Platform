@@ -428,14 +428,14 @@ CHỈ chỉnh nếu Step 1 lộ map sai rõ. Mỗi chỉnh sửa: sửa 1 dòng 
 
 Run:
 ```bash
-cd /Users/kenz_de/projects/C2-App-116 && grep -rn "data2/taxonomy/routing_table\|auxiliary/data2/taxonomy" --include="*.py" . | grep -v node_modules
+cd /Users/kenz_de/projects/AI-Quality-Intelligence-Platform && grep -rn "data2/taxonomy/routing_table\|auxiliary/data2/taxonomy" --include="*.py" . | grep -v node_modules
 ```
 Expected: KHÔNG có dòng nào load chính file `routing_table.json` trong data2. (Các script chỉ tham chiếu thư mục data2 nói chung — không sao.) Nếu có code load trực tiếp file này → DỪNG, không xoá, báo lại.
 
 - [ ] **Step 4: Xoá artifact gây nhiễu**
 
 ```bash
-cd /Users/kenz_de/projects/C2-App-116 && git rm data/auxiliary/data2/taxonomy/routing_table.json
+cd /Users/kenz_de/projects/AI-Quality-Intelligence-Platform && git rm data/auxiliary/data2/taxonomy/routing_table.json
 ```
 
 - [ ] **Step 5: Xác nhận không vỡ import + gate**
@@ -446,7 +446,7 @@ Expected: không lỗi import; các test pass (gate accuracy có thể vẫn đ�
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/kenz_de/projects/C2-App-116 && git add data/taxonomy/routing_table.json data/auxiliary/data2/taxonomy/routing_table.json
+cd /Users/kenz_de/projects/AI-Quality-Intelligence-Platform && git add data/taxonomy/routing_table.json data/auxiliary/data2/taxonomy/routing_table.json
 git commit -m "chore(taxonomy): rà bảng map 4 phòng + xoá routing_table data2 gây nhiễu
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -539,7 +539,7 @@ Expected: dept accuracy ≥ 80%, gate PASS. Nếu vẫn < 80% sau cả rules + r
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/kenz_de/projects/C2-App-116 && git add pipeline/ml/retrain_topic.py pipeline/ml/topic_model.joblib pipeline/tests/test_routing_accuracy.py 2>/dev/null
+cd /Users/kenz_de/projects/AI-Quality-Intelligence-Platform && git add pipeline/ml/retrain_topic.py pipeline/ml/topic_model.joblib pipeline/tests/test_routing_accuracy.py 2>/dev/null
 git commit -m "feat(ml): retrain topic model (promote nếu holdout tăng) + chốt ngưỡng gate
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -585,7 +585,7 @@ Run: `cd pipeline && .venv/bin/python -m eval.route_eval | head -3`
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/kenz_de/projects/C2-App-116 && git add docs/project/architecture/e2e-flow.md docs/project/architecture/routing-taxonomy.md
+cd /Users/kenz_de/projects/AI-Quality-Intelligence-Platform && git add docs/project/architecture/e2e-flow.md docs/project/architecture/routing-taxonomy.md
 git commit -m "docs: luồng E2E + taxonomy định tuyến 4 phòng ban
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -604,7 +604,7 @@ REQUIRED SUB-SKILL: `humanizer` cho mọi đoạn viết lại.
 
 - [ ] **Step 1: Liệt kê & đọc các .md top-level**
 
-Run: `cd /Users/kenz_de/projects/C2-App-116 && ls *.md && wc -l *.md`
+Run: `cd /Users/kenz_de/projects/AI-Quality-Intelligence-Platform && ls *.md && wc -l *.md`
 Đọc từng file, ghi chú: chỗ nào mô tả sai hiện trạng (vd nói routing chưa fix), chỗ nào trùng lặp, chỗ nào nói "6 phòng ban" như thể đã có (phải đánh dấu là future).
 
 - [ ] **Step 2: Sửa nội dung lỗi thời**
@@ -620,7 +620,7 @@ Nếu `JOURNAL.md` và `WORKLOG.md` chồng lấn và một file đã chết (kh
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/kenz_de/projects/C2-App-116 && git add -A *.md
+cd /Users/kenz_de/projects/AI-Quality-Intelligence-Platform && git add -A *.md
 git commit -m "docs: audit & dọn .md lỗi thời, đồng bộ trạng thái routing & 4 phòng ban
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -649,7 +649,7 @@ Mở `docs/project/architecture/routing-taxonomy.md`, đối chiếu số accura
 - [ ] **Step 4: Commit (nếu có chỉnh nhỏ khi verify)**
 
 ```bash
-cd /Users/kenz_de/projects/C2-App-116 && git add -A
+cd /Users/kenz_de/projects/AI-Quality-Intelligence-Platform && git add -A
 git commit -m "test: verify E2E routing accuracy + đồng bộ tài liệu
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"

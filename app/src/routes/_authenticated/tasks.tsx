@@ -66,6 +66,10 @@ type AssignableUsersResponse = {
 
 const TEAMS = ["All", ...ALL_TEAMS] as const;
 const STATUSES = ["All", "open", "assigned", "in_progress", "pending_review", "resolved"] as const;
+
+// Trạng thái mà backend còn cho phép gán/đổi người nhận. Bản sao của
+// ALLOWED_TASK_TRANSITIONS trong pipeline/main.py (đích 'assigned').
+const ASSIGNABLE_STATUSES = new Set(["open", "assigned", "in_progress"]);
 const PRIORITIES = ["All", "P1", "P2", "P3", "P4", "P5"] as const;
 
 const STATUS_LABELS: Record<string, string> = {
@@ -112,14 +116,15 @@ function TasksPage() {
   >({});
 
   // Completion-report form state per task (staff -> manager)
-  const [reportForm, setReportForm] = useState<
-    Record<string, { note: string; level: string }>
-  >({});
+  const [reportForm, setReportForm] = useState<Record<string, { note: string; level: string }>>({});
   const [submittingReport, setSubmittingReport] = useState<string | null>(null);
 
   // Gợi ý người nhận (agent rule-based) per task
   const [suggestion, setSuggestion] = useState<
-    Record<string, { id: string; email: string; full_name: string | null; open_tasks: number; reason: string }>
+    Record<
+      string,
+      { id: string; email: string; full_name: string | null; open_tasks: number; reason: string }
+    >
   >({});
   const [loadingSuggestion, setLoadingSuggestion] = useState<string | null>(null);
 
@@ -220,21 +225,26 @@ function TasksPage() {
         }),
       });
       const assignedUser = assignableUsers.find((u) => u.id === form.owner_id);
-      setTasks(
-        tasks.map((t) =>
+      setTasks((prev) =>
+        prev.map((t) =>
           t.id === taskId
             ? {
                 ...t,
                 owner_id: form.owner_id,
                 owner_email: assignedUser?.email || null,
                 due_at: form.due_at || null,
+                // Backend đặt status='assigned' khi có owner_id. Không đồng bộ ở đây thì
+                // thẻ vẫn mang badge "Đang mở" và ở lại bộ lọc cũ cho tới khi tải lại trang.
+                status: "assigned",
               }
             : t,
         ),
       );
       toast.success("Đã gán task thành công.");
-    } catch {
-      toast.error("Lỗi khi gán task.");
+    } catch (err) {
+      // Backend trả lý do cụ thể (không phải staff / khác phòng ban / sai transition) —
+      // nuốt hết thành một câu chung khiến manager không biết phải sửa gì.
+      toast.error(err instanceof Error ? err.message : "Lỗi khi gán task.");
     } finally {
       setAssigningTask(null);
     }
@@ -244,9 +254,7 @@ function TasksPage() {
     try {
       await apiFetch(`/api/tasks/${taskId}/accept`, { method: "POST" });
       toast.success("Đã nhận việc.");
-      setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, status: "in_progress" } : t)),
-      );
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: "in_progress" } : t)));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Lỗi khi nhận việc.");
     }
@@ -278,7 +286,15 @@ function TasksPage() {
     setLoadingSuggestion(taskId);
     try {
       const json = await apiFetch<{
-        data: { suggested: { id: string; email: string; full_name: string | null; open_tasks: number } | null; reason: string };
+        data: {
+          suggested: {
+            id: string;
+            email: string;
+            full_name: string | null;
+            open_tasks: number;
+          } | null;
+          reason: string;
+        };
       }>(`/api/tasks/${taskId}/suggest-assignee`);
       const s = json.data?.suggested;
       if (!s) {
@@ -633,114 +649,120 @@ function TasksPage() {
                     </div>
 
                     {/* Assignment Section — chỉ manager/admin giao việc */}
-                    {isManager && (
-                    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-                      <h4 className="font-semibold text-sm flex items-center gap-2 text-xanh-deep">
-                        <UserPlus className="h-4 w-4" />
-                        Gán task
-                      </h4>
+                    {/* Chỉ hiện form gán khi backend thật sự nhận: ALLOWED_TASK_TRANSITIONS
+                        không có (pending_review|resolved) -> assigned, nên mở form ở hai
+                        trạng thái đó là mời manager bấm vào một nút chắc chắn lỗi. */}
+                    {isManager && ASSIGNABLE_STATUSES.has(task.status) && (
+                      <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+                        <h4 className="font-semibold text-sm flex items-center gap-2 text-xanh-deep">
+                          <UserPlus className="h-4 w-4" />
+                          Gán task
+                        </h4>
 
-                      {/* Agent gợi ý người nhận (cân bằng tải trong phòng) */}
-                      <div className="space-y-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            loadSuggestion(task.id);
-                          }}
-                          disabled={loadingSuggestion === task.id}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-lg border border-xanh-cyan/40 bg-xanh-cyan/10 text-xanh-deep hover:bg-xanh-cyan/20 transition-colors disabled:opacity-50"
-                        >
-                          {loadingSuggestion === task.id ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Sparkles className="h-3.5 w-3.5" />
-                          )}
-                          Gợi ý người nhận (AI)
-                        </button>
-                        {suggestion[task.id] && (
-                          <div className="flex items-center justify-between gap-2 rounded-lg border border-xanh-cyan/40 bg-xanh-cyan/5 px-3 py-2">
-                            <div className="min-w-0">
-                              <p className="text-xs font-semibold text-xanh-deep truncate">
-                                {suggestion[task.id].full_name || suggestion[task.id].email}
-                              </p>
-                              <p className="text-[11px] text-muted-foreground">
-                                {suggestion[task.id].reason}
-                              </p>
-                            </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                updateAssignForm(task.id, "owner_id", suggestion[task.id].id);
-                                toast.success("Đã chọn người được gợi ý.");
-                              }}
-                              className="shrink-0 px-3 py-1.5 text-[11px] font-semibold rounded-lg bg-xanh-deep text-white hover:bg-xanh-deep/90 transition-colors"
-                            >
-                              Chọn
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      {task.owner_email && (
-                        <p className="text-xs text-muted-foreground font-mono">
-                          Hiện tại:{" "}
-                          <span className="text-xanh-green font-semibold">{task.owner_email}</span>
-                        </p>
-                      )}
-                      <div className="flex flex-wrap items-end gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-mono text-muted-foreground">
-                            Người nhận
-                          </label>
-                          <select
-                            value={assignForm[task.id]?.owner_id || task.owner_id || ""}
-                            onChange={(e) => updateAssignForm(task.id, "owner_id", e.target.value)}
-                            className="px-3 py-2 text-xs border border-border rounded-lg bg-card focus:outline-none focus:ring-2 focus:ring-xanh-green/30 min-w-[200px]"
+                        {/* Agent gợi ý người nhận (cân bằng tải trong phòng) */}
+                        <div className="space-y-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              loadSuggestion(task.id);
+                            }}
+                            disabled={loadingSuggestion === task.id}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-lg border border-xanh-cyan/40 bg-xanh-cyan/10 text-xanh-deep hover:bg-xanh-cyan/20 transition-colors disabled:opacity-50"
                           >
-                            <option value="">-- Chọn người --</option>
-                            {assignableUsers
-                              .filter(
-                                (user) =>
-                                  user.role === "staff" &&
-                                  user.department === task.assigned_team,
-                              )
-                              .map((user) => (
-                                <option key={user.id} value={user.id}>
-                                  {user.full_name || user.email} ({user.role})
-                                </option>
-                              ))}
-                          </select>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-mono text-muted-foreground">
-                            Hạn hoàn thành
-                          </label>
-                          <input
-                            type="date"
-                            value={
-                              assignForm[task.id]?.due_at ||
-                              (task.due_at ? task.due_at.split("T")[0] : "")
-                            }
-                            onChange={(e) => updateAssignForm(task.id, "due_at", e.target.value)}
-                            className="px-3 py-2 text-xs border border-border rounded-lg bg-card focus:outline-none focus:ring-2 focus:ring-xanh-green/30"
-                          />
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            assignTask(task.id);
-                          }}
-                          disabled={assigningTask === task.id}
-                          className="px-4 py-2 bg-xanh-deep text-white hover:bg-xanh-deep/90 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1"
-                        >
-                          {assigningTask === task.id ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <UserPlus className="h-3.5 w-3.5" />
+                            {loadingSuggestion === task.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Sparkles className="h-3.5 w-3.5" />
+                            )}
+                            Gợi ý người nhận (AI)
+                          </button>
+                          {suggestion[task.id] && (
+                            <div className="flex items-center justify-between gap-2 rounded-lg border border-xanh-cyan/40 bg-xanh-cyan/5 px-3 py-2">
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-xanh-deep truncate">
+                                  {suggestion[task.id].full_name || suggestion[task.id].email}
+                                </p>
+                                <p className="text-[11px] text-muted-foreground">
+                                  {suggestion[task.id].reason}
+                                </p>
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateAssignForm(task.id, "owner_id", suggestion[task.id].id);
+                                  toast.success("Đã chọn người được gợi ý.");
+                                }}
+                                className="shrink-0 px-3 py-1.5 text-[11px] font-semibold rounded-lg bg-xanh-deep text-white hover:bg-xanh-deep/90 transition-colors"
+                              >
+                                Chọn
+                              </button>
+                            </div>
                           )}
-                          Gán
-                        </button>
+                        </div>
+                        {task.owner_email && (
+                          <p className="text-xs text-muted-foreground font-mono">
+                            Hiện tại:{" "}
+                            <span className="text-xanh-green font-semibold">
+                              {task.owner_email}
+                            </span>
+                          </p>
+                        )}
+                        <div className="flex flex-wrap items-end gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-mono text-muted-foreground">
+                              Người nhận
+                            </label>
+                            <select
+                              value={assignForm[task.id]?.owner_id || task.owner_id || ""}
+                              onChange={(e) =>
+                                updateAssignForm(task.id, "owner_id", e.target.value)
+                              }
+                              className="px-3 py-2 text-xs border border-border rounded-lg bg-card focus:outline-none focus:ring-2 focus:ring-xanh-green/30 min-w-[200px]"
+                            >
+                              <option value="">-- Chọn người --</option>
+                              {assignableUsers
+                                .filter(
+                                  (user) =>
+                                    user.role === "staff" && user.department === task.assigned_team,
+                                )
+                                .map((user) => (
+                                  <option key={user.id} value={user.id}>
+                                    {user.full_name || user.email} ({user.role})
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-mono text-muted-foreground">
+                              Hạn hoàn thành
+                            </label>
+                            <input
+                              type="date"
+                              value={
+                                assignForm[task.id]?.due_at ||
+                                (task.due_at ? task.due_at.split("T")[0] : "")
+                              }
+                              onChange={(e) => updateAssignForm(task.id, "due_at", e.target.value)}
+                              className="px-3 py-2 text-xs border border-border rounded-lg bg-card focus:outline-none focus:ring-2 focus:ring-xanh-green/30"
+                            />
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              assignTask(task.id);
+                            }}
+                            disabled={assigningTask === task.id}
+                            className="px-4 py-2 bg-xanh-deep text-white hover:bg-xanh-deep/90 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1"
+                          >
+                            {assigningTask === task.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <UserPlus className="h-3.5 w-3.5" />
+                            )}
+                            Gán
+                          </button>
+                        </div>
                       </div>
-                    </div>
                     )}
 
                     {/* Báo cáo hoàn thành — chỉ hiện cho nhân viên được giao khi đang xử lý */}
@@ -755,14 +777,15 @@ function TasksPage() {
                           thao tác xử lý ticket.
                         </p>
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-[11px] font-mono text-muted-foreground">Mức độ:</span>
+                          <span className="text-[11px] font-mono text-muted-foreground">
+                            Mức độ:
+                          </span>
                           {[
                             { v: "completed", l: "Hoàn thành" },
                             { v: "partial", l: "Một phần" },
                             { v: "blocked", l: "Bị chặn" },
                           ].map((opt) => {
-                            const active =
-                              (reportForm[task.id]?.level || "completed") === opt.v;
+                            const active = (reportForm[task.id]?.level || "completed") === opt.v;
                             return (
                               <button
                                 key={opt.v}

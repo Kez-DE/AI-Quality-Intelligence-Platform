@@ -41,7 +41,7 @@ Adapter mỏng bọc quanh code sẵn có. **Không sửa** `chat_tools.py` (nó
 - `submit_feedback` vẫn mask PII qua `mask_pii` như hiện tại (đi qua `execute_guest_tool`).
 
 ### Ngoài phạm vi (ghi lại làm tương lai)
-- HTTP/SSE server đa tenant, map token → (role, team) cho nhiều người dùng đồng thời. Demo cohort không cần; một identity mỗi cấu hình là đủ.
+- HTTP/SSE server đa tenant, map token → (role, team) cho nhiều người dùng đồng thời. Demo hiện tại không cần; một identity mỗi cấu hình là đủ.
 
 ### Validation
 - Test in-process: server cấu hình role `staff` **không** expose `get_feedback_summary` (chỉ `search_knowledge_base` + `get_team_priority_tasks`).

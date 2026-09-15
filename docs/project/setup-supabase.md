@@ -12,7 +12,7 @@
 1. Truy cập [supabase.com](https://supabase.com) → Sign in / Sign up.
 2. Nhấn **New Project**.
 3. Điền:
-  - **Name:** `c2-app-116` (hoặc tuỳ chọn)
+  - **Name:** `ai-quality-intelligence-platform` (hoặc tuỳ chọn)
   - **Database Password:** ghi nhớ (cần cho CLI link)
   - **Region:** Singapore hoặc gần nhất
 4. Chờ project khởi tạo (~2 phút).
@@ -79,7 +79,7 @@ supabase --version
 ## 5. Liên kết project
 
 ```bash
-cd C2-App-116/supabase
+cd AI-Quality-Intelligence-Platform/supabase
 
 # Đăng nhập (mở browser xác thực)
 supabase login
@@ -212,7 +212,7 @@ Nếu muốn dev offline:
 
 ```bash
 # Cần Docker Desktop đang chạy
-cd C2-App-116/supabase
+cd AI-Quality-Intelligence-Platform/supabase
 supabase start
 ```
 

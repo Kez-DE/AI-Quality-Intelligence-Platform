@@ -39,6 +39,14 @@ def test_tier_is_monotonic():
     assert m <= a, "manager là tập con của admin (khác biệt còn lại là scope_team phòng ban)"
 
 
-def test_unknown_role_defaults_to_full_then_scope_guards():
-    # Vai trò lạ -> mặc định full tool; scope_team ở execute_tool vẫn là lớp chặn dữ liệu.
-    assert _names(tools_for_role(None)) == _names(TOOLS_DEFINITIONS)
+def test_unknown_role_gets_no_ops_tools():
+    """Fail-closed: vai trò lạ KHÔNG được im lặng nhận quyền admin.
+
+    Nhánh mặc định cũ trả về toàn bộ tool, nên mọi vai trò mới thêm vào hệ thống
+    sẽ mặc nhiên có quyền cao nhất mà không ai nhận ra.
+    """
+    assert tools_for_role(None) == []
+    assert tools_for_role("guest") == []
+    assert tools_for_role("vai_tro_moi_chua_khai_bao") == []
+    # admin vẫn phải là toàn bộ tool
+    assert _names(tools_for_role("admin")) == _names(TOOLS_DEFINITIONS)

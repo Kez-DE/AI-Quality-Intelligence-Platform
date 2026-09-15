@@ -67,9 +67,13 @@ Endpoint dùng `can_view_team` để chặn thao tác chéo phòng:
 | `PATCH /api/tasks/{id}/status` | team của task |
 | `PATCH /api/tasks/{id}/assign` | team của task |
 | `PATCH /api/alerts/{id}/status` | team (qua `task_id → assigned_team`) |
-| `PATCH /api/reports/{id}/approve` | team của report |
-| `PUT /api/reports/{id}/draft-tasks` | team của report (409 nếu đã duyệt) |
-| `POST /api/reports/{id}/approve-and-dispatch` | team của report (409 nếu đã duyệt) |
+| `PATCH /api/reports/{id}/approve` | team của report — **`require_manager`**; 409 nếu báo cáo còn Draft Task (dùng approve-and-dispatch) |
+| `PUT /api/reports/{id}/draft-tasks` | team của report — **`require_manager`**; 409 nếu đã duyệt |
+| `POST /api/reports/{id}/approve-and-dispatch` | team của report — **`require_manager`**; 409 nếu đã duyệt |
+| `PATCH /api/feedback/{id}/label` | team suy ra từ routing của feedback |
+| `PATCH /api/feedback/{id}/review` | team suy ra từ routing của feedback |
+| `POST /api/tasks/{id}/completion-report` | team của task + `owner_id` phải là chính user |
+| `POST /api/tasks/{id}/support-resolve` | team của task + task phải có `source='ticket'` |
 | `GET /api/insights/departments/{team}` | team trong path |
 
 Endpoint admin-only (qua `require_admin`): `GET /api/agent/stats`, `POST /api/ingest-real-dataset`, `POST /api/live-stream/start|stop`, `POST /api/run-real-pipeline`, `POST /api/trigger-spike-detect`, `POST /api/feedback/reclassify`, và toàn bộ quản lý user.

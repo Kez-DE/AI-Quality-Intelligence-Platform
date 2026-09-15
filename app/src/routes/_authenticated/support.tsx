@@ -46,10 +46,26 @@ type Alert = {
 };
 
 const CANNED_RESPONSES = [
-  { id: "c1", title: "Xin lỗi & Sẽ xử lý", text: "XanhSM chân thành xin lỗi vì trải nghiệm không tốt của bạn. Chúng tôi đã ghi nhận phản hồi và đang tiến hành xử lý ngay lập tức." },
-  { id: "c2", title: "Cảm ơn đóng góp", text: "Cảm ơn bạn đã đóng góp ý kiến. XanhSM luôn nỗ lực cải thiện dịch vụ mỗi ngày." },
-  { id: "c3", title: "Kiểm tra tài xế", text: "Chúng tôi đã ghi nhận thông tin và sẽ tiến hành xác minh với tài xế. Cảm ơn bạn đã báo cáo." },
-  { id: "c4", title: "Hoàn tiền", text: "Chúng tôi đã tiếp nhận yêu cầu và sẽ tiến hành kiểm tra giao dịch. Nếu có sai sót, bộ phận kế toán sẽ hoàn tiền cho bạn trong vòng 24h." },
+  {
+    id: "c1",
+    title: "Xin lỗi & Sẽ xử lý",
+    text: "XanhSM chân thành xin lỗi vì trải nghiệm không tốt của bạn. Chúng tôi đã ghi nhận phản hồi và đang tiến hành xử lý ngay lập tức.",
+  },
+  {
+    id: "c2",
+    title: "Cảm ơn đóng góp",
+    text: "Cảm ơn bạn đã đóng góp ý kiến. XanhSM luôn nỗ lực cải thiện dịch vụ mỗi ngày.",
+  },
+  {
+    id: "c3",
+    title: "Kiểm tra tài xế",
+    text: "Chúng tôi đã ghi nhận thông tin và sẽ tiến hành xác minh với tài xế. Cảm ơn bạn đã báo cáo.",
+  },
+  {
+    id: "c4",
+    title: "Hoàn tiền",
+    text: "Chúng tôi đã tiếp nhận yêu cầu và sẽ tiến hành kiểm tra giao dịch. Nếu có sai sót, bộ phận kế toán sẽ hoàn tiền cho bạn trong vòng 24h.",
+  },
 ];
 
 function isOverdue(task: Task): boolean {
@@ -65,7 +81,7 @@ function SupportPage() {
   const [selectedAlerts, setSelectedAlerts] = useState<Alert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
   const [filterPriority, setFilterPriority] = useState<string>("All");
-  
+
   const [cannedReply, setCannedReply] = useState("");
   const [resolving, setResolving] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -85,8 +101,12 @@ function SupportPage() {
       const params = new URLSearchParams();
       params.set("limit", "100");
       params.set("status", "open");
+      // Bàn CSKH chỉ xử lý ticket khách. Trước đây hàng đợi kéo cả task từ báo cáo và
+      // task gom cụm, nên nhân viên đóng được việc nội bộ bằng 2 click, bỏ qua vòng
+      // giao việc → nhận → báo cáo → manager duyệt (backend nay từ chối, 409).
+      params.set("source", "ticket");
       if (filterPriority !== "All") params.set("priority", filterPriority);
-      
+
       const json = await apiFetch<{ data: Task[] }>(`/api/tasks?${params.toString()}`);
       // Lọc local ưu tiên hiển thị Task quá hạn hoặc Priority cao lên trên
       let loadedTasks = json.data || [];
@@ -182,22 +202,22 @@ function SupportPage() {
             </h3>
             {/* Filter Priority */}
             <div className="flex items-center gap-2">
-               <Filter className="h-3 w-3 text-muted-foreground" />
-               <span className="text-[11px] font-mono text-muted-foreground">Lọc mức độ:</span>
-               <div className="flex gap-1">
-                 {["All", "P1", "P2", "P3"].map(p => (
-                   <button
-                     key={p}
-                     onClick={() => setFilterPriority(p)}
-                     className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase ${filterPriority === p ? "bg-xanh-deep text-white" : "bg-muted text-muted-foreground border border-border"}`}
-                   >
-                     {p}
-                   </button>
-                 ))}
-               </div>
+              <Filter className="h-3 w-3 text-muted-foreground" />
+              <span className="text-[11px] font-mono text-muted-foreground">Lọc mức độ:</span>
+              <div className="flex gap-1">
+                {["All", "P1", "P2", "P3"].map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setFilterPriority(p)}
+                    className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase ${filterPriority === p ? "bg-xanh-deep text-white" : "bg-muted text-muted-foreground border border-border"}`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto divide-y divide-border">
             {loading ? (
               <div className="p-8 flex justify-center">
@@ -216,12 +236,16 @@ function SupportPage() {
                     key={task.id}
                     onClick={() => selectTask(task.id)}
                     className={`p-3 cursor-pointer transition-colors ${
-                      isSelected ? "bg-xanh-mint/50 ring-1 ring-inset ring-xanh-green/40" : "hover:bg-muted/30"
+                      isSelected
+                        ? "bg-xanh-mint/50 ring-1 ring-inset ring-xanh-green/40"
+                        : "hover:bg-muted/30"
                     }`}
                   >
                     <div className="flex justify-between items-start mb-1">
                       <div className="flex gap-1.5 flex-wrap">
-                        <span className={`text-[10px] font-mono font-bold px-1.5 rounded ${overdue ? "bg-xanh-coral/15 text-xanh-coral" : "bg-xanh-amber/20 text-xanh-deep"}`}>
+                        <span
+                          className={`text-[10px] font-mono font-bold px-1.5 rounded ${overdue ? "bg-xanh-coral/15 text-xanh-coral" : "bg-xanh-amber/20 text-xanh-deep"}`}
+                        >
                           {overdue ? "QUÁ HẠN" : task.priority}
                         </span>
                         <span className="text-[10px] uppercase font-mono text-muted-foreground">
@@ -230,10 +254,15 @@ function SupportPage() {
                       </div>
                       <span className="text-[10px] font-mono text-muted-foreground flex items-center">
                         <Clock className="h-3 w-3 mr-1" />
-                        {new Date(task.created_at).toLocaleTimeString("vi-VN", { hour: '2-digit', minute:'2-digit' })}
+                        {new Date(task.created_at).toLocaleTimeString("vi-VN", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </span>
                     </div>
-                    <div className={`font-semibold text-sm line-clamp-1 ${overdue ? "text-xanh-coral" : "text-xanh-deep"}`}>
+                    <div
+                      className={`font-semibold text-sm line-clamp-1 ${overdue ? "text-xanh-coral" : "text-xanh-deep"}`}
+                    >
                       {task.title}
                     </div>
                     <div className="text-xs text-muted-foreground line-clamp-1 mt-1">
@@ -260,19 +289,19 @@ function SupportPage() {
               {/* Ticket Meta */}
               <div className="p-5 border-b border-border bg-muted/10">
                 <div className="flex items-center gap-2 mb-2">
-                   <span className="text-xs uppercase font-mono bg-xanh-deep text-white px-2 py-0.5 rounded">
-                     {selectedTask.priority}
-                   </span>
-                   {selectedTask.area && (
-                     <span className="text-xs flex items-center text-muted-foreground font-mono bg-muted px-2 py-0.5 border border-border rounded">
-                       <MapPin className="h-3 w-3 mr-1" /> {regionLabel(selectedTask.area)}
-                     </span>
-                   )}
-                   {isOverdue(selectedTask) && (
-                     <span className="text-xs flex items-center text-xanh-coral font-bold bg-xanh-coral/15 px-2 py-0.5 rounded">
-                       <AlertTriangle className="h-3 w-3 mr-1" /> QUÁ HẠN SLA
-                     </span>
-                   )}
+                  <span className="text-xs uppercase font-mono bg-xanh-deep text-white px-2 py-0.5 rounded">
+                    {selectedTask.priority}
+                  </span>
+                  {selectedTask.area && (
+                    <span className="text-xs flex items-center text-muted-foreground font-mono bg-muted px-2 py-0.5 border border-border rounded">
+                      <MapPin className="h-3 w-3 mr-1" /> {regionLabel(selectedTask.area)}
+                    </span>
+                  )}
+                  {isOverdue(selectedTask) && (
+                    <span className="text-xs flex items-center text-xanh-coral font-bold bg-xanh-coral/15 px-2 py-0.5 rounded">
+                      <AlertTriangle className="h-3 w-3 mr-1" /> QUÁ HẠN SLA
+                    </span>
+                  )}
                 </div>
                 <h2 className="text-xl font-bold text-xanh-deep">{selectedTask.title}</h2>
                 <div className="text-sm text-muted-foreground mt-2 bg-card p-3 rounded-lg border border-border">
@@ -290,15 +319,20 @@ function SupportPage() {
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 ) : (
                   <div className="space-y-2">
-                    {selectedAlerts.map(alert => (
-                      <div key={alert.id} className="p-3 bg-card border border-border rounded-lg text-sm flex gap-3">
-                         <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${alert.severity === "P5" ? "bg-red-500" : "bg-amber-500"}`} />
-                         <div>
-                            <p className="font-medium">{alert.title}</p>
-                            <p className="text-[11px] font-mono text-muted-foreground mt-1">
-                               {new Date(alert.created_at).toLocaleString("vi-VN")}
-                            </p>
-                         </div>
+                    {selectedAlerts.map((alert) => (
+                      <div
+                        key={alert.id}
+                        className="p-3 bg-card border border-border rounded-lg text-sm flex gap-3"
+                      >
+                        <div
+                          className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${alert.severity === "P5" ? "bg-red-500" : "bg-amber-500"}`}
+                        />
+                        <div>
+                          <p className="font-medium">{alert.title}</p>
+                          <p className="text-[11px] font-mono text-muted-foreground mt-1">
+                            {new Date(alert.created_at).toLocaleString("vi-VN")}
+                          </p>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -314,7 +348,7 @@ function SupportPage() {
                     </label>
                     {/* Canned Responses Chips */}
                     <div className="flex gap-2">
-                      {CANNED_RESPONSES.map(c => (
+                      {CANNED_RESPONSES.map((c) => (
                         <button
                           key={c.id}
                           onClick={() => setCannedReply(c.text)}
@@ -325,8 +359,8 @@ function SupportPage() {
                       ))}
                     </div>
                   </div>
-                  
-                  <textarea 
+
+                  <textarea
                     value={cannedReply}
                     onChange={(e) => setCannedReply(e.target.value)}
                     placeholder="Nhập nội dung phản hồi hoặc chọn mẫu câu soạn sẵn..."
@@ -336,13 +370,19 @@ function SupportPage() {
                   <div className="flex justify-end">
                     {confirming ? (
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">Xác nhận đóng ticket này?</span>
+                        <span className="text-sm text-muted-foreground">
+                          Xác nhận đóng ticket này?
+                        </span>
                         <button
                           onClick={resolveTicket}
                           disabled={resolving}
                           className="flex items-center gap-1.5 px-4 py-2 bg-xanh-coral text-white rounded-xl text-sm font-bold hover:bg-xanh-coral/90 transition-all disabled:opacity-50"
                         >
-                          {resolving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                          {resolving ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Send className="h-4 w-4" />
+                          )}
                           Đóng
                         </button>
                         <button

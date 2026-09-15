@@ -1,8 +1,8 @@
-# C2-App-116 Audit → Fix → Deploy Implementation Plan
+# AI-Quality-Intelligence-Platform Audit → Fix → Deploy Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Find and fix every bug in C2-App-116, verify locally with real services, ship to main (auto-deploy 6 Railway services), verify production parity.
+**Goal:** Find and fix every bug in AI-Quality-Intelligence-Platform, verify locally with real services, ship to main (auto-deploy 6 Railway services), verify production parity.
 
 **Architecture:** Audit funnel — cheap signals (test battery) → real flow at small volume → targeted logic read → single triage table → fix wave (TDD per fix) → re-run → review → ship → prod verify. Spec: `docs/superpowers/specs/2026-07-11-system-audit-fix-deploy-design.md`.
 

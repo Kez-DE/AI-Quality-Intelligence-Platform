@@ -1447,7 +1447,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Kiểm tra tool DB có sẵn**
 
-Run: `cd /Users/kenz_de/projects/C2-App-116 && scripts/bin/harness-cli query tools --capability database --status present 2>/dev/null || echo "no db capability"`
+Run: `cd /Users/kenz_de/projects/AI-Quality-Intelligence-Platform && scripts/bin/harness-cli query tools --capability database --status present 2>/dev/null || echo "no db capability"`
 Nếu không có, dùng Supabase SQL editor / `supabase db push` theo quy trình của dự án.
 
 - [ ] **Step 2: Apply migrations**
@@ -1492,13 +1492,13 @@ Expected: build thành công, không lỗi type.
 
 - [ ] **Step 3: Rà gọi API cũ không vỡ**
 
-Run: `cd /Users/kenz_de/projects/C2-App-116 && grep -rn "updateTaskStatus\|/api/tasks/.*/status" app/src/routes/_authenticated/tasks.tsx`
+Run: `cd /Users/kenz_de/projects/AI-Quality-Intelligence-Platform && grep -rn "updateTaskStatus\|/api/tasks/.*/status" app/src/routes/_authenticated/tasks.tsx`
 Kiểm tra: không còn nút thủ công gọi `updateTaskStatus` ngoài luồng mới (handler có thể còn định nghĩa nhưng không bị gọi — chấp nhận được).
 
 - [ ] **Step 4: Commit (nếu có chỉnh nhỏ khi verify)**
 
 ```bash
-cd /Users/kenz_de/projects/C2-App-116 && git add -A
+cd /Users/kenz_de/projects/AI-Quality-Intelligence-Platform && git add -A
 git commit -m "test: verify E2E vòng khép kín giao việc & duyệt hoàn thành task
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"

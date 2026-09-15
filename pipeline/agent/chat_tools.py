@@ -99,14 +99,21 @@ def get_team_priority_tasks(team_name: str) -> str:
 
 
 def submit_feedback(content: str, topic: str = "Other", sentiment: str = "negative", user_id: str | None = None) -> str:
-    """Gửi phản hồi/khiếu nại của khách hàng vào hệ thống Supabase."""
+    """Gửi phản hồi/khiếu nại của khách hàng vào hệ thống Supabase.
+
+    Cột phải khớp lược đồ `feedback`: nội dung nằm ở `text`, và `user_id` là
+    NOT NULL — thiếu nó thì bản ghi không vào được, nên phải từ chối rõ ràng
+    thay vì để tầng dưới ném lỗi rồi bị nuốt.
+    """
+    if not user_id:
+        return "Không gửi được phản hồi: phiên đăng nhập chưa xác định người gửi."
     try:
         db = get_supabase()
         safe_content = mask_pii(content[:2000])
         row = {
             "id": str(uuid.uuid4()),
-            "raw_text": safe_content,
-            "cleaned_text": safe_content,
+            "user_id": user_id,
+            "text": safe_content,
             "topic": topic,
             "sentiment": sentiment,
             "severity": "P3",  # default severity cho feedback từ chat
@@ -114,11 +121,10 @@ def submit_feedback(content: str, topic: str = "Other", sentiment: str = "negati
             "needs_review": True,
             "reviewed": False,
         }
-        if user_id:
-            row["user_id"] = user_id
         db.table("feedback").insert(row).execute()
         return f"✅ Phản hồi của bạn đã được ghi nhận thành công! Chúng tôi sẽ xem xét và phản hồi sớm nhất có thể."
     except Exception as e:
+        print(f"[chat_tools] submit_feedback failed: {e}")
         return f"Lỗi khi gửi phản hồi: {str(e)[:200]}"
 
 
@@ -391,10 +397,16 @@ _MANAGER_TOOL_NAMES = _STAFF_TOOL_NAMES + [
 
 
 def tools_for_role(role: str | None) -> list:
-    """Bộ tool OPS theo vai trò. scope_team (phòng ban) vẫn ép riêng ở execute_tool."""
-    if role == "staff":
-        return [_TOOL_BY_NAME[n] for n in _STAFF_TOOL_NAMES if n in _TOOL_BY_NAME]
+    """Bộ tool OPS theo vai trò. scope_team (phòng ban) vẫn ép riêng ở execute_tool.
+
+    Mặc định FAIL-CLOSED: vai trò không nhận ra thì KHÔNG có tool vận hành nào.
+    Trước đây nhánh mặc định trả về toàn bộ tool, nghĩa là một vai trò mới thêm
+    vào hệ thống sẽ im lặng nhận quyền admin — đúng mẫu thất bại trong im lặng.
+    """
+    if role == "admin":
+        return TOOLS_DEFINITIONS
     if role == "manager":
         return [_TOOL_BY_NAME[n] for n in _MANAGER_TOOL_NAMES if n in _TOOL_BY_NAME]
-    # admin (hoặc mặc định): toàn bộ tool.
-    return TOOLS_DEFINITIONS
+    if role == "staff":
+        return [_TOOL_BY_NAME[n] for n in _STAFF_TOOL_NAMES if n in _TOOL_BY_NAME]
+    return []

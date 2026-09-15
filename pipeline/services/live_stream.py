@@ -7,6 +7,9 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from core.paths import DEFAULT_DATA_FILE
 from ingest import ingest_dataset
+# Trần spike dùng chung một nguồn cho stream, worker và API — trước đây ba nơi ba số
+# (1 / 6 / 3), nên số ticket bỏ sót mỗi lượt phụ thuộc đường nào khởi động stream.
+from spike_detector import DEFAULT_MAX_SPIKES
 
 scheduler: BackgroundScheduler | None = None
 live_stream_lock = Lock()
@@ -20,7 +23,7 @@ live_stream_state: dict[str, Any] = {
     "auto_ticket": os.getenv("AUTO_TICKET_ENABLED", "true").lower() == "true",
     "ticket_every_batches": int(os.getenv("AUTO_TICKET_EVERY_BATCHES", "2")),
     "ticket_max_feedback": int(os.getenv("AUTO_TICKET_MAX_FEEDBACK", "1000")),
-    "ticket_max_spikes": int(os.getenv("AUTO_TICKET_MAX_SPIKES", "6")),
+    "ticket_max_spikes": int(os.getenv("AUTO_TICKET_MAX_SPIKES", str(DEFAULT_MAX_SPIKES))),
     "ticket_running": False,
     "batches_ingested": 0,
     "batch_running": False,
@@ -184,7 +187,7 @@ def start_live_stream(
     reset: bool = False,
     auto_ticket: bool = True,
     ticket_every_batches: int = 2,
-    ticket_max_spikes: int = 6,
+    ticket_max_spikes: int = DEFAULT_MAX_SPIKES,
 ):
     if not scheduler:
         raise ValueError("Scheduler is not initialized")

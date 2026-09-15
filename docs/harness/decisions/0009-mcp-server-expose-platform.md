@@ -26,7 +26,7 @@ qua env `MCP_ROLE` / `MCP_SCOPE_TEAM`, không lấy từ caller. Mọi tool call
 1. **Pipeline đi consume MCP server ngoài** (vd Supabase MCP) thay lớp tool nội bộ:
    loại — rewrite code đang chạy tốt, và server generic bỏ qua department scoping =
    regression bảo mật.
-2. **HTTP/SSE server đa tenant** map token → (role, team): hoãn — demo cohort chỉ cần
+2. **HTTP/SSE server đa tenant** map token → (role, team): hoãn — demo hiện tại chỉ cần
    một identity mỗi cấu hình; thêm phức tạp không cần thiết lúc này.
 
 ## Consequences

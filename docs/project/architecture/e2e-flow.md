@@ -125,7 +125,9 @@ Logic này là deterministic, không có LLM.
 
 ### Chặng 4: Task agent (`pipeline/agents/task_agent.py`)
 
-`cluster_alerts_into_tasks()` gom alert theo (team, area). Nếu đã có Task open cùng cặp đó, nó gán alert vào Task hiện có. Nếu chưa có, tạo Task mới và gọi LLM một lần để sinh title/summary. Kết quả ghi vào bảng `tasks`.
+`cluster_alerts_into_tasks()` gom alert theo **(team, area, topic)**. Nếu đã có Task còn hút được (`open` / `assigned` / `in_progress`) cùng bộ ba đó, nó gán alert vào Task hiện có và **nâng mức ưu tiên** nếu alert mới nặng hơn (ưu tiên chỉ đi lên, `due_at` siết theo SLA mới). Nếu chưa có, tạo Task mới với `topic`, `area`, `source='agent'` và `due_at` lấy từ SLA của routing table; LLM được gọi một lần để đặt title/summary, hỏng thì dùng tiêu đề suy diễn từ dữ liệu cụm. Cụm nào lỗi được đếm vào `clusters_failed` và trả về `status='partial_success'` — alert vẫn giữ `task_id` null để chu kỳ sau thử lại, không bị mất.
+
+Hợp đồng đầy đủ: `docs/harness/decisions/0014-dispatch-and-hitl-contract.md`.
 
 ### Chặng 5: Báo cáo
 

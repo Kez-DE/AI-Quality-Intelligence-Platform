@@ -2,7 +2,7 @@
 
 > **Cập nhật 2026-06-27:** phản ánh trạng thái hoàn thành (task loop, HI-loop, hybrid RAG, 6 phòng).
 
-**xanhSM AI Quality Intelligence Platform** (C2-App-116) phân tích phản hồi khách hàng cho dịch vụ di chuyển thông minh xanhSM. Hệ thống tự động tiếp nhận phản hồi, làm sạch PII, phân loại bằng ML, phát hiện spike, tạo báo cáo AI theo phòng ban, hỗ trợ vòng duyệt nhân viên (Human-in-the-Loop), và cung cấp giao diện hỏi đáp RAG cho nhiều nhóm người dùng.
+**xanhSM AI Quality Intelligence Platform** (AI-Quality-Intelligence-Platform) phân tích phản hồi khách hàng cho dịch vụ di chuyển thông minh xanhSM. Hệ thống tự động tiếp nhận phản hồi, làm sạch PII, phân loại bằng ML, phát hiện spike, tạo báo cáo AI theo phòng ban, hỗ trợ vòng duyệt nhân viên (Human-in-the-Loop), và cung cấp giao diện hỏi đáp RAG cho nhiều nhóm người dùng.
 
 Stack: FastAPI + scikit-learn + LLM multi-agent (backend), React 19 + TanStack Start + Vite 7 (frontend), Supabase PostgreSQL + Auth + Realtime (database). Deploy: 6 service Docker trên Railway.
 

@@ -44,7 +44,7 @@ ALTER TABLE public.tasks ADD CONSTRAINT tasks_source_check
 - [ ] **Step 3: Verify constraint đã mở**
 
 ```bash
-cd /Users/kenz_de/projects/C2-App-116 && set -a && . ./.env && set +a
+cd /Users/kenz_de/projects/AI-Quality-Intelligence-Platform && set -a && . ./.env && set +a
 BASE="$SUPABASE_URL/rest/v1"; H="apikey: $SUPABASE_SERVICE_ROLE_KEY"; A="Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"
 # Lấy 1 user_id + insert thử task source='ticket' rồi xoá
 UID=$(curl -s "$BASE/profiles?select=id&limit=1" -H "$H" -H "$A" | python3 -c "import sys,json;print(json.load(sys.stdin)[0]['id'])")
@@ -350,7 +350,7 @@ git commit -m "feat(tasks-ui): badge 'Từ ticket' cho task source='ticket'"
 - [ ] **Step 1: Push toàn bộ lên main**
 
 ```bash
-cd /Users/kenz_de/projects/C2-App-116 && git push origin main
+cd /Users/kenz_de/projects/AI-Quality-Intelligence-Platform && git push origin main
 ```
 
 - [ ] **Step 2: Chạy loop thật trên shared DB**
@@ -386,7 +386,7 @@ Expected: `source=ticket? True` và `Đã xong? True`.
 - [ ] **Step 3: Verify Railway deploy + code mới live**
 
 ```bash
-set -a && . /Users/kenz_de/projects/C2-App-116/.env && set +a
+set -a && . /Users/kenz_de/projects/AI-Quality-Intelligence-Platform/.env && set +a
 railway deployment list --service backend | head -2   # chờ SUCCESS cho commit mới
 curl -s -m 15 https://backend-production-2f4d.up.railway.app/ -o /dev/null -w "health %{http_code}\n"
 ```

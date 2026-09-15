@@ -2,12 +2,12 @@
 
 > **Cập nhật 2026-06-27:** Cập nhật mô tả KB nội bộ: xóa claim phủ số phòng ban cố định; ghi rõ KB dùng nhãn legacy (Safety, CSKH, Vận hành, IT) vì soạn trước khi chuyển 6 phòng ban chuẩn.
 
-Dự án AI20K-223. Phân tích phản hồi khách hàng smart mobility (xanhSM) và định tuyến sự cố tới đúng phòng ban.
+Phân tích phản hồi khách hàng smart mobility (xanhSM) và định tuyến sự cố tới đúng phòng ban.
 
 ## Một repo, ba tầng
 
 ```
-C2-App-116/
+AI-Quality-Intelligence-Platform/
 ├── app/        Frontend TanStack Start + React 19 (Quality Cockpit, auth, chat, admin)
 ├── pipeline/   Python FastAPI: clean → classify → ingest → spike → LLM agent → multi-agent
 ├── supabase/   Schema PostgreSQL + RLS + RBAC (6 migration)
@@ -179,9 +179,25 @@ Endpoint: `GET /api/insights/departments`, `GET /api/insights/departments/{team}
 
 ## ML — distillation
 
-Model `.joblib` (TF-IDF + LinearSVC) train trên nhãn do LLM sinh (distillation). Độ chính xác trên `data/train/test_split.json` (932 mẫu):
-- Topic: 77.1%
-- Sentiment: 94.3% (negative recall 97%, positive 87%, neutral 78%)
+Model `.joblib` (TF-IDF + LinearSVC) train trên nhãn do LLM sinh (distillation).
+
+**Số đo chính thức — holdout n=968** (`eval/splits.py`, seed=42, model chỉ train trên 3.869 mẫu còn lại):
+
+| Trục | Accuracy | KTC 95% | Macro-F1 | Baseline lớp đa số |
+|---|---|---|---|---|
+| Topic (7 lớp) | 75.0% | 72.2–77.6% | 0.674 | 33.4% |
+| Department (6 lớp) | 71.1% | 68.1–73.8% | 0.698 | 33.1% |
+
+Cohen's κ (department) = 0.635. Chạy lại: `.venv/bin/python -m eval.holdout_report`.
+
+**Điểm yếu theo lớp** (bị accuracy tổng thể che):
+- `Delay` recall **0.328** — bỏ sót 2/3 phản hồi chậm chuyến, phần lớn bị đẩy sang `App Issue`.
+- `App Issue` precision **0.568** / recall 0.870 — hố đen: model dồn văn bản không chắc chắn vào đây, kéo precision phòng IT xuống 0.484.
+- `Safety` chỉ có **7 mẫu** trong holdout → chưa kết luận được gì về năng lực phát hiện an toàn.
+
+**Cảnh báo về `data/train/test_split.json` (932 mẫu):** KHÔNG phải holdout của `splits.py` — 79% số mẫu của nó nằm trong tập train của model hiện tại. Con số 77.1% từng công bố cho tập này thuộc về **model topic đời trước**, đã bị thay khi retrain 2026-06-25. Đừng dùng lại.
+
+**Sentiment model chưa truy được nguồn gốc:** không có script train nào trong repo sinh ra `sentiment_model.joblib`. Nó đạt precision 1.000 trên lớp `neutral` (n=35) của holdout, trong khi model train sạch chỉ đạt 0.083 → dấu hiệu đã học trên holdout. Xem `ml/retrain_sentiment.py`.
 
 Rule engine bù phần model yếu (câu ngắn, từ khóa rõ).
 

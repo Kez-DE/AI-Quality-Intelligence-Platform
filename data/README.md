@@ -1,6 +1,6 @@
 # Data Manifest — AI Quality Intelligence Platform
 
-Thư mục này chứa dữ liệu phục vụ demo học thuật của **C2-App-116**. Đây không
+Thư mục này chứa dữ liệu phục vụ demo học thuật của **AI-Quality-Intelligence-Platform**. Đây không
 phải dữ liệu vận hành nội bộ của xanhSM/Green SM. Các review gốc đến từ nguồn
 công khai; metadata vận hành như khu vực, tài xế, chuyến đi và cờ spike là dữ
 liệu tổng hợp để demo luồng AI.

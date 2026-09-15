@@ -1,6 +1,6 @@
 # Hướng dẫn cài đặt trên Windows
 
-> Dành cho thành viên mới join dự án. Sau khi hoàn tất, bạn sẽ chạy được cả backend (FastAPI) và frontend (React/Vite) trên máy Windows.
+> Hướng dẫn dựng môi trường dự án từ đầu. Sau khi hoàn tất, bạn sẽ chạy được cả backend (FastAPI) và frontend (React/Vite) trên máy Windows.
 
 > **Cập nhật 2026-06-27:** đồng bộ env-var (.env.example) và thêm COHERE_API_KEY (bắt buộc cho RAG hybrid embedding).
 
@@ -58,8 +58,8 @@ npm install -g supabase
 Mở **PowerShell** hoặc **Git Bash**:
 
 ```powershell
-git clone <repo-url> C2-App-116
-cd C2-App-116
+git clone <repo-url> AI-Quality-Intelligence-Platform
+cd AI-Quality-Intelligence-Platform
 
 # Tạo file .env từ template
 copy .env.example .env
@@ -134,7 +134,7 @@ Mở **2 terminal** (2 tab PowerShell hoặc 2 cửa sổ trong VS Code):
 **PowerShell:**
 
 ```powershell
-cd C2-App-116\pipeline
+cd AI-Quality-Intelligence-Platform\pipeline
 .venv\Scripts\Activate.ps1
 
 # Load biến môi trường từ .env
@@ -150,7 +150,7 @@ python -m uvicorn main:app --host 127.0.0.1 --port 8000
 **Git Bash (thay thế):**
 
 ```bash
-cd ~/C2-App-116/pipeline
+cd ~/AI-Quality-Intelligence-Platform/pipeline
 source .venv/Scripts/activate
 set -a && source ../.env && set +a
 python -m uvicorn main:app --host 127.0.0.1 --port 8000
@@ -168,7 +168,7 @@ curl http://127.0.0.1:8000/health
 **PowerShell:**
 
 ```powershell
-cd C2-App-116\app
+cd AI-Quality-Intelligence-Platform\app
 
 # Load biến môi trường
 Get-Content ..\.env | ForEach-Object {
@@ -183,7 +183,7 @@ npx vite dev --port 5174 --host 127.0.0.1
 **Git Bash (thay thế):**
 
 ```bash
-cd ~/C2-App-116/app
+cd ~/AI-Quality-Intelligence-Platform/app
 set -a && source ../.env && set +a
 npx vite dev --port 5174 --host 127.0.0.1
 ```
@@ -290,7 +290,7 @@ Get-Process -Id (Get-NetTCPConnection -LocalPort 5174).OwningProcess | Stop-Proc
 ## 10. Cập nhật code mới
 
 ```powershell
-cd C2-App-116
+cd AI-Quality-Intelligence-Platform
 git pull origin main
 
 # Backend

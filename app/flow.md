@@ -1,9 +1,9 @@
 > **Cập nhật 2026-06-27:** sửa cấu trúc pipeline cho khớp code.
 
-C2-App-116/
+AI-Quality-Intelligence-Platform/
 │
-├── 🔒 [KHUNG COHORT — KHÔNG ĐỘNG]
-│   ├── scripts/                    # logging AI usage — giữ nguyên
+├── 🔒 [KHUNG HẠ TẦNG — KHÔNG ĐỘNG]
+│   ├── scripts/                    # logging AI usage (local) — giữ nguyên
 │   │   ├── _pyrun.sh / .cmd
 │   │   ├── log_hook.py / log_antigravity.py / log_manual.py
 │   ├── .claude/ .codex/ .cursor/ .gemini/ .github/hooks/  # hook configs

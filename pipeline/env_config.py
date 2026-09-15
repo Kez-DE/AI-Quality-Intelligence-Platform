@@ -123,7 +123,8 @@ class Settings(BaseSettings):
     ticket_volume_spike_threshold: int = Field(default=10, alias="TICKET_VOLUME_SPIKE_THRESHOLD")
     ticket_opportunity_spike_threshold: int = Field(default=5, alias="TICKET_OPPORTUNITY_SPIKE_THRESHOLD")
     ticket_alert_cooldown_minutes: int = Field(default=60, alias="TICKET_ALERT_COOLDOWN_MINUTES")
-    auto_ticket_workflow_enabled: bool = Field(default=True, alias="AUTO_TICKET_WORKFLOW_ENABLED")
+    auto_ticket_workflow_enabled: bool = Field(default=False, alias="AUTO_TICKET_WORKFLOW_ENABLED")
+    # Mặc định TẮT: alert chuyển trạng thái bằng workflow THẬT (nút ops), không auto theo tuổi.
     auto_ticket_in_progress_after_seconds: int = Field(default=10, alias="AUTO_TICKET_IN_PROGRESS_AFTER_SECONDS")
     auto_ticket_resolved_after_seconds: int = Field(default=30, alias="AUTO_TICKET_RESOLVED_AFTER_SECONDS")
 

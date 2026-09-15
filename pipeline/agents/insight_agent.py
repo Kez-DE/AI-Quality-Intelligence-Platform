@@ -9,6 +9,7 @@ from typing import Any, Dict
 import time
 
 from agents.common import get_db, log_agent_run
+from db_utils import fetch_paginated
 from agents.router_agent import route_ticket
 from agents.schemas import InsightOutput, TopArea, TopTopic, RecentSample
 
@@ -33,15 +34,15 @@ def generate_department_insights(team: str, hours: int = 24) -> Dict[str, Any]:
     since = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
 
     try:
-        response = (
-            db.table("feedback")
+        # PostgREST cắt cứng 1000 dòng/response, nên `.limit(2000)` quét THIẾU
+        # trong im lặng. Mọi số liệu của báo cáo phòng ban dựng từ đây.
+        all_feedback = fetch_paginated(
+            lambda: db.table("feedback")
             .select("id, text, topic, severity, overall_risk, sentiment, created_at, area")
             .gte("created_at", since)
-            .order("created_at", desc=True)
-            .limit(2000)
-            .execute()
+            .order("created_at", desc=True),
+            cap=2000,
         )
-        all_feedback = response.data or []
     except Exception as exc:  # noqa: BLE001
         print(f"[insight_agent] Error fetching feedback: {exc}")
         all_feedback = []

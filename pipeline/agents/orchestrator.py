@@ -70,9 +70,13 @@ def run_agent_pipeline(hours: int = 24, run_alert: bool = True, run_report: bool
     else:
         try:
             # Dùng cùng một detector với live stream để routing/threshold không bị lệch.
-            from spike_detector import detect_spikes
+            from spike_detector import DEFAULT_MAX_SPIKES, detect_spikes
 
-            spike_result = detect_spikes(hours=hours, max_feedback=5000, max_spikes=20)
+            # Trần phải lấy từ MỘT nguồn (= số phòng ban). Hard-code 20 ở đây từng
+            # làm đường chạy định kỳ lệch khỏi live-stream và khỏi tài liệu.
+            spike_result = detect_spikes(
+                hours=hours, max_feedback=5000, max_spikes=DEFAULT_MAX_SPIKES
+            )
             alerts_created_count = int(spike_result.get("alerts_created", 0))
             results["spike_detection"] = spike_result
             pipeline_log.append(

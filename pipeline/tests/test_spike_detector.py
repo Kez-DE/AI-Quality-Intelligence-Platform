@@ -38,9 +38,24 @@ class TestSpikeDetector(unittest.TestCase):
             {"area": "D", "topic": "Other", "team": "Sản phẩm"},
         ]
 
-        selected = _select_candidates(candidates, recent_alerts=[], limit=3)
+        selected, dropped = _select_candidates(candidates, recent_alerts=[], limit=3)
 
         self.assertEqual([group["team"] for group in selected], ["Vận hành", "IT", "Sản phẩm"])
+        # Nhóm bị trần cắt phải được trả về, không biến mất im lặng.
+        self.assertEqual([group["area"] for group in dropped], ["B"])
+
+    def test_empty_topic_alert_does_not_block_other_topics(self):
+        """Alert legacy thiếu topic từng chặn MỌI chủ đề mới của cùng (khu vực, phòng)."""
+        from spike_detector import _is_duplicate
+
+        recent = [{"area": "A", "assigned_team": "Vận hành", "topic": None}]
+        self.assertFalse(_is_duplicate(recent, area="A", team="Vận hành", topic="Safety"))
+
+    def test_same_topic_is_duplicate(self):
+        from spike_detector import _is_duplicate
+
+        recent = [{"area": "A", "assigned_team": "Vận hành", "topic": "Safety"}]
+        self.assertTrue(_is_duplicate(recent, area="A", team="Vận hành", topic="Safety"))
 
     @patch("spike_detector.create_or_update_ticket")
     @patch("spike_detector.analyze_spike")

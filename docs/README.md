@@ -3,7 +3,7 @@
 Bản đồ toàn bộ tài liệu của dự án. Bắt đầu từ đây để tìm đúng file.
 
 ```
-C2-App-116/
+AI-Quality-Intelligence-Platform/
   README.md            tổng quan + cài đặt nhanh (đọc đầu tiên)
   docs/
     project/           tài liệu sản phẩm: cơ chế, kiến trúc, dữ liệu, vận hành, setup

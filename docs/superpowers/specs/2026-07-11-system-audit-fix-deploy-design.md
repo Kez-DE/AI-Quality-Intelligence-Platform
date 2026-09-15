@@ -4,7 +4,7 @@ Harness intake #5, lane: high-risk. Requested by user via /start.
 
 ## Understanding
 
-Audit C2-App-116 end-to-end, fix all bugs found, verify locally with real
+Audit AI-Quality-Intelligence-Platform end-to-end, fix all bugs found, verify locally with real
 services, ship to main (auto-deploys 6 Railway services via GitHub Actions),
 then verify production parity against local results.
 

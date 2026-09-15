@@ -1,6 +1,6 @@
 # Hướng dẫn cài đặt trên macOS
 
-> Dành cho thành viên mới join dự án. Sau khi hoàn tất, bạn sẽ chạy được cả backend (FastAPI) và frontend (React/Vite) trên máy Mac.
+> Hướng dẫn dựng môi trường dự án từ đầu. Sau khi hoàn tất, bạn sẽ chạy được cả backend (FastAPI) và frontend (React/Vite) trên máy Mac.
 
 > **Cập nhật 2026-06-27:** đồng bộ env-var (.env.example) và thêm COHERE_API_KEY (bắt buộc cho RAG hybrid embedding).
 
@@ -47,8 +47,8 @@ brew install supabase/tap/supabase
 ## 2. Clone repo và chuẩn bị environment
 
 ```bash
-git clone <repo-url> C2-App-116
-cd C2-App-116
+git clone <repo-url> AI-Quality-Intelligence-Platform
+cd AI-Quality-Intelligence-Platform
 
 # Tạo file .env từ template
 cp .env.example .env
@@ -109,7 +109,7 @@ Mở **2 terminal** riêng biệt:
 ### Terminal 1 — Backend (cổng 8000)
 
 ```bash
-cd ~/C2-App-116/pipeline
+cd ~/AI-Quality-Intelligence-Platform/pipeline
 source .venv/bin/activate
 set -a && source ../.env && set +a
 python -m uvicorn main:app --host 127.0.0.1 --port 8000
@@ -125,7 +125,7 @@ curl http://127.0.0.1:8000/health
 ### Terminal 2 — Frontend (cổng 5174)
 
 ```bash
-cd ~/C2-App-116/app
+cd ~/AI-Quality-Intelligence-Platform/app
 set -a && source ../.env && set +a
 npx vite dev --port 5174 --host 127.0.0.1
 ```
@@ -198,7 +198,7 @@ lsof -ti:5174 | xargs kill -9
 ## 9. Cập nhật code mới
 
 ```bash
-cd ~/C2-App-116
+cd ~/AI-Quality-Intelligence-Platform
 git pull origin main
 
 # Backend: cài lại nếu có package mới

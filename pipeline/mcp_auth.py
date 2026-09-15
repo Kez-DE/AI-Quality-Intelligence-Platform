@@ -20,6 +20,9 @@ from typing import Optional, TypedDict
 class Identity(TypedDict):
     role: str
     scope_team: Optional[str]
+    # submit_feedback ghi feedback.user_id (NOT NULL), nên guest qua MCP cũng phải
+    # mang theo chủ token — thiếu nó thì tool im lặng từ chối mọi lần gọi.
+    user_id: Optional[str]
 
 
 def hash_token(raw: str) -> str:
@@ -27,17 +30,19 @@ def hash_token(raw: str) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def _identity_from_profile(role: Optional[str], department: Optional[str]) -> Identity:
+def _identity_from_profile(
+    role: Optional[str], department: Optional[str], user_id: Optional[str] = None
+) -> Identity:
     """Ánh xạ (role, department) của profile → identity MCP. Đóng an toàn:
     ops thiếu phòng KHÔNG được toàn hệ thống mà tụt về guest."""
     role = (role or "").strip().lower()
     dept = (department or "").strip() or None
     if role == "admin":
-        return {"role": "admin", "scope_team": None}
+        return {"role": "admin", "scope_team": None, "user_id": user_id}
     if role in ("manager", "staff") and dept:
-        return {"role": role, "scope_team": dept}
+        return {"role": role, "scope_team": dept, "user_id": user_id}
     # guest, hoặc nhân viên chưa được gán phòng → chỉ submit_feedback
-    return {"role": "guest", "scope_team": None}
+    return {"role": "guest", "scope_team": None, "user_id": user_id}
 
 
 def verify_token(raw: str, db=None) -> Optional[Identity]:
@@ -81,7 +86,8 @@ def verify_token(raw: str, db=None) -> Optional[Identity]:
     if not profs:
         return None
 
-    ident = _identity_from_profile(profs[0].get("role"), profs[0].get("department"))
+    ident = _identity_from_profile(
+        profs[0].get("role"), profs[0].get("department"), user_id)
     # last_used_at best-effort
     try:
         db.table("mcp_tokens").update(
@@ -152,7 +158,7 @@ class SupabaseTokenVerifier(TokenVerifier):
                 return None  # ponytail: fail closed, lỗi DB không phải cửa vào bearer
             if profs:
                 ident = _identity_from_profile(
-                    profs[0].get("role"), profs[0].get("department"))
+                    profs[0].get("role"), profs[0].get("department"), uid)
                 return AccessToken(
                     token=token, client_id=f"supabase-user:{uid}",
                     scopes=[], claims=dict(ident))

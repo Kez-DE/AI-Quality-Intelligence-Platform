@@ -5,14 +5,14 @@ import mcp_server as m
 
 def test_identity_reads_sdk_access_token(monkeypatch):
     class _AT:
-        claims = {"role": "manager", "scope_team": "CSKH"}
+        claims = {"role": "manager", "scope_team": "CSKH", "user_id": "u1"}
     monkeypatch.setattr(mcp_http, "get_access_token", lambda: _AT())
-    assert mcp_http._current_identity() == ("manager", "CSKH")
+    assert mcp_http._current_identity() == ("manager", "CSKH", "u1")
 
 
 def test_identity_none_when_no_token(monkeypatch):
     monkeypatch.setattr(mcp_http, "get_access_token", lambda: None)
-    assert mcp_http._current_identity() == (None, None)
+    assert mcp_http._current_identity() == (None, None, None)
 
 
 def test_build_app_returns_asgi_app():

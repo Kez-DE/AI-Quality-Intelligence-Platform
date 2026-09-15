@@ -7,7 +7,7 @@ activation: always-on
 
 Log prompt vào `.ai-log/session.jsonl` được **tự động hoá hoàn toàn** qua hook của từng
 AI client. **Không có bất kỳ đường đẩy dữ liệu nào ra server bên ngoài** — phần
-submit lên grading server (`scripts/submit_log.py`, pre-push hook, `AI_LOG_SERVER`,
+submit ra ngoài (`scripts/submit_log.py`, pre-push hook, `AI_LOG_SERVER`,
 `AI_LOG_API_KEY`) đã bị gỡ bỏ.
 
 ## Cơ chế

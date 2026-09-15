@@ -36,6 +36,10 @@ class _Query:
     def lt(self, col, val):
         self._filters.append(("lt", col, val)); return self
 
+    def is_(self, col, val):
+        # PostgREST .is_(col, "null") -> IS NULL. Chỉ hỗ trợ null/not.null như code dùng.
+        self._filters.append(("is", col, val)); return self
+
     def limit(self, n):
         self._limit = n; return self
 
@@ -56,6 +60,10 @@ class _Query:
                 return False
             if kind == "lt" and not (cur is not None and cur < val):
                 return False
+            if kind == "is":
+                want_null = str(val).lower() == "null"
+                if want_null != (cur is None):
+                    return False
         return True
 
     def execute(self):

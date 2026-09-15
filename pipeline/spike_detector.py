@@ -7,13 +7,21 @@ from agents.router_agent import route_ticket
 from agents.ticket_agent import create_or_update_ticket
 from clean import mask_pii
 from db_utils import fetch_paginated
-from departments import alert_department
+from departments import DEPARTMENTS, alert_department
 from env_config import get_settings, get_supabase_config, has_supabase_admin_key
 from llm_agent import analyze_spike
 from webhook_notifier import send_alert_webhook
 
 SUPABASE_URL, SUPABASE_KEY = get_supabase_config()
 _settings = get_settings()
+
+# Trần mặc định cho một lượt quét. Đặt bằng số phòng ban để mỗi phòng có cơ hội nhận
+# ít nhất một ticket mỗi lượt — trần nhỏ hơn số phòng khiến phòng xếp sau luôn đói.
+# Đây là NGUỒN DUY NHẤT của mặc định này (live_stream, worker, API cùng import).
+DEFAULT_MAX_SPIKES = len(DEPARTMENTS)
+
+# Alert đã đóng thì không còn là "đang xử lý", không được dùng để chặn alert mới.
+ACTIVE_ALERT_STATUSES = ["open", "in_progress"]
 
 # P5 tạo ngay; P4 cần một cụm nhỏ; mức thấp chỉ tạo khi có volume spike.
 CRITICAL_THRESHOLD = _settings.ticket_critical_threshold
@@ -55,19 +63,31 @@ def _group_threshold(group: dict) -> int | None:
 
 
 def _is_duplicate(recent_alerts: list[dict], *, area: str, team: str, topic: str) -> bool:
+    """Đã có alert đang mở cho đúng (khu vực, phòng, chủ đề) trong cửa sổ cooldown chưa.
+
+    Chủ đề phải TRÙNG mới tính trùng. Trước đây alert thiếu topic (row legacy hoặc do
+    ticket_agent ghi bằng legacy_payload) bị coi là trùng với MỌI chủ đề, nên một alert
+    cũ không rõ chủ đề chặn luôn cả spike Safety mới của cùng khu vực suốt cooldown.
+    """
     for alert in recent_alerts:
         if str(alert.get("area") or "Unknown") != area:
             continue
         if alert_department(alert) != team:
             continue
-        existing_topic = str(alert.get("topic") or "").strip()
-        if not existing_topic or existing_topic == topic:
+        if str(alert.get("topic") or "").strip() == topic:
             return True
     return False
 
 
-def _select_candidates(candidates: list[dict], recent_alerts: list[dict], limit: int) -> list[dict]:
-    """Select the highest-risk group per department before filling remaining slots."""
+def _select_candidates(
+    candidates: list[dict], recent_alerts: list[dict], limit: int
+) -> tuple[list[dict], list[dict]]:
+    """Chọn nhóm rủi ro nhất của mỗi phòng trước, rồi mới lấp chỗ trống.
+
+    Trả về ``(selected, dropped)``. ``dropped`` là các nhóm ĐỦ ngưỡng nhưng bị trần
+    ``limit`` cắt — caller phải báo cáo con số này, cắt im lặng khiến vận hành tưởng
+    đã quét hết trong khi phần lớn spike bị bỏ.
+    """
     viable = [
         group
         for group in candidates
@@ -90,21 +110,25 @@ def _select_candidates(candidates: list[dict], recent_alerts: list[dict], limit:
         selected_ids.add(id(group))
         selected_teams.add(group["team"])
         if len(selected) >= limit:
-            return selected
-
-    for group in viable:
-        if id(group) in selected_ids:
-            continue
-        selected.append(group)
-        if len(selected) >= limit:
             break
-    return selected
+
+    if len(selected) < limit:
+        for group in viable:
+            if id(group) in selected_ids:
+                continue
+            selected.append(group)
+            selected_ids.add(id(group))
+            if len(selected) >= limit:
+                break
+
+    dropped = [group for group in viable if id(group) not in selected_ids]
+    return selected, dropped
 
 
 def detect_spikes(
     hours: int = 1,
     max_feedback: int = 1000,
-    max_spikes: int = 3,
+    max_spikes: int = DEFAULT_MAX_SPIKES,
     texts_per_group: int = 20,
 ):
     """Create deterministic tickets from risk or volume spikes.
@@ -176,19 +200,33 @@ def detect_spikes(
     )
 
     cooldown_since = (now - timedelta(minutes=ALERT_COOLDOWN_MINUTES)).isoformat()
+    dedup_degraded = False
     try:
         recent_alerts = (
             db.table("alerts")
-            .select("*")
+            .select("area,assigned_team,topic,description,status,created_at")
+            .in_("status", ACTIVE_ALERT_STATUSES)
             .gte("created_at", cooldown_since)
             .execute()
             .data
             or []
         )
-    except Exception:
+    except Exception as exc:
+        # Fail-open có chủ ý (thà trùng ticket còn hơn mất cảnh báo), NHƯNG phải nói ra:
+        # nuốt im biến lỗi hạ tầng thành "không có gì trùng" và gây lụt ticket không dấu vết.
         recent_alerts = []
+        dedup_degraded = True
+        print(f"[Spike Detector] CẢNH BÁO: không đọc được alert gần đây, dedup bị vô hiệu lượt này: {str(exc)[:200]}")
 
-    selected = _select_candidates(candidates, recent_alerts, max_spikes)
+    selected, dropped = _select_candidates(candidates, recent_alerts, max_spikes)
+    if dropped:
+        dropped_summary = ", ".join(
+            f"{g['team']}/{g['area']}/{g['topic']}" for g in dropped[:10]
+        )
+        print(
+            f"[Spike Detector] {len(dropped)} nhóm đủ ngưỡng bị trần max_spikes={max_spikes} cắt: "
+            f"{dropped_summary}{' ...' if len(dropped) > 10 else ''}"
+        )
 
     profiles_res = db.table("profiles").select("id").limit(1).execute()
     user_id = profiles_res.data[0]["id"] if profiles_res.data else None
@@ -239,6 +277,10 @@ def detect_spikes(
         "candidate_spikes": len(candidates),
         "candidate_teams": dict(Counter(group["team"] for group in candidates)),
         "selected_teams": dict(Counter(group["team"] for group in selected)),
+        # Cắt do trần max_spikes phải hiện ra ở kết quả, không được im lặng.
+        "dropped_groups": len(dropped),
+        "dropped_teams": dict(Counter(group["team"] for group in dropped)),
+        "dedup_degraded": dedup_degraded,
         "alerts_created": alerts_created,
         "records_scanned": len(data),
         "groups_scanned": len(groups),

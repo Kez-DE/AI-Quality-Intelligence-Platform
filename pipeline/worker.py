@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from services.live_stream import set_scheduler, start_live_stream
+from services.live_stream import DEFAULT_MAX_SPIKES, set_scheduler, start_live_stream
 from services.ticket_workflow import advance_ticket_workflow
 
 
@@ -46,7 +46,7 @@ def start_configured_live_stream():
         reset=_env_bool("LIVE_STREAM_RESET_ON_START", False),
         auto_ticket=_env_bool("AUTO_TICKET_ENABLED", True),
         ticket_every_batches=int(os.getenv("AUTO_TICKET_EVERY_BATCHES", "2")),
-        ticket_max_spikes=int(os.getenv("AUTO_TICKET_MAX_SPIKES", "1")),
+        ticket_max_spikes=int(os.getenv("AUTO_TICKET_MAX_SPIKES", str(DEFAULT_MAX_SPIKES))),
     )
 
 

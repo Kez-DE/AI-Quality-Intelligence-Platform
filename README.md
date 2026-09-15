@@ -1,14 +1,14 @@
-# C2-App-116 — AI Quality Intelligence Platform
+# AI Quality Intelligence Platform
 
 **xanhSM** | Nền tảng Phân tích Chất lượng Dịch vụ Di chuyển Thông minh bằng AI
 
-*AI20K Build Cohort 2 — Team 116*
+*Dự án cá nhân*
 
 ---
 
 ## Giới thiệu
 
-**C2-App-116** là nền tảng AI phân tích phản hồi khách hàng cho dịch vụ di chuyển thông minh **xanhSM**. Hệ thống tự động tiếp nhận phản hồi, làm sạch PII, phân loại bằng ML, phát hiện điểm nóng, tạo ticket/alert, và phân tích chuyên sâu theo phòng ban thông qua multi-agent LLM.
+**AI Quality Intelligence Platform** là nền tảng AI phân tích phản hồi khách hàng cho dịch vụ di chuyển thông minh **xanhSM**. Hệ thống tự động tiếp nhận phản hồi, làm sạch PII, phân loại bằng ML, phát hiện điểm nóng, tạo ticket/alert, và phân tích chuyên sâu theo phòng ban thông qua multi-agent LLM.
 
 Mục tiêu: giúp đội ngũ vận hành nắm bắt nhanh vấn đề chất lượng dịch vụ, giảm thời gian xử lý, và đưa ra quyết định dựa trên dữ liệu.
 
@@ -80,8 +80,8 @@ LLM Providers: OpenRouter, OpenAI, Gemini, Groq (cấu hình qua `LLM_PROVIDER` 
 ### Bước 1: Cấu hình môi trường
 
 ```bash
-git clone https://github.com/AI20K-Build-Cohort-2/C2-App-116.git
-cd C2-App-116
+git clone https://github.com/Kez-DE/AI-Quality-Intelligence-Platform.git
+cd AI-Quality-Intelligence-Platform
 cp .env.example .env
 ```
 
@@ -133,7 +133,7 @@ Mở: [http://localhost:5174](http://localhost:5174)
 ## Cấu trúc thư mục
 
 ```text
-C2-App-116/
+AI-Quality-Intelligence-Platform/
 ├── app/                    Frontend (React 19 / TanStack Start / Vite 7)
 │   └── src/routes/         dashboard, feedback, alerts, insights, chat, admin
 ├── pipeline/               Backend (FastAPI + ML + Agent)
@@ -160,7 +160,7 @@ C2-App-116/
 │   ├── train/ demo/        Split ML + seed demo 150 review
 │   └── auxiliary/data2/    Dataset phụ trợ/thí nghiệm, không thay runtime
 ├── docs/                   Tài liệu chi tiết (xem mục Tài liệu)
-├── JOURNAL.md              Nhật ký cohort
+├── JOURNAL.md              Nhật ký phát triển
 └── WORKLOG.md              Quyết định kỹ thuật
 ```
 
@@ -258,10 +258,9 @@ Kịch bản chi tiết: [`docs/project/demo-script.md`](docs/project/demo-scrip
 
 ---
 
-## Quy tắc làm việc nhóm
+## Quy tắc làm việc
 
 - Trước khi PR: cập nhật `JOURNAL.md`, `WORKLOG.md` nếu có quyết định mới
-- Ghi AI usage log: `python3 scripts/log_manual.py --tool "<tool>" --prompt "<việc>" --result "<kết quả>"`
 - Commit nhỏ theo phase, không commit `.env`, `.venv`, `node_modules`
 - Push GitHub khi đã build/test thành công
 
@@ -269,4 +268,4 @@ Kịch bản chi tiết: [`docs/project/demo-script.md`](docs/project/demo-scrip
 
 ## License
 
-Dự án phục vụ mục đích học tập và demo trong khuôn khổ AI20K Build Cohort 2.
+Dự án cá nhân, phục vụ mục đích học tập và demo.
