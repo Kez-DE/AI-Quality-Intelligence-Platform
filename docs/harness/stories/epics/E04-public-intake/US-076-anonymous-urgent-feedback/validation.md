@@ -71,8 +71,23 @@ Two findings the run produced, both fixed in this story:
 
 Not yet done, and deliberately so:
 
-- E2E against the deployed app, deferred until the backend ships. The database
-  is ready but the Railway `backend` service still runs the previous image.
+- E2E against the deployed app, deferred. The database is ready and the code is
+  on `main` (`4a735f8`), but nothing is serving it.
+
+  Two separate blockers, both pre-existing and neither caused by this story:
+
+  1. Both GitHub Actions workflows are `runs-on: self-hosted` and the repository
+     has **zero** registered runners, so `Deploy to Railway` sits queued
+     indefinitely. The previous run was cancelled after 24h for the same reason.
+  2. The Railway `backend` service is **not running**.
+     `GET https://backend-production-2f4d.up.railway.app/health` returns
+     `{"status":"error","code":404,"message":"Application not found"}` from
+     Railway's edge. Its last deployment (2026-09-15, commit `79b04ae`) is
+     `REMOVED`; every other service's latest deployment is `FAILED`, the newest
+     from 2026-06-17; `mcp-http` has never deployed at all.
+
+  Deploying is out of scope for this story by the owner's decision. Until a
+  deploy happens, `/f` has no server to answer it.
 
 Migration applied 2026-09-23 by the repo owner via `supabase db push` against
 Supabase `gvtoqbowulwmpzfogjwp`:
