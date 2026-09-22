@@ -23,7 +23,7 @@ just the presence of the happy path.
 | --- | --- |
 | Unit | `public_ref` is unguessable and unique across generations; client IP resolves to the rightmost `X-Forwarded-For` entry so a forged leading entry cannot move the rate-limit bucket; fingerprints differ per IP; derived status maps `reviewed` -> resolved, `needs_review` -> under_review, else received. |
 | Integration | Submit with no auth header -> 200 with a reference; stored row has `user_id` None, `source='public'`, a `submitter_hash`, a `retention_until`; empty and 4001-char `text` -> 422; PII (phone, email, plate) masked in the stored text; rate limit -> 429 with `Retry-After`; separate IPs get separate buckets; status lookup by reference -> 200; unknown reference -> 404; status response omits `user_id`, `submitter_hash`, `retention_until`, `text`, `confidence` and the risk columns; classification fields are server-assigned and a client-supplied `severity` is ignored. |
-| E2E | Not run. The story ships behind a public route with no session; browser proof is deferred to the next deploy window. |
+| E2E | Run against a real Postgres via `supabase start` (all 31 migrations applied) with the backend on `127.0.0.1:8099`. Submit with no `Authorization` header, status read-back, 404 on an unknown reference, 401 still enforced on the authenticated route, rate limit with a live `Retry-After`, forged `X-Forwarded-For` prefix, and both database constraints. |
 | Platform | `tsc --noEmit`, `vite build`, `vitest run` for the two new routes. |
 | Performance | None. The submit path performs the same single classifier call and single insert as the authenticated path. |
 | Logs/Audit | Asserted by omission: no test captures a log line containing submitted text, and the endpoint contains no log statement that takes the body. |
@@ -71,8 +71,55 @@ Two findings the run produced, both fixed in this story:
 
 Not yet done, and deliberately so:
 
-- E2E against the deployed app, deferred. The database is ready and the code is
-  on `main` (`4a735f8`), but nothing is serving it.
+### E2E run, 2026-09-23
+
+Not against production — nothing is serving there (see below). Run against a
+local stack: `supabase start` applied all 31 migrations to a real Postgres, and
+the backend ran on `127.0.0.1:8099` pointed at it.
+
+| # | Check | Result |
+| --- | --- | --- |
+| 1 | `POST /api/public/feedback`, no `Authorization` header | `200` — `{"public_ref":"psztBPVx2InB","status":"under_review","created_at":"2026-09-22T17:39:30.837106+00:00"}`, 12 characters as designed |
+| 2 | `GET /api/public/feedback/psztBPVx2InB` | `200` with exactly `public_ref`, `status`, `created_at`, `topic`, `severity` — no `text`, no `user_id`, no `submitter_hash` |
+| 3 | `GET` an unknown reference | `404` |
+| 4 | `POST /api/feedback/submit` with no header | `401` — the authenticated path is untouched |
+| 5 | Rate limit, default 5/hour | requests 1–5 `200`, request 6 `429` with `retry-after: 3600` — the header now survives the exception handler |
+| 6 | `X-Forwarded-For: 1.1.1.1, 198.51.100.7` after the bucket was spent | `429` — a forged leading hop cannot move the bucket |
+| 7 | A different client IP | `200` — separate bucket |
+
+The stored row, read straight out of Postgres:
+
+```text
+user_id         |                      <- NULL, no account invented
+source          | public
+channel         | web
+area            | HN
+severity        | P5
+topic           | Safety
+needs_review    | t
+public_ref      | psztBPVx2InB
+hash_prefix     | 28aa5c2674d0
+retention_until | 2027-03-21           <- now + 180 days
+text            | Tai xe bien [BIỂN_SỐ_ĐÃ_ẨN] phong au vuot den do, goi [SĐT_ĐÃ_ẨN] chui toi
+```
+
+Both database constraints reject what they are meant to:
+
+```text
+INSERT (user_id NULL, public_ref NULL)
+  ERROR: new row for relation "feedback" violates check constraint "feedback_identity_chk"
+
+INSERT (public_ref 'psztBPVx2InB')
+  ERROR: duplicate key value violates unique constraint "feedback_public_ref_idx"
+```
+
+Local stack torn down afterwards (`supabase stop --no-backup`). Nothing was
+written to production.
+
+### Not verified on production
+
+The code is on `main` (`4a735f8`) and the production database carries the
+migration, but nothing serves the routes yet.
 
   Two separate blockers, both pre-existing and neither caused by this story:
 
