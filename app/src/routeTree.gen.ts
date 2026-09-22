@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as FRouteImport } from './routes/f'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
@@ -23,8 +24,14 @@ import { Route as AuthenticatedCompletionReportsRouteImport } from './routes/_au
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedAlertsRouteImport } from './routes/_authenticated/alerts'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as FStatusCodeRouteImport } from './routes/f_.status.$code'
 import { Route as AuthenticatedFeedbackUploadRouteImport } from './routes/_authenticated/feedback_.upload'
 
+const FRoute = FRouteImport.update({
+  id: '/f',
+  path: '/f',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -95,6 +102,11 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const FStatusCodeRoute = FStatusCodeRouteImport.update({
+  id: '/f_/status/$code',
+  path: '/f/status/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedFeedbackUploadRoute =
   AuthenticatedFeedbackUploadRouteImport.update({
     id: '/feedback_/upload',
@@ -105,6 +117,7 @@ const AuthenticatedFeedbackUploadRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/f': typeof FRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/alerts': typeof AuthenticatedAlertsRoute
   '/chat': typeof AuthenticatedChatRoute
@@ -117,10 +130,12 @@ export interface FileRoutesByFullPath {
   '/support': typeof AuthenticatedSupportRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/feedback/upload': typeof AuthenticatedFeedbackUploadRoute
+  '/f/status/$code': typeof FStatusCodeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/f': typeof FRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/alerts': typeof AuthenticatedAlertsRoute
   '/chat': typeof AuthenticatedChatRoute
@@ -133,12 +148,14 @@ export interface FileRoutesByTo {
   '/support': typeof AuthenticatedSupportRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/feedback/upload': typeof AuthenticatedFeedbackUploadRoute
+  '/f/status/$code': typeof FStatusCodeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/f': typeof FRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/alerts': typeof AuthenticatedAlertsRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
@@ -151,12 +168,14 @@ export interface FileRoutesById {
   '/_authenticated/support': typeof AuthenticatedSupportRoute
   '/_authenticated/tasks': typeof AuthenticatedTasksRoute
   '/_authenticated/feedback_/upload': typeof AuthenticatedFeedbackUploadRoute
+  '/f_/status/$code': typeof FStatusCodeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/auth'
+    | '/f'
     | '/admin'
     | '/alerts'
     | '/chat'
@@ -169,10 +188,12 @@ export interface FileRouteTypes {
     | '/support'
     | '/tasks'
     | '/feedback/upload'
+    | '/f/status/$code'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
+    | '/f'
     | '/admin'
     | '/alerts'
     | '/chat'
@@ -185,11 +206,13 @@ export interface FileRouteTypes {
     | '/support'
     | '/tasks'
     | '/feedback/upload'
+    | '/f/status/$code'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/f'
     | '/_authenticated/admin'
     | '/_authenticated/alerts'
     | '/_authenticated/chat'
@@ -202,16 +225,26 @@ export interface FileRouteTypes {
     | '/_authenticated/support'
     | '/_authenticated/tasks'
     | '/_authenticated/feedback_/upload'
+    | '/f_/status/$code'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  FRoute: typeof FRoute
+  FStatusCodeRoute: typeof FStatusCodeRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/f': {
+      id: '/f'
+      path: '/f'
+      fullPath: '/f'
+      preLoaderRoute: typeof FRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -310,6 +343,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/f_/status/$code': {
+      id: '/f_/status/$code'
+      path: '/f/status/$code'
+      fullPath: '/f/status/$code'
+      preLoaderRoute: typeof FStatusCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/feedback_/upload': {
       id: '/_authenticated/feedback_/upload'
       path: '/feedback/upload'
@@ -357,6 +397,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  FRoute: FRoute,
+  FStatusCodeRoute: FStatusCodeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

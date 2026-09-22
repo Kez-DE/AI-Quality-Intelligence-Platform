@@ -20,6 +20,7 @@ from auth_guard import AuthUser, can_view_team, get_current_user, require_admin,
 from dispatch_utils import parse_deadline
 from db_utils import fetch_paginated
 from users_admin import router as users_router, audit_router
+from public_intake import router as public_intake_router
 from rate_limiter import RateLimiter, check_rate_limit
 from clean import mask_pii
 from env_config import get_settings
@@ -239,6 +240,9 @@ async def http_exception_handler(_request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": {"code": "HTTP_ERROR", "message": str(exc.detail)}},
+        # Forward exc.headers. Dropping them silently discarded every Retry-After
+        # the rate limiter sets, so a throttled client had no idea when to retry.
+        headers=exc.headers,
     )
 
 
@@ -267,6 +271,10 @@ app.add_middleware(
 # User-management (admin only) — định danh + RBAC ở tầng API vì service role bypass RLS.
 app.include_router(users_router)
 app.include_router(audit_router)
+
+# Anonymous intake (decision 0016) — the only routes here with no auth dependency.
+# Kept in their own module so the unauthenticated contract stays one small file.
+app.include_router(public_intake_router)
 
 
 @app.get("/api/me")

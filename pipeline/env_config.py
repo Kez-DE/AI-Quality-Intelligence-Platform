@@ -134,6 +134,20 @@ class Settings(BaseSettings):
     rate_limit_chat_guest: int = Field(default=20, alias="RATE_LIMIT_CHAT_GUEST")
     rate_limit_chat_staff: int = Field(default=100, alias="RATE_LIMIT_CHAT_STAFF")
     rate_limit_feedback_guest: int = Field(default=10, alias="RATE_LIMIT_FEEDBACK_GUEST")
+    # Public intake has no account to key on, so these buckets are per client IP:
+    # a shared NAT counts as one submitter. Low enough that bulk submission is
+    # tedious, high enough for a household reporting the same incident.
+    rate_limit_public_intake: int = Field(default=5, alias="RATE_LIMIT_PUBLIC_INTAKE")
+    rate_limit_public_status: int = Field(default=60, alias="RATE_LIMIT_PUBLIC_STATUS")
+
+    # ------------------------------------------------------------------
+    # Public anonymous intake (decision 0016)
+    # ------------------------------------------------------------------
+    # Salt for the stored client-IP hash. IPv4 is small enough to brute-force, so
+    # an unsalted hash would just be a reversible IP log. Empty means "random
+    # salt per process": rate limiting still works within a process and stored
+    # hashes stop being linkable across restarts, which fails safe.
+    public_fingerprint_salt: str = Field(default="", alias="PUBLIC_FINGERPRINT_SALT")
 
     @field_validator("llm_provider", mode="before")
     @classmethod

@@ -88,6 +88,44 @@ export async function apiFetch<T = unknown>(
   }
 }
 
+/** Gọi endpoint công khai (`/api/public/*`) — KHÔNG gắn token.
+ *
+ *  `apiFetch` gắn Bearer token khi tình cờ có session, nên một nhân viên đang
+ *  đăng nhập mở trang gửi phản hồi ẩn danh sẽ gửi kèm JWT tới route không cần
+ *  nó. Hàm này giữ trang công khai hành xử giống hệt nhau cho người lạ và cho
+ *  người đã đăng nhập.
+ *
+ *  Backend override handler lỗi thành `{ error: { message } }`, không phải
+ *  `{ detail }` mặc định của FastAPI — đọc đúng chỗ để người gửi thấy thông báo
+ *  thật (vd lý do bị chặn khi quá hạn mức). */
+export async function publicFetch<T = unknown>(
+  path: string,
+  init: RequestInit = {},
+  timeoutMs = 15_000,
+): Promise<T> {
+  const headers = new Headers(init.headers);
+  if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, { ...init, headers, signal: controller.signal });
+    if (!res.ok) {
+      let detail = `${res.status} ${res.statusText}`;
+      try {
+        const body = (await res.json()) as { error?: { message?: string }; detail?: string };
+        detail = body?.error?.message ?? body?.detail ?? detail;
+      } catch {
+        // body không phải JSON — giữ status text.
+      }
+      throw new Error(detail);
+    }
+    return (await res.json()) as T;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 /** Đọc danh tính + role của user đang đăng nhập. Dùng để render nav/route theo quyền. */
 export function useMe() {
   return useQuery({

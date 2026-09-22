@@ -63,6 +63,17 @@ OPS_ROLES = {"admin", "manager", "staff"}  # guest KHÔNG nằm trong đây
 - `GET /health` — health check
 - `POST /api/agent/chat`: chat hỗ trợ công khai (GUEST_SYSTEM_PROMPT, chỉ dùng public KB + submit_feedback)
 
+**Không phải guest — route ẩn danh (US-076 / decision 0016):**
+
+`guest` là một vai trò ĐÃ ĐĂNG NHẬP. Mọi endpoint ở trên vẫn cần JWT Supabase.
+Người chưa đăng nhập đi qua hai route riêng, không có `Depends(get_current_user)`:
+
+- `POST /api/public/feedback` — gửi phản hồi không cần tài khoản, trả về mã tra cứu
+- `GET /api/public/feedback/{public_ref}` — xem tiến độ bằng mã đó
+
+Hai route này ghi row có `user_id = NULL`, `source = 'public'`, giới hạn tần suất
+theo hash IP thay vì `user.id`. Chi tiết: `pipeline/public_intake.py`.
+
 **Endpoint guest BỊ CHẶN:**
 - `POST /api/live-stream/start|stop` — trigger stream
 - `POST /api/ingest-real-dataset` — nạp data
