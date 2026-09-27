@@ -1,4 +1,4 @@
-"""Public KB retriever — RAG cho CHATBOT KHÁCH (guest).
+"""Public KB retriever — RAG cho tầng công khai của chatbot (public_only).
 
 TÁCH HOÀN TOÀN khỏi knowledge_base.py (KB nội bộ): đọc data/public_kb/ (chính sách,
 FAQ công khai cào từ greensm.com). Khách KHÔNG bao giờ chạm tới SOP/SLA nội bộ.

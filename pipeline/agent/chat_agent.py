@@ -37,7 +37,7 @@ def run_chat_agent(
     này (chống rò rỉ dữ liệu chéo phòng). None = admin/toàn hệ thống.
 
     tools_override: thay thế TOOLS_DEFINITIONS mặc định bằng danh sách tool tuỳ chỉnh
-    (dùng cho guest tier: chỉ truyền GUEST_TOOLS_DEFINITIONS).
+    (dùng cho tầng công khai public_only: chỉ truyền PUBLIC_TOOLS_DEFINITIONS).
 
     execute_fn: hàm thực thi tool (name, args) -> str tuỳ chỉnh. Nếu không truyền,
     dùng execute_tool mặc định (dành cho ops/admin).
@@ -109,7 +109,7 @@ def run_chat_agent(
             except Exception:
                 args = {}
                 
-            # Thực thi tool (ops dùng execute_tool, guest dùng execute_fn)
+            # Thực thi tool (ops dùng execute_tool, tầng công khai dùng execute_fn)
             tool_result = _execute(name, args)
             
             # Lọc PII từ tool context

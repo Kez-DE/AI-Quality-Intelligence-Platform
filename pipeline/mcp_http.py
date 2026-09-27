@@ -24,9 +24,10 @@ SUPABASE_ISSUER = (os.environ.get("SUPABASE_URL", "").rstrip("/") or
 PUBLIC_URL = os.environ.get(
     "MCP_PUBLIC_URL", "https://mcp-http-production-ffd0.up.railway.app/mcp")
 
+# submit_feedback was the guest-only tool; retired with the guest role (decision 0017).
 _ALL_TOOLS = [
     "get_feedback_summary", "get_hot_areas", "get_sla_tickets",
-    "get_team_priority_tasks", "search_knowledge_base", "submit_feedback",
+    "get_team_priority_tasks", "search_knowledge_base",
 ]
 
 

@@ -1,7 +1,7 @@
-"""build_agent_data_context phải chứa roster 6 phòng; admin có đếm per-phòng; guest không dính."""
+"""build_agent_data_context phải chứa roster 6 phòng; admin có đếm per-phòng; tầng công khai không dính."""
 import types
 
-from services.agent_context import build_agent_data_context, GUEST_SYSTEM_PROMPT
+from services.agent_context import build_agent_data_context, PUBLIC_SYSTEM_PROMPT
 from departments import DEPARTMENTS
 
 
@@ -71,6 +71,6 @@ def test_staff_without_dept_unchanged():
     assert "chưa" in ctx.lower()              # giữ thông báo chưa có phạm vi
 
 
-def test_guest_prompt_has_no_roster():
+def test_public_prompt_has_no_roster():
     for d in DEPARTMENTS:
-        assert d not in GUEST_SYSTEM_PROMPT
+        assert d not in PUBLIC_SYSTEM_PROMPT

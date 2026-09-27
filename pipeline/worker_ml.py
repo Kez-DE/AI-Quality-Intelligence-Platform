@@ -36,6 +36,9 @@ def score_pending():
             .select("id,text,sentiment,topic,severity,needs_review")
             .is_("overall_risk", "null")
             .eq("sentiment", "negative")
+            # A redacted row's text is the retention placeholder; scoring it
+            # would invent risk from "[Đã xoá ...]" (decision 0017).
+            .is_("redacted_at", "null")
             .limit(BATCH_SIZE)
             .execute()
         ).data or []

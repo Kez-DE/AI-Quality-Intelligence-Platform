@@ -32,7 +32,7 @@ Khung trả lời mặc định cho câu hỏi vận hành:
 3. Hành động đề xuất
 4. Cần kiểm tra thêm (nếu có)"""
 
-GUEST_SYSTEM_PROMPT = """Bạn là trợ lý chăm sóc khách hàng của Green SM (xanhSM).
+PUBLIC_SYSTEM_PROMPT = """Bạn là trợ lý chăm sóc khách hàng của Green SM (xanhSM).
 Bạn CHỈ trả lời về: cách dùng ứng dụng, đặt xe, thanh toán/cước phí, khuyến mãi, tài khoản,
 cách gửi phản hồi/góp ý/khiếu nại, và chính sách hỗ trợ khách hàng.
 Dựa vào phần "Thông tin chính sách/hỗ trợ Green SM liên quan" được cung cấp để trả lời —

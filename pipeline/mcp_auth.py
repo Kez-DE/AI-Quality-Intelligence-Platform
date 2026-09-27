@@ -7,9 +7,15 @@ tự phản ánh, KHÔNG cần cấp lại.
 Ánh xạ profile → identity MCP:
 - role admin                          → (admin, None)      : toàn hệ thống
 - role manager/staff + có department  → (role, department) : scoped đúng phòng
-- role manager/staff + CHƯA có phòng  → (guest, None)      : chỉ submit_feedback
-- role guest                          → (guest, None)      : chỉ submit_feedback
+- role manager/staff + CHƯA có phòng  → (pending, None)    : không tool nào
+- role pending / role lạ / rỗng       → (pending, None)    : không tool nào
 - không tìm thấy profile              → None               : từ chối
+
+Qua HTTP, SupabaseTokenVerifier từ chối luôn identity pending (401): không có
+danh sách tool, không có phiên.
+
+Tầng tool guest (submit_feedback) đã bỏ theo decision 0017: Customer gửi phản hồi
+qua Customer web, không qua tài khoản.
 """
 import hashlib
 import secrets
@@ -20,8 +26,7 @@ from typing import Optional, TypedDict
 class Identity(TypedDict):
     role: str
     scope_team: Optional[str]
-    # submit_feedback ghi feedback.user_id (NOT NULL), nên guest qua MCP cũng phải
-    # mang theo chủ token — thiếu nó thì tool im lặng từ chối mọi lần gọi.
+    # Chủ token/JWT. Không tool nào hiện dùng; giữ để truy vết ai gọi.
     user_id: Optional[str]
 
 
@@ -34,15 +39,15 @@ def _identity_from_profile(
     role: Optional[str], department: Optional[str], user_id: Optional[str] = None
 ) -> Identity:
     """Ánh xạ (role, department) của profile → identity MCP. Đóng an toàn:
-    ops thiếu phòng KHÔNG được toàn hệ thống mà tụt về guest."""
+    ops thiếu phòng KHÔNG được toàn hệ thống mà tụt về pending (không tool)."""
     role = (role or "").strip().lower()
     dept = (department or "").strip() or None
     if role == "admin":
         return {"role": "admin", "scope_team": None, "user_id": user_id}
     if role in ("manager", "staff") and dept:
         return {"role": role, "scope_team": dept, "user_id": user_id}
-    # guest, hoặc nhân viên chưa được gán phòng → chỉ submit_feedback
-    return {"role": "guest", "scope_team": None, "user_id": user_id}
+    # Pending account, role lạ, hoặc nhân viên chưa được gán phòng → không tool nào.
+    return {"role": "pending", "scope_team": None, "user_id": user_id}
 
 
 def verify_token(raw: str, db=None) -> Optional[Identity]:
@@ -139,6 +144,7 @@ class SupabaseTokenVerifier(TokenVerifier):
         # 1) JWT Supabase (OAuth hoặc session thường) — chỉ get_user() rơi xuống bearer,
         # vì JWT hết hạn/không hợp lệ là lý do DUY NHẤT hợp lệ để thử bearer.
         uid = None
+        user = None
         try:
             result = db.auth.get_user(token)
             user = getattr(result, "user", None)
@@ -147,6 +153,9 @@ class SupabaseTokenVerifier(TokenVerifier):
             uid = None  # không phải JWT hợp lệ → thử bearer
 
         if uid:
+            # Còn mật khẩu tạm (decision 0017): đổi xong ở Staff web mới dùng MCP được.
+            if (getattr(user, "app_metadata", None) or {}).get("must_change_password") is True:
+                return None
             # uid đã xác thực hợp lệ: tra profiles PHẢI fail-closed, không được rơi
             # xuống bearer path (lỗi DB tạm thời != JWT invalid).
             try:
@@ -159,13 +168,15 @@ class SupabaseTokenVerifier(TokenVerifier):
             if profs:
                 ident = _identity_from_profile(
                     profs[0].get("role"), profs[0].get("department"), uid)
+                if ident["role"] == "pending":
+                    return None  # không quyền → 401, không lộ danh sách tool
                 return AccessToken(
                     token=token, client_id=f"supabase-user:{uid}",
                     scopes=[], claims=dict(ident))
             return None  # có JWT nhưng không có profile → từ chối
         # 2) Bearer bảng mcp_tokens
         ident = verify_token(token, db=db)
-        if ident:
+        if ident and ident["role"] != "pending":
             return AccessToken(token=token, client_id="mcp-bearer-token",
                                scopes=[], claims=dict(ident))
         return None

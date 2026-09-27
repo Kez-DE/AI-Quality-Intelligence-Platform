@@ -318,8 +318,8 @@ TOOLS_DEFINITIONS = [
     }
 ]
 
-# ── Tool definitions cho GUEST (giới hạn, chỉ 1 tool) ─────────────────────────
-GUEST_TOOLS_DEFINITIONS = [
+# ── Tool definitions cho TẦNG CÔNG KHAI (public_only, chỉ 1 tool) ──────────────
+PUBLIC_TOOLS_DEFINITIONS = [
     {
         "type": "function",
         "function": {
@@ -366,8 +366,8 @@ def execute_tool(name: str, args: dict, scope_team: str | None = None, sources_o
     return f"Error: Tool '{name}' not found"
 
 
-def execute_guest_tool(name: str, args: dict, user_id: str | None = None) -> str:
-    """Thực thi tool dành riêng cho GUEST (submit_feedback)."""
+def execute_public_tool(name: str, args: dict, user_id: str | None = None) -> str:
+    """Thực thi tool của tầng công khai (submit_feedback)."""
     if name == "submit_feedback":
         return submit_feedback(
             content=args.get("content", ""),
@@ -375,7 +375,7 @@ def execute_guest_tool(name: str, args: dict, user_id: str | None = None) -> str
             sentiment=args.get("sentiment", "negative"),
             user_id=user_id,
         )
-    return f"Error: Guest tool '{name}' not found"
+    return f"Error: Public tool '{name}' not found"
 
 
 # ── Phân tầng tool theo VAI TRÒ (role) ────────────────────────────────────────

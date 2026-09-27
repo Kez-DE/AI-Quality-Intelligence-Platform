@@ -47,15 +47,31 @@ def test_staff_with_department_is_scoped():
     assert a.verify_token("raw", db=db) == {"role": "staff", "scope_team": "CSKH", "user_id": "u1"}
 
 
-def test_staff_without_department_downgrades_to_guest():
-    # nhân viên chưa được admin gán phòng → chỉ submit_feedback, KHÔNG toàn hệ thống
+def test_staff_without_department_gets_no_access():
+    # Ops chưa được admin gán phòng → không tool nào, KHÔNG được toàn hệ thống.
     db = _db([{"id": "t1", "user_id": "u1"}], [{"role": "staff", "department": None}])
-    assert a.verify_token("raw", db=db) == {"role": "guest", "scope_team": None, "user_id": "u1"}
+    assert a.verify_token("raw", db=db) == {"role": "pending", "scope_team": None, "user_id": "u1"}
 
 
-def test_guest_profile_only_submit():
-    db = _db([{"id": "t1", "user_id": "u1"}], [{"role": "guest", "department": None}])
-    assert a.verify_token("raw", db=db) == {"role": "guest", "scope_team": None, "user_id": "u1"}
+@pytest.mark.parametrize("role", ["pending", "guest", None, "superuser"])
+def test_pending_or_unknown_profile_gets_no_access(role):
+    db = _db([{"id": "t1", "user_id": "u1"}], [{"role": role, "department": None}])
+    assert a.verify_token("raw", db=db) == {"role": "pending", "scope_team": None, "user_id": "u1"}
+
+
+@pytest.mark.parametrize("role,dept", [("pending", None), ("guest", None), ("staff", None)])
+def test_verifier_rejects_no_access_jwt(role, dept):
+    """A Pending account (or ops without a department) gets 401 over HTTP, not a tool list."""
+    db = _JwtDB({"profiles": [{"role": role, "department": dept}]}, jwt_uid="u1")
+    assert _verify(a.SupabaseTokenVerifier(db=db), "jwt-good") is None
+
+
+def test_verifier_rejects_no_access_bearer():
+    db = _JwtDB({
+        "mcp_tokens": [{"id": "t1", "user_id": "u1"}],
+        "profiles": [{"role": "pending", "department": None}],
+    })
+    assert _verify(a.SupabaseTokenVerifier(db=db), "raw-bearer") is None
 
 
 def test_unknown_token_returns_none():
