@@ -12,7 +12,7 @@
 
 Mục tiêu: giúp đội ngũ vận hành nắm bắt nhanh vấn đề chất lượng dịch vụ, giảm thời gian xử lý, và đưa ra quyết định dựa trên dữ liệu.
 
-> **Phạm vi**: chạy được cả local lẫn deploy. Production chạy trên Railway (6 service Docker) + Supabase cloud. Stack: FastAPI + Vite + Supabase.
+> **Phạm vi**: chạy được cả local lẫn deploy. Production chạy trên Railway (6 service Docker; service `customer-web` mới chưa tạo) + Supabase cloud. Stack: FastAPI + Vite + Supabase. Hai web: **Staff web** (`app/`, cho nhân viên) và **Customer web** (`customer-web/`, khách gửi phản hồi không cần tài khoản).
 
 ---
 
@@ -27,23 +27,26 @@ Mục tiêu: giúp đội ngũ vận hành nắm bắt nhanh vấn đề chất 
 | 5 | Multi-Agent | 8 agent nghiệp vụ + Orchestrator |
 | 6 | Phân tích phòng ban | Báo cáo AI 6 phòng ban theo lịch (09:00 & 14:00, nhiều báo cáo/ngày), cấu trúc 3 khối Vấn đề → Phân tích → Đề xuất, phân tích sâu bằng LLM |
 | 7 | Human-in-the-Loop | Hàng đợi duyệt nhãn — nhân viên sửa nhãn AI, ghi correction log |
-| 8 | AI Chat & RAG (Tiered) | Hỏi đáp tích hợp Hybrid Search KB, tự động phân quyền truy cập (Guest: Public FAQ / Staff: Internal Ops Tools) |
+| 8 | AI Chat & RAG (Tiered) | Hỏi đáp tích hợp Hybrid Search KB, tự động phân quyền truy cập (widget trang chủ `public_only`: Public FAQ / Staff: Internal Ops Tools) |
 | 9 | Streaming Realtime | Ingest phản hồi theo luồng thời gian thực |
-| 10 | RBAC 4 vai trò | Phân quyền admin, manager, staff, guest |
+| 10 | RBAC 4 vai trò | Phân quyền admin, manager, staff, pending (chờ cấp quyền); chỉ admin tạo tài khoản |
 | 11 | Khép kín Báo cáo → Task | HI-Loop Approval: Manager biên tập hành động AI đề xuất trong báo cáo rồi duyệt một nút để tự tạo task chính thức, có liên kết ngược về báo cáo gốc |
 | 12 | MCP Server | Expose tool nghiệp vụ qua MCP (stdio) cho agent ngoài (Claude Desktop...), identity + phân quyền cố định phía server — xem [`docs/project/mcp-server.md`](docs/project/mcp-server.md) |
+| 13 | Customer web | Khách gửi phản hồi và tra cứu trạng thái bằng mã tra cứu, không cần tài khoản; nội dung tự xoá sau 180 ngày — xem [`docs/project/guest-account.md`](docs/project/guest-account.md) |
 
 ---
 
 ## Kiến trúc tổng quan
 
 ```text
-┌─────────────────────────────────────────────────┐
-│            FRONTEND (app/)                       │
-│  React 19 + TanStack Start + Vite 7 + Tailwind  │
-│  shadcn/ui + Recharts                           │
-└──────────────────────┬──────────────────────────┘
-                       │ REST API
+┌──────────────────────────────┐  ┌───────────────────────────┐
+│   STAFF WEB (app/)           │  │  CUSTOMER WEB             │
+│   React 19 + TanStack Start  │  │  (customer-web/)          │
+│   Vite 7 + Tailwind          │  │  Vite + React, SPA tĩnh   │
+│   shadcn/ui + Recharts       │  │  không đăng nhập          │
+└──────────────┬───────────────┘  └─────────────┬─────────────┘
+               │ REST API                       │ /api/public/*
+               └───────┬────────────────────────┘
                        ▼
 ┌─────────────────────────────────────────────────┐
 │            BACKEND (pipeline/)                   │
@@ -55,6 +58,7 @@ Mục tiêu: giúp đội ngũ vận hành nắm bắt nhanh vấn đề chất 
 │  agents/  orchestrator + 8 agent nghiệp vụ      │
 │                                                 │
 │  4 worker: ticket · ingest · ml · agent         │
+│  (ticket worker: xoá nội dung quá hạn 03:00)    │
 └──────────────────────┬──────────────────────────┘
                        │ SQL / Realtime
                        ▼
@@ -123,10 +127,21 @@ npx vite dev --port 5174 --host 127.0.0.1
 
 Mở: [http://localhost:5174](http://localhost:5174)
 
+### Bước 4: Customer web (Terminal 3, tuỳ chọn)
+
+```bash
+cd customer-web
+npm install
+VITE_BACKEND_API_URL=http://127.0.0.1:8000 npm run dev
+```
+
+Customer web không cần biến Supabase nào. Dev server chạy ở cổng 5175 (Staff web ở 5174), nên chạy song song được. Chi tiết: [`customer-web/README.md`](customer-web/README.md).
+
 ### Tài khoản Admin
 
 - Email: `manhnguyn1912@gmail.com` / Password: `12345678`
-- Staff/Guest: tạo qua UI hoặc Supabase Auth → gán role trong trang Admin.
+- Tài khoản khác: admin tạo bằng form "Tạo tài khoản" trong trang Admin (mật khẩu tạm, bắt đổi ở lần đăng nhập đầu). Staff web không còn form tự đăng ký. Tài khoản tạo trong Supabase Dashboard vào với role `pending` và chờ admin cấp quyền.
+- Chủ dự án cần tắt tự đăng ký và Google/Facebook trong Supabase Dashboard: xem [`docs/project/setup-supabase.md`](docs/project/setup-supabase.md) mục 8.1.
 
 ---
 
@@ -134,8 +149,9 @@ Mở: [http://localhost:5174](http://localhost:5174)
 
 ```text
 AI-Quality-Intelligence-Platform/
-├── app/                    Frontend (React 19 / TanStack Start / Vite 7)
+├── app/                    Staff web (React 19 / TanStack Start / Vite 7)
 │   └── src/routes/         dashboard, feedback, alerts, insights, chat, admin
+├── customer-web/           Customer web (Vite + React SPA tĩnh): gửi phản hồi, tra cứu mã
 ├── pipeline/               Backend (FastAPI + ML + Agent)
 │   ├── main.py             API chính + endpoint handlers
 │   ├── classifier.py       ML classifier (TF-IDF/LinearSVC)
@@ -153,7 +169,7 @@ AI-Quality-Intelligence-Platform/
 ├── data/
 │   ├── README.md           Manifest dữ liệu, provenance, quy tắc sử dụng
 │   ├── knowledge_base/     KB nội bộ mock cho RAG theo phòng
-│   ├── public_kb/          FAQ công khai cho chatbot guest
+│   ├── public_kb/          FAQ công khai cho tầng chat public_only
 │   ├── taxonomy/           routing_table.json, severity_rules.json
 │   ├── reference/          area_catalog + enrichment summary
 │   ├── raw/ processed/     Public reviews + dataset runtime đã clean
@@ -168,20 +184,21 @@ AI-Quality-Intelligence-Platform/
 
 ## Phân quyền RBAC
 
-| Trang | Admin | Manager | Staff | Guest |
+| Trang | Admin | Manager | Staff | Pending |
 |-------|:-----:|:-------:|:-----:|:-----:|
-| Dashboard | có | có | có | có |
+| Dashboard | có | có | có | không |
 | Ticket Triage (Alerts) | có | có | có | không |
-| Phản hồi (list + HITL) | có | có | có | có |
+| Phản hồi (list + HITL) | có | có | có | không |
 | Phân tích phòng ban | có | có | có | không |
-| AI Chat / Hỗ trợ CSKH | có | có | có | có |
+| AI Chat / Hỗ trợ CSKH | có | có | có | không |
 | Quản lý người dùng | có | không | không | không |
 | Trigger Operations | có | không | không | không |
 
 - **Admin**: toàn quyền, quản lý user, trigger ingest/streaming, xem mọi phòng
 - **Manager**: giám sát phòng mình — alerts, feedback, insights, reports, chat
 - **Staff**: công việc hàng ngày phòng mình — feedback, tasks, chat
-- **Guest**: dashboard, feedback, chat hỗ trợ CSKH
+- **Pending**: tài khoản chờ cấp quyền, chỉ thấy màn "Tài khoản đang chờ admin cấp quyền"; backend trả 403 trừ `GET /api/me`, `POST /api/me/password` và `/health`
+- **Khách hàng**: không có tài khoản, dùng Customer web
 
 Ngoài role, mỗi ops user gắn một **phòng ban** (IT/CSKH/Vận hành/Tài chính & Thanh toán/Sản phẩm/Quản lý Rủi ro & Gian lận) quyết định họ thấy dữ liệu của ai. Manager/staff chỉ xem và thao tác trong phòng mình; admin xem tất cả. Chi tiết cơ chế scope: [`docs/project/rbac-departments.md`](docs/project/rbac-departments.md).
 
@@ -198,6 +215,7 @@ Ngoài role, mỗi ops user gắn một **phòng ban** (IT/CSKH/Vận hành/Tài
 7. Phân tích phòng ban → bấm "Phân tích sâu"
 8. Vào Báo cáo AI → sửa Draft Task → bấm "Duyệt và triển khai task" → xem task mới trên Task Board (badge "Từ báo cáo")
 9. AI Chat: hỏi "khu vực nào đang nóng?"
+10. Mở Customer web, gửi một phản hồi → nhận mã tra cứu → xem trạng thái; trong Staff web, dòng đó có badge "Khách hàng"
 
 Kịch bản chi tiết: [`docs/project/demo-script.md`](docs/project/demo-script.md)
 
@@ -233,16 +251,16 @@ Kịch bản chi tiết: [`docs/project/demo-script.md`](docs/project/demo-scrip
 |------|----------|
 | [`data/README.md`](data/README.md) | Manifest dữ liệu, provenance, dataset runtime, Data_2 phụ trợ |
 | [`data/knowledge_base/README.md`](data/knowledge_base/README.md) | KB nội bộ mock, frontmatter, cách retriever ops đọc Markdown |
-| [`data/public_kb/README.md`](data/public_kb/README.md) | KB công khai cho guest chatbot, manifest và quy tắc biên tập |
+| [`data/public_kb/README.md`](data/public_kb/README.md) | KB công khai cho tầng chat `public_only`, manifest và quy tắc biên tập |
 | [`data/auxiliary/data2/README.md`](data/auxiliary/data2/README.md) | Data_2 phụ trợ cho safety spike và thí nghiệm balanced-label |
 
 **Vận hành**
 
 | File | Nội dung |
 |------|----------|
-| [`docs/project/deploy-railway.md`](docs/project/deploy-railway.md) | Deploy 6 service lên Railway qua GitHub Actions |
+| [`docs/project/deploy-railway.md`](docs/project/deploy-railway.md) | Deploy 6 service (+ `customer-web`) lên Railway qua GitHub Actions |
 | [`docs/project/demo-script.md`](docs/project/demo-script.md) | Kịch bản demo 5-7 phút |
-| [`docs/project/guest-account.md`](docs/project/guest-account.md) | Cơ chế tài khoản khách + chatbot CSKH |
+| [`docs/project/guest-account.md`](docs/project/guest-account.md) | Khách hàng (Customer web), tài khoản chờ cấp quyền, cách tạo tài khoản |
 | [`docs/project/eval-evidence.md`](docs/project/eval-evidence.md) | Bằng chứng đánh giá model (Gate G2) |
 
 ---

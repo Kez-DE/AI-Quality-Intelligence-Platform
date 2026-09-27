@@ -203,7 +203,7 @@ Sau khi có 5 điểm, `calculate_overall_risk()` chạy thuật toán Waterfall
 | Tier | Người dùng | Knowledge base | Công cụ |
 |------|-----------|----------------|---------|
 | Internal | staff, manager, admin | `knowledge_base/` (SOP/SLA nội bộ) | Full tool set + `scope_team` filter |
-| Public | guest | `public_kb/` (FAQ công khai) | `GUEST_TOOLS_DEFINITIONS` (giới hạn) |
+| Public | ops staff gửi cờ `public_only` (widget trang chủ) | `public_kb/` (FAQ công khai) | `PUBLIC_TOOLS_DEFINITIONS` (giới hạn) |
 
 `scope_team` ép tool chỉ truy vấn dữ liệu đúng phòng, tránh rò dữ liệu chéo phòng.
 
@@ -232,16 +232,16 @@ Bản ghi vào Review Queue khi: `confidence < 0.55`, hoặc `severity = P5`, ho
 
 ## Luồng 11: RBAC 4 vai trò + scope phòng ban (`auth_guard.py`, `departments.py`)
 
-4 vai trò: **admin**, **manager**, **staff**, **guest**.
+4 vai trò: **admin**, **manager**, **staff**, **pending** (chờ cấp quyền). Khách hàng không có tài khoản; họ gửi phản hồi qua Customer web (`POST /api/public/feedback`).
 
 | Vai trò | Quyền chính |
 |---------|------------|
 | admin | Toàn quyền: CRUD user, reclassify, xem mọi phòng |
 | manager | Xem insights/báo cáo phòng mình, phê duyệt task, chat nội bộ |
 | staff | Duyệt nhãn, xem feedback, chat nội bộ (scoped theo phòng) |
-| guest | Chat công khai (`public_kb`) chỉ đọc |
+| pending | Không có quyền: 403 ở mọi endpoint trừ `GET /api/me`, `POST /api/me/password` và `/health` |
 
-Backend dùng `SERVICE_ROLE_KEY` (bypass RLS Supabase). Gate quyền ở tầng API: decorator `require_admin`, `require_ops_staff` trong `auth_guard.py`. Bootstrap: user đăng ký đầu tiên tự nhận role admin.
+Backend dùng `SERVICE_ROLE_KEY` (bypass RLS Supabase). Gate quyền ở tầng API: decorator `require_admin`, `require_ops_staff` trong `auth_guard.py`. Bootstrap: profile đầu tiên của hệ thống tự nhận role admin; sau đó chỉ admin tạo tài khoản (`POST /api/admin/users`).
 
 `departments.py` định nghĩa tuple `DEPARTMENTS` gồm 6 phòng ban chuẩn. Mọi code routing, ticket, report đều import từ đây.
 

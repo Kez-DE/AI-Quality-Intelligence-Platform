@@ -42,7 +42,7 @@ Mỗi phòng ban có một "trợ lý AI" tổng hợp vấn đề cốt lõi + 
 
 **Phút 7-8 (tùy chọn): Báo cáo AI → Task (HI-Loop Approval).** Vào trang Báo cáo AI. Chọn một báo cáo có đề xuất hành động. Nhấn "Sửa Draft Task" để biên tập nội dung task (phạm vi, ưu tiên). Nhấn "Duyệt và triển khai task". Chuyển sang Task Board: task mới xuất hiện với badge "Từ báo cáo" và liên kết ngược về báo cáo gốc. Nhấn mạnh: luồng khép kín từ phản hồi → phân tích → hành động được phê duyệt.
 
-**Phút 8-9 (tùy chọn): AI Chat tiered RBAC.** Mở trang AI Chat dưới tài khoản admin/manager. Hỏi "khu vực nào đang nóng?" hoặc "tuần này Vận hành có vấn đề gì?". Chat truy vấn Knowledge Base nội bộ qua Hybrid Search (Cohere embed-multilingual-v3.0 + BM25-lite + RRF k=60). Sau đó thử đăng nhập tài khoản guest và hỏi cùng câu hỏi: guest chỉ nhận FAQ công khai, không thấy dữ liệu nội bộ. Nhấn mạnh: cùng giao diện chat, phân quyền tự động theo role.
+**Phút 8-9 (tùy chọn): AI Chat tiered RBAC.** Mở trang AI Chat dưới tài khoản admin/manager. Hỏi "khu vực nào đang nóng?" hoặc "tuần này Vận hành có vấn đề gì?". Chat truy vấn Knowledge Base nội bộ qua Hybrid Search (Cohere embed-multilingual-v3.0 + BM25-lite + RRF k=60). Sau đó hỏi cùng câu hỏi qua widget chat ở trang chủ (chạy tầng `public_only`): chỉ nhận FAQ công khai, không thấy dữ liệu nội bộ. Nhấn mạnh: cùng backend chat, phân quyền tự động theo tầng.
 
 ## Câu hỏi hay gặp
 
@@ -51,4 +51,4 @@ Mỗi phòng ban có một "trợ lý AI" tổng hợp vấn đề cốt lõi + 
 - *Model gì?* TF-IDF + LinearSVC (distill từ nhãn LLM) + rule engine bù câu ngắn/từ khóa. Topic 77%, sentiment 94% trên test set.
 - *AI gán sai thì sao?* Confidence thấp → vào Review Queue → người duyệt/sửa → ghi correction_logs. Vòng học khép kín.
 - *Phụ thuộc 1 API key?* Không — failover tự nhảy provider có key sống (OpenRouter→OpenAI→Gemini→Groq→mock).
-- *Phân quyền?* RBAC 4 role (admin/manager/staff/guest), login Supabase Auth, nút vận hành gate theo role.
+- *Phân quyền?* RBAC 4 role (admin/manager/staff/pending), chỉ admin tạo tài khoản, login Supabase Auth, nút vận hành gate theo role. Khách hàng không cần tài khoản: dùng Customer web.

@@ -1,216 +1,136 @@
-# Tài khoản khách (Guest Account): Cơ chế & giới hạn
+# Khách hàng và tài khoản chờ cấp quyền (thay cho vai trò guest)
 
-> **Cập nhật 2026-06-27:** đồng bộ 6 phòng ban & phân tầng quyền chat.
+> **Cập nhật 2026-09-27 (US-077 / decision 0017):** vai trò `guest` đã bị bỏ. File giữ tên cũ để các link hiện có không bị gãy.
 
-> Tài khoản khách là vai trò có quyền thấp nhất trong hệ thống. Mục tiêu: cho phép người ngoài xem dashboard tổng quan và gửi feedback mà không truy cập được dữ liệu nội bộ.
+Trước đây `guest` gánh ba việc cùng lúc: tài khoản của khách, hàng đợi nhân viên chờ admin duyệt, và vai trò dự phòng khi thiếu hoặc sai role. Giờ nó được tách thành hai khái niệm (xem `CONTEXT.md` ở gốc repo):
+
+- **Khách hàng (Customer)**: người ngoài công ty, **không có tài khoản**, gửi phản hồi và tra cứu trạng thái trên **Customer web**.
+- **Tài khoản chờ cấp quyền (Pending account)**: role `pending`. Tài khoản đăng nhập được vào Staff web nhưng **không có quyền gì** cho tới khi admin cấp `admin`, `manager` hoặc `staff`.
 
 ---
 
 ## 1. Phân quyền tổng quan
 
-| Tính năng | Admin | Manager | Staff | Guest |
-|-----------|:-----:|:-------:|:-----:|:-----:|
-| Dashboard (xem) | ✅ | ✅ | ✅ | ✅ |
-| Gửi feedback | ✅ | ✅ | ✅ | ✅ |
-| Xem danh sách feedback raw | ✅ | ✅ | ✅ | ❌ |
-| Sửa nhãn AI (HITL) | ✅ | ✅ | ✅ | ❌ |
-| Alerts / Ticket Triage | ✅ | ✅ | ✅ | ❌ |
-| Phân tích phòng ban | ✅ | ✅ | ✅ | ❌ |
-| AI Chat nội bộ | ✅ | ✅ | ✅ | ❌ |
-| Chat hỗ trợ công khai | ✅ | ✅ | ✅ | ✅ |
-| Agent Logs | ✅ | ✅ | ✅ | ❌ |
-| Quản lý người dùng | ✅ | ❌ | ❌ | ❌ |
-| Trigger demo/stream | ✅ | ❌ | ❌ | ❌ |
-| Chạy agent pipeline | ✅ | ❌ | ❌ | ❌ |
+| Tính năng | Admin | Manager | Staff | Pending | Khách hàng (không tài khoản) |
+|-----------|:-----:|:-------:|:-----:|:-------:|:-----:|
+| Gửi phản hồi trên Customer web | — | — | — | — | ✅ |
+| Tra cứu trạng thái bằng mã tra cứu | — | — | — | — | ✅ |
+| Dashboard / cockpit | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Gửi feedback trong Staff web (`POST /api/feedback/submit`) | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Xem danh sách feedback, sửa nhãn AI (HITL) | ✅ | ✅ | ✅ | ❌ | ❌ |
+| AI Chat nội bộ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Quản lý người dùng, tạo tài khoản | ✅ | ❌ | ❌ | ❌ | ❌ |
+
+Quyền theo phòng ban của manager/staff xem ở [rbac-departments.md](rbac-departments.md).
 
 ---
 
-## 2. Cơ chế hoạt động
+## 2. Khách hàng và Customer web
 
-### 2.1 Frontend (React/TanStack Router)
+Customer web là một ứng dụng riêng ở `customer-web/` (Vite + React, SPA tĩnh), deploy thành service riêng, tách hẳn khỏi Staff web (`app/`). Nó không có Supabase client, không đăng nhập, không chứa code nội bộ. Chỉ có tiếng Việt, thiết kế ưu tiên điện thoại vì khách thường quét mã QR.
 
-**AppShell** (`app/src/components/AppShell.tsx`):
-- Sidebar ẩn các menu không dành cho guest
-- Guest chỉ thấy: Dashboard, Gửi phản hồi
-- Không hiển thị: Alerts, Feedback list, Insights, Chat, Admin
+Hai trang:
 
-**Route guard** (`app/src/routes/_authenticated/route.tsx`):
-- Mọi route authenticated đều check role
-- Guest truy cập route không được phép → redirect về `/dashboard`
+- `/`: form gửi phản hồi (nội dung, kênh, khu vực) và một ô "Tra cứu mã".
+- `/status/:code`: trạng thái của một phản hồi.
 
-**Trang upload riêng** (`app/src/routes/_authenticated/feedback-upload.tsx`):
-- Guest dùng trang này để gửi feedback
-- Chỉ nhập: nội dung + kênh + khu vực
-- Topic/sentiment/severity do AI tự phân tích
+Trình duyệt gọi thẳng backend qua `VITE_BACKEND_API_URL`, không qua proxy, vì rate limit tính theo IP của client:
 
-### 2.2 Backend (FastAPI)
+- `POST /api/public/feedback`: không cần token. Trả về mã tra cứu (`public_ref`).
+- `GET /api/public/feedback/{public_ref}`: trả đúng ba trường `public_ref`, `status`, `created_at`.
 
-**Auth guard** (`pipeline/auth_guard.py`):
-```python
-VALID_ROLES = {"admin", "manager", "staff", "guest"}
-OPS_ROLES = {"admin", "manager", "staff"}  # guest KHÔNG nằm trong đây
-```
+Khách hàng chỉ thấy:
 
-**Endpoint chặn guest:**
-- `require_ops_staff` → 403 nếu role = guest
-- `require_admin` → 403 nếu role ≠ admin
+- Sau khi gửi: **mã tra cứu** (có nút sao chép) và link tới trang trạng thái. Không hiện nhãn AI (topic, sentiment, severity).
+- Trang trạng thái: **trạng thái** và **ngày gửi**. Ba nhãn trạng thái: `received` → "Đã tiếp nhận", `under_review` → "Đang xem xét", `reviewed` → "Đã xem xét". "Đã xem xét" nghĩa là nhân viên đã kiểm tra phân loại của AI, không có nghĩa sự việc đã được xử lý xong.
+- Mã không tồn tại, đã hết hạn lưu trữ hoặc đã bị xoá nội dung đều hiện cùng một thông báo "không tìm thấy".
 
-**Endpoint guest ĐƯỢC gọi:**
-- `GET /api/me` — xem thông tin bản thân
-- `GET /api/feedback/recent` — chỉ data aggregate/dashboard
-- `POST /api/feedback/submit` — gửi feedback mới
-- `GET /api/live-stream/status` — xem trạng thái stream
-- `GET /health` — health check
-- `POST /api/agent/chat`: chat hỗ trợ công khai (GUEST_SYSTEM_PROMPT, chỉ dùng public KB + submit_feedback)
+Chống lạm dụng:
 
-**Không phải guest — route ẩn danh (US-076 / decision 0016):**
+- Rate limit theo hash IP: mặc định 5 lần gửi và 60 lần tra cứu mỗi giờ (`RATE_LIMIT_PUBLIC_INTAKE`, `RATE_LIMIT_PUBLIC_STATUS`).
+- Honeypot: form có một ô ẩn tên `website`. Người thật để trống. Nếu ô này có nội dung, backend trả 400, không lưu gì, và lần gửi đó vẫn bị tính vào rate limit.
+- Chưa có captcha/Turnstile (backlog).
 
-`guest` là một vai trò ĐÃ ĐĂNG NHẬP. Mọi endpoint ở trên vẫn cần JWT Supabase.
-Người chưa đăng nhập đi qua hai route riêng, không có `Depends(get_current_user)`:
+Quyền riêng tư: số điện thoại, email, biển số được che tự động trước khi lưu (`clean_text`). Mỗi phản hồi ẩn danh có `retention_until = ngày gửi + 180 ngày`. Mỗi ngày lúc 03:00 (giờ Việt Nam), `backend-worker` thay nội dung các phản hồi quá hạn bằng "[Đã xoá theo hạn lưu trữ]", xoá `submitter_hash`, và ghi `redacted_at`. Nhãn, khu vực, kênh, ngày và điểm rủi ro được giữ lại, nên dashboard và xu hướng không đổi.
 
-- `POST /api/public/feedback` — gửi phản hồi không cần tài khoản, trả về mã tra cứu
-- `GET /api/public/feedback/{public_ref}` — xem tiến độ bằng mã đó
-
-Hai route này ghi row có `user_id = NULL`, `source = 'public'`, giới hạn tần suất
-theo hash IP thay vì `user.id`. Chi tiết: `pipeline/public_intake.py`.
-
-**Endpoint guest BỊ CHẶN:**
-- `POST /api/live-stream/start|stop` — trigger stream
-- `POST /api/ingest-real-dataset` — nạp data
-- `POST /api/trigger-spike-detect` — spike detect
-- `POST /api/agent/run` — chạy agent pipeline
-- `PATCH /api/feedback/*/label` — sửa nhãn
-- `PATCH /api/feedback/*/review` — duyệt feedback
-- `GET /api/insights/departments` — insight phòng ban
-- `PATCH /api/alerts/*/status` — đổi trạng thái alert
-
-### 2.3 Supabase RLS
-
-**Policy cho guest:**
-```sql
--- Guest chỉ insert feedback của chính mình
-CREATE POLICY "guest_insert_own_feedback" ON feedback
-  FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-
--- Guest chỉ đọc feedback aggregate (qua view hoặc function)
--- KHÔNG cho đọc trực tiếp bảng feedback raw
-CREATE POLICY "ops_read_feedback" ON feedback
-  FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE profiles.id = auth.uid()
-      AND profiles.role IN ('admin', 'manager', 'staff')
-    )
-  );
-```
+Phía Staff web, phản hồi từ Customer web có `source = 'public'`, `user_id = NULL`, và hiện badge **"Khách hàng"** trong danh sách feedback.
 
 ---
 
-## 3. Tạo tài khoản khách
+## 3. Tài khoản chờ cấp quyền (`pending`)
 
-### Cách 1: Qua Admin UI
+Một tài khoản ở trạng thái `pending` khi:
 
-1. Login admin → vào trang "Quản lý người dùng"
-2. Tạo user mới → chọn role = guest
-3. Gửi thông tin đăng nhập cho khách
+- là tài khoản `guest` cũ: migration của US-077 đổi toàn bộ `guest` thành `pending`, không xoá tài khoản hay feedback nào;
+- được tạo ngoài form "Tạo tài khoản" của admin, ví dụ qua Supabase Dashboard. Trigger `handle_new_user` gán `pending`, trừ profile đầu tiên của hệ thống thành `admin`;
+- có role bị thiếu hoặc không hợp lệ: mọi chỗ fail-closed (`auth_guard.py`, route guard, MCP) đều rơi về `pending`.
 
-### Cách 2: Tự đăng ký
+Tài khoản `pending` được gì:
 
-1. User đăng ký qua trang `/auth`
-2. Mặc định tài khoản mới = guest
-3. Admin vào Admin page đổi role nếu cần
+- **Staff web**: sau khi đăng nhập chỉ thấy màn "Tài khoản đang chờ admin cấp quyền" với nút đăng xuất. Không có thanh điều hướng, không tải dữ liệu.
+- **Backend**: 403 ở mọi endpoint, trừ `GET /api/me`, `POST /api/me/password` và `/health`.
+- **Chat**: `POST /api/agent/chat` trả 403. Tầng chat công khai giờ chỉ còn cho ops staff khi gửi cờ `public_only` (widget trang chủ).
+- **MCP**: qua HTTP, `SupabaseTokenVerifier` từ chối identity `pending` hoặc role lạ (cả JWT lẫn bearer `mcp_tokens`) bằng 401: không có phiên, không có danh sách tool. Bản stdio với `MCP_ROLE` rỗng hoặc `pending` không có tool nào.
+- **Database (RLS)**: `is_ops_staff()` loại `pending`. Chỉ ops staff mới `INSERT` được vào `feedback`, và phải đúng `user_id` của mình. Không ai tự `INSERT`/`DELETE` được dòng `profiles`. Knowledge base nội bộ (`graph_nodes`, `graph_edges`) chỉ ops staff đọc được.
 
-### Cách 3: Qua Supabase Dashboard
+Admin cấp quyền ở trang Quản lý người dùng: tab "Chờ cấp quyền" liệt kê tài khoản `pending` với nút "Cấp quyền Nhân viên" / "Cấp quyền Quản lý" (`PATCH /api/users/{id}/role`); backend còn có `POST /api/users/bulk-approve` để duyệt hàng loạt thành staff/manager.
 
-1. Vào Supabase Dashboard → Authentication → Users → Invite user
-2. Sau khi user xác nhận email, vào bảng `profiles`
-3. Set `role = 'guest'` cho user đó
-
----
-
-## 4. Luồng guest sử dụng hệ thống
-
-```
-Guest login
-    │
-    ▼
-┌───────────────┐
-│  Dashboard    │ ← Xem KPI, trend, severity, heatmap
-└───────┬───────┘
-        │
-        ▼
-┌───────────────┐
-│  Gửi phản hồi│ ← Nhập text + kênh + khu vực
-└───────┬───────┘
-        │
-        ▼
-┌───────────────┐
-│  AI phân tích │ ← Tự gán topic/sentiment/severity
-└───────┬───────┘
-        │
-        ▼
-┌───────────────┐
-│  Done         │ ← Guest thấy thông báo thành công
-└───────────────┘
-        
-        ❌ Guest KHÔNG thể:
-        - Xem feedback raw của người khác
-        - Vào trang Alerts/Tickets
-        - Xem phân tích phòng ban
-        - Sửa nhãn AI
-        - Trigger demo/stream
-```
+> ⚠️ Nút "Từ chối và xoá tài khoản" gọi xoá tài khoản (`auth.admin.delete_user`). Mọi FK tới `auth.users` là `ON DELETE CASCADE`, nên feedback, alert, lịch sử chat và MCP token của người đó bị xoá theo. Đã ghi vào backlog, chưa sửa.
 
 ---
 
-## 5. Bảo mật
+## 4. Tạo tài khoản
 
-- **Không leak PII:** Guest không đọc được bảng feedback raw
-- **Không leak internal:** Guest không thấy agent logs, prompt, config
-- **URL guard:** Truy cập trực tiếp bằng URL → redirect về dashboard
-- **API guard:** Backend validate role ở mọi endpoint nhạy cảm
-- **RLS guard:** Supabase chặn ở tầng database nếu bypass frontend
-- **Rate limit:** Nên thêm rate limit cho guest upload (tránh spam)
+Chỉ admin tạo tài khoản. Staff web không còn form đăng ký, cũng không còn nút đăng nhập Google/Facebook.
+
+### Cách 1: Form "Tạo tài khoản" trong trang Admin (cách chính)
+
+1. Admin nhập email, họ tên, role (`admin` / `manager` / `staff`), phòng ban (tuỳ chọn) và mật khẩu tạm.
+2. Mật khẩu tạm phải đạt 5 tiêu chí: ít nhất 8 ký tự, có chữ hoa, chữ thường, chữ số và ký tự đặc biệt.
+3. Frontend gọi `POST /api/admin/users` (chỉ admin). Backend tạo tài khoản bằng service role (`auth.admin.create_user`, email xác nhận sẵn, `app_metadata.must_change_password = true`), gán role và phòng ban, ghi `audit_logs`, trả 201. Email trùng thì trả 409; dữ liệu sai trả 400 và chỉ nêu tên field. Mật khẩu không bao giờ được ghi log hay trả về.
+4. Admin tự gửi email và mật khẩu tạm cho người đó (hệ thống không gửi mail mời).
+5. Lần đăng nhập đầu tiên, Staff web chỉ hiện màn đổi mật khẩu (nhập hai lần, cùng 5 tiêu chí). Màn này gọi `POST /api/me/password`: backend kiểm lại 5 tiêu chí rồi gọi `auth.admin.update_user_by_id` để đặt mật khẩu mới và `app_metadata.must_change_password = false`. Staff web gọi `supabase.auth.refreshSession()` để lấy JWT mới không còn cờ, rồi mới vào màn thường.
+
+Cờ nằm trong `app_metadata`, không phải `user_metadata`: chỉ service role ghi được `app_metadata`, nên người dùng không tự xoá cờ bằng `supabase.auth.updateUser` được. Chừng nào cờ còn bật, server tự chặn, không phụ thuộc Staff web:
+
+- `require_ops_staff`, `require_admin`, `require_manager` trả 403 "Bạn cần đổi mật khẩu tạm trước khi tiếp tục". Chỉ `GET /api/me` (có trả `must_change_password`) và `POST /api/me/password` không cần role.
+- MCP HTTP từ chối JWT còn cờ bằng 401.
+- RLS: `password_is_current()` đọc `auth.jwt() -> app_metadata`; `is_ops_staff()` và `is_admin()` đòi hàm này đúng, nên PostgREST và realtime cũng đóng với tài khoản còn cờ.
+
+### Cách 2: Supabase Dashboard
+
+**Authentication → Users → Add user**. Tài khoản tạo kiểu này vào hệ thống với role `pending` (trừ khi đây là profile đầu tiên, sẽ thành `admin`). Admin cấp quyền như ở mục 3. Không có bước bắt đổi mật khẩu.
+
+### Tắt đăng ký trên Supabase (thao tác tay)
+
+Code đã bỏ form đăng ký, nhưng Supabase Auth vẫn nhận đăng ký trực tiếp qua API cho tới khi chủ dự án tắt trong Dashboard. Xem [setup-supabase.md](setup-supabase.md) mục 8.1. Trước khi tắt, tài khoản tự đăng ký vẫn chỉ vào hệ thống với role `pending`, không có quyền.
 
 ---
 
-## 6. Test tài khoản khách
+## 5. Kiểm thử nhanh (chỉ trên stack local)
+
+Chạy với backend local trỏ vào Supabase local (`supabase start`). **Không** dùng file `.env` ở gốc repo, vì file đó trỏ vào production.
 
 ```bash
-# 1. Tạo guest account trong Supabase Auth
-# 2. Login và lấy token
-TOKEN_GUEST=$(.venv/bin/python - <<'PY'
-import os; from dotenv import load_dotenv; load_dotenv("../.env")
-from supabase import create_client
-c=create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_PUBLISHABLE_KEY"])
-r=c.auth.sign_in_with_password({"email":"guest@example.com","password":"Guest@12345"})
-print(r.session.access_token)
-PY
-)
+# Khách hàng: gửi không cần token → 200 kèm public_ref
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"text":"Tài xế chạy quá nhanh","channel":"web","area":"HN-Cau-Giay"}' \
+  http://127.0.0.1:8000/api/public/feedback
 
-# 3. Test gửi feedback (PHẢI được)
-curl -s -X POST -H "Authorization: Bearer $TOKEN_GUEST" \
-  -H "Content-Type: application/json" \
-  -d '{"text":"Xe sạch, tài xế lịch sự","channel":"app","area":"HN-Cau-Giay"}' \
+# Honeypot có nội dung → 400, không lưu gì
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"text":"spam","website":"http://spam.example"}' \
+  http://127.0.0.1:8000/api/public/feedback
+
+# Tra cứu → chỉ public_ref, status, created_at
+curl -s http://127.0.0.1:8000/api/public/feedback/<public_ref>
+
+# Tài khoản pending: /api/me → 200 (role "pending"), mọi thứ khác (trừ POST /api/me/password) → 403
+curl -s -H "Authorization: Bearer $TOKEN_PENDING" http://127.0.0.1:8000/api/me
+curl -s -X POST -H "Authorization: Bearer $TOKEN_PENDING" \
+  -H "Content-Type: application/json" -d '{"text":"test"}' \
   http://127.0.0.1:8000/api/feedback/submit
-# → 200 OK
-
-# 4. Test trigger spike (PHẢI bị chặn)
-curl -s -X POST -H "Authorization: Bearer $TOKEN_GUEST" \
-  http://127.0.0.1:8000/api/trigger-spike-detect
 # → 403 Forbidden
-
-# 5. Test chạy agent (PHẢI bị chặn)
-curl -s -X POST -H "Authorization: Bearer $TOKEN_GUEST" \
-  http://127.0.0.1:8000/api/agent/run
-# → 403 Forbidden
-
-# 6. Test chat công khai (PHẢI được, giới hạn public KB + submit_feedback)
-curl -s -X POST -H "Authorization: Bearer $TOKEN_GUEST" \
-  -H "Content-Type: application/json" \
-  -d '{"messages":[{"role":"user","content":"test"}]}' \
-  http://127.0.0.1:8000/api/agent/chat
-# → 200 OK (GUEST_SYSTEM_PROMPT, không có dữ liệu nội bộ)
 ```
+
+Danh sách kiểm thử đầy đủ: `docs/harness/stories/epics/E04-public-intake/US-077-separate-customer-web/validation.md`.

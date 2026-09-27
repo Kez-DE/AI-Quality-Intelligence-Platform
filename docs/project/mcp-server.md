@@ -8,7 +8,7 @@ inspector, ...) truy vấn dữ liệu chất lượng dịch vụ. Nó là adap
 
 Server đọc danh tính từ env lúc khởi động, client KHÔNG truyền được:
 
-- `MCP_ROLE` — `admin` | `manager` | `staff` | `guest` (mặc định `guest`).
+- `MCP_ROLE` — `admin` | `manager` | `staff`. Không set hoặc giá trị khác thì rơi về `pending`: không có tool nào (US-077 / decision 0017 đã bỏ role `guest`).
 - `MCP_SCOPE_TEAM` — tên phòng ban (vd `Tài chính & Thanh toán`); rỗng = toàn hệ thống,
   chỉ hợp lệ khi role `admin`. Bắt buộc khi role `staff`/`manager`.
 
@@ -19,7 +19,7 @@ thi. Đây là ranh giới bảo mật — MCP client không leo ra khỏi phòn
 
 | Role | Tool thấy được |
 |---|---|
-| guest | `submit_feedback` |
+| pending (mặc định) | không có tool nào |
 | staff | `search_knowledge_base`, `get_team_priority_tasks` |
 | manager | như staff + `get_feedback_summary`, `get_hot_areas`, `get_sla_tickets` |
 | admin | toàn bộ tool, scope toàn hệ thống |
@@ -89,10 +89,14 @@ Supabase phát **JWT** → mọi request sau gắn JWT đó (client tự refresh
 |---|---|
 | role `admin` | mọi tool, toàn hệ thống |
 | `manager`/`staff` + đã gán phòng | tool theo role, scoped đúng phòng đó |
-| `manager`/`staff` CHƯA gán phòng | chỉ `submit_feedback` (như khách) |
-| role `guest` (tài khoản mới) | chỉ `submit_feedback` |
+| `manager`/`staff` CHƯA gán phòng | 401, không có phiên, không có danh sách tool (xử lý như `pending`) |
+| role `pending` hoặc role lạ | 401, không có phiên, không có danh sách tool |
+| JWT còn `app_metadata.must_change_password = true` (tài khoản còn mật khẩu tạm) | 401; đổi mật khẩu ở Staff web xong mới dùng được |
 
-Vì resolve LIVE, **admin nâng khách → nhân viên/quản lý và gán phòng thì kết nối cũ tự có
+Verifier từ chối identity `pending` ở cả hai đường, JWT lẫn bearer `mcp_tokens`, nên client
+không bao giờ thấy danh sách tool rỗng: nó nhận 401 ngay ở bước xác thực.
+
+Vì resolve LIVE, **admin cấp quyền cho tài khoản `pending` → nhân viên/quản lý và gán phòng thì kết nối cũ tự có
 quyền phòng đó ngay — không cấp lại gì, không cấu hình lại Claude.** `scope_team` lấy từ
 profile không từ args (không leo quyền); JWT hợp lệ nhưng user không có profile → bị từ chối
 (fail-closed).
@@ -132,6 +136,8 @@ mcp-http`. `$PORT` do Railway inject.
 ## Kiểm thử (HTTP)
 
 - `pipeline/tests/test_mcp_auth.py`, `test_mcp_http.py`: hash/verify token, 401, ContextVar
-  identity, role gate, unknown-role → không tool.
+  identity, role gate, unknown-role → không tool (tầng handler); JWT hoặc bearer của identity
+  pending/role lạ → verifier từ chối (401).
+- `pipeline/tests/test_must_change_password.py`: JWT còn cờ `must_change_password` → verifier từ chối.
 - E2E production: token manager CSKH gọi `get_feedback_summary` ra "Phòng CSKH"; hỏi task
   phòng "Safety" vẫn bị ép về CSKH (scope guard qua mạng).

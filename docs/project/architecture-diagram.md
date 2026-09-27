@@ -10,7 +10,12 @@ Bản mô tả chữ chi tiết: [`docs/project/architecture.md`](architecture.m
 ```mermaid
 flowchart TB
     subgraph Client["Người dùng"]
-        U["Admin / Manager / Staff / Guest"]
+        U["Admin / Manager / Staff"]
+        K["Khách hàng (không tài khoản)"]
+    end
+
+    subgraph CW["Customer web — customer-web/ (Vite + React, SPA tĩnh)"]
+        CWUI["Gửi phản hồi · Tra cứu mã"]
     end
 
     subgraph FE["Frontend — app/ (React 19 + TanStack Start + Vite)"]
@@ -31,6 +36,8 @@ flowchart TB
     end
 
     U --> UI
+    K --> CWUI
+    CWUI -- REST /api/public/* --> API
     UI -- REST --> API
     UI -- Realtime subscribe --> DB
     API --> PIPE

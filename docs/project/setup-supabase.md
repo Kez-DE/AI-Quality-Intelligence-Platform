@@ -5,6 +5,8 @@
 
 > **Cập nhật 2026-06-27:** rà soát khớp với migrations & schema 6 phòng hiện tại; nội dung kỹ thuật giữ nguyên.
 
+> **Cập nhật 2026-09-27 (US-077 / decision 0017):** thêm bước tay tắt tự đăng ký và OAuth (8.1); admin đầu tiên tạo trong Dashboard vì Staff web không còn form đăng ký (8.4); role `guest` đổi thành `pending`.
+
 ---
 
 ## 1. Tạo project trên Supabase Cloud
@@ -115,33 +117,61 @@ Hoặc migration đã tự bật (file `enable_feedback_realtime.sql`).
 
 ## 8. Cấu hình Authentication
 
-### 8.1 Email Auth (mặc định)
+### 8.1 Tắt tự đăng ký và đăng nhập Google/Facebook (thao tác tay, bắt buộc)
+
+Từ US-077 (decision 0017), chỉ admin tạo tài khoản và Staff web đã bỏ form đăng ký cùng nút Google/Facebook. Nhưng Supabase Auth vẫn nhận đăng ký trực tiếp qua API và qua OAuth cho tới khi chủ dự án tắt trong Dashboard. Không có code nào trong repo làm hoặc kiểm tra được việc này, nên đây là bước tay, làm trên **đúng project production**.
+
+Nhãn có thể khác nhau giữa các phiên bản Dashboard:
+
+1. Vào **Authentication → Sign In / Providers** (bản cũ: **Authentication → Providers**).
+2. Ở mục **User Signups**, tắt **Allow new users to sign up**. Theo tài liệu Supabase, khi tắt thì chỉ user đã tồn tại mới đăng nhập được.
+3. Trong danh sách provider, tắt **Google** và **Facebook**.
+4. **Giữ provider Email bật.** Đây là đường đăng nhập bằng mật khẩu duy nhất còn lại; tắt provider Email sẽ chặn luôn cả đăng nhập.
+5. Kiểm tra ngay sau khi tắt:
+   - Admin tạo một tài khoản thử bằng form "Tạo tài khoản" trên Staff web (`POST /api/admin/users`), đăng nhập được và bị bắt đổi mật khẩu, rồi xoá tài khoản thử. Tài liệu Supabase không nói rõ việc tạo user bằng admin API (service role) có còn chạy khi tắt đăng ký hay không, nên phải kiểm tra thực tế.
+   - Đăng ký trực tiếp bằng publishable key phải bị từ chối và không tạo user mới:
+
+     ```bash
+     curl -s -X POST "$SUPABASE_URL/auth/v1/signup" \
+       -H "apikey: $SUPABASE_PUBLISHABLE_KEY" -H "Content-Type: application/json" \
+       -d '{"email":"signup-check@example.com","password":"Chk#12345678"}'
+     ```
+
+     Nếu lệnh này tạo được user thì bước 2 chưa có hiệu lực. Tài khoản đó vào hệ thống với role `pending` (không có quyền), nhưng vẫn nên xoá trong **Authentication → Users**.
+
+Chưa tắt thì rủi ro còn lại là tài khoản rác: mọi tài khoản tự đăng ký đều vào với role `pending`, backend trả 403 ở mọi endpoint trừ `GET /api/me`, `POST /api/me/password` và `/health`.
+
+Stack local: tương đương là `enable_signup = false` trong mục `[auth]` của `supabase/config.toml` (hiện file chưa đặt giá trị này).
+
+### 8.2 Email Auth
 
 Vào **Authentication → Providers → Email**:
 
-- ✅ Enable Email
+- ✅ Enable Email (giữ bật, xem 8.1)
 - ✅ Enable Email Confirmations: **TẮT** (cho dev/demo nhanh)
-- Hoặc bật nếu muốn verify email thật
+- Hoặc bật nếu muốn verify email thật. Tài khoản admin tạo qua `POST /api/admin/users` đã được xác nhận email sẵn.
 
-### 8.2 Site URL & Redirect
+### 8.3 Site URL & Redirect
 
 Vào **Authentication → URL Configuration**:
 
 - **Site URL:** `http://localhost:5174` (dev) hoặc URL deploy
 - **Redirect URLs:** thêm `http://localhost:5174/`**
 
-### 8.3 Tạo tài khoản admin đầu tiên
+### 8.4 Tạo tài khoản admin đầu tiên
 
-Cách 1 — Qua UI frontend:
+Staff web không còn form đăng ký, nên admin đầu tiên được tạo trong Dashboard:
 
-1. Mở `http://localhost:5174/auth`
-2. Đăng ký email/password
-3. User đầu tiên tự động được gán role `admin`
+Cách 1 — Database mới (chưa có profile nào):
 
-Cách 2 — Qua Supabase Dashboard:
+1. **Authentication → Users → Add user**, nhập email + password, chọn tự xác nhận email.
+2. Trigger `handle_new_user` gán role `admin` cho profile đầu tiên của hệ thống.
+3. Đăng nhập Staff web bằng tài khoản này; các tài khoản sau tạo bằng form "Tạo tài khoản" trong trang Quản lý người dùng.
+
+Cách 2 — Database đã có profile:
 
 1. **Authentication → Users → Add user**
-2. Nhập email + password
+2. Nhập email + password (tài khoản vào với role `pending`)
 3. Vào **Table Editor → profiles** → sửa cột `role` = `admin`
 
 ## 9. Row Level Security (RLS)
@@ -150,8 +180,13 @@ Project dùng `SERVICE_ROLE_KEY` ở backend (bypass RLS), nên gate quyền ở
 
 Frontend đọc trực tiếp qua anon key + RLS:
 
-- Guest chỉ đọc được dashboard view
+- Tài khoản không thuộc ops (kể cả `pending`) chỉ đọc được dòng feedback/alert của chính mình; phản hồi ẩn danh (`user_id` NULL) chỉ ops đọc được
 - Staff/admin đọc được feedback, alerts
+- Chỉ ops staff được insert vào `feedback`, và phải đúng `user_id` của mình
+- Knowledge base nội bộ (`graph_nodes`, `graph_edges`) chỉ ops staff đọc được
+- `is_ops_staff()` và `is_admin()` đòi `password_is_current()`: tài khoản còn mật khẩu tạm (`app_metadata.must_change_password`) không có quyền ops/admin qua PostgREST và realtime cho tới khi đổi mật khẩu và refresh session
+
+Bảng RLS đầy đủ theo từng bảng: [data-model.md](data-model.md) mục 11.
 
 Kiểm tra RLS đã bật:
 
@@ -167,7 +202,7 @@ SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public';
 | ----------------- | ---------------------------------------------------------------------------------- |
 | `feedback`        | Phản hồi đã phân loại (topic, sentiment, severity, confidence, area, needs_review) |
 | `alerts`          | Ticket/Alert do spike detector + LLM sinh ra                                       |
-| `profiles`        | User profile kèm role (admin/manager/staff/guest)                                  |
+| `profiles`        | User profile kèm role (admin/manager/staff/pending)                                |
 | `correction_logs` | Audit trail khi staff sửa nhãn AI                                                  |
 | `chat_messages`   | Lịch sử chat AI                                                                    |
 

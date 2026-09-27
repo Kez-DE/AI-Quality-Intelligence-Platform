@@ -1,6 +1,8 @@
 # Kiến trúc — AI Quality Intelligence Platform
 
 > **Cập nhật 2026-06-27:** Cập nhật mô tả KB nội bộ: xóa claim phủ số phòng ban cố định; ghi rõ KB dùng nhãn legacy (Safety, CSKH, Vận hành, IT) vì soạn trước khi chuyển 6 phòng ban chuẩn.
+>
+> **Cập nhật 2026-09-27 (US-077 / decision 0017):** thêm Customer web (`customer-web/`), bỏ role `guest` thay bằng `pending`.
 
 Phân tích phản hồi khách hàng smart mobility (xanhSM) và định tuyến sự cố tới đúng phòng ban.
 
@@ -8,7 +10,8 @@ Phân tích phản hồi khách hàng smart mobility (xanhSM) và định tuyế
 
 ```
 AI-Quality-Intelligence-Platform/
-├── app/        Frontend TanStack Start + React 19 (Quality Cockpit, auth, chat, admin)
+├── app/        Staff web: TanStack Start + React 19 (Quality Cockpit, auth, chat, admin)
+├── customer-web/ Customer web: Vite + React SPA tĩnh (gửi phản hồi + tra cứu, không đăng nhập)
 ├── pipeline/   Python FastAPI: clean → classify → ingest → spike → LLM agent → multi-agent
 ├── supabase/   Schema PostgreSQL + RLS + RBAC (6 migration)
 └── data/       Dataset public review + metadata synthetic + train splits + taxonomy
@@ -25,7 +28,7 @@ data/
 │   ├── sla/              cam kết bồi thường chuẩn
 │   ├── tech/             lỗi kỹ thuật + bảo mật dữ liệu (neo chính sách greensm)
 │   └── tickets/          1 file case study P5 làm few-shot cho AI
-├── public_kb/            FAQ khách hàng cho chatbot guest (audience: public)
+├── public_kb/            FAQ khách hàng cho tầng chat công khai `public_only` (audience: public)
 ├── taxonomy/             routing_table.json, severity_rules.json
 ├── reference/            area_catalog.json (16 khu vực HN/HCM/ĐN), enrichment
 ├── raw/                  Dataset review công khai (Google Play + App Store)
@@ -35,13 +38,14 @@ data/
 └── auxiliary/data2/      Dataset phụ trợ/thí nghiệm, không thay runtime
 ```
 
-Mỗi file trong `knowledge_base/` có YAML frontmatter `department` để RAG lọc theo phòng. KB nội bộ hiện dùng nhãn legacy (`Safety`, `CSKH`, `Vận hành`, `IT`) vì được soạn trước khi chuyển sang 6 phòng ban chuẩn; các phòng Tài chính & Thanh toán, Sản phẩm, Quản lý Rủi ro & Gian lận chưa có tài liệu KB riêng. `public_kb/` gắn `topic_group` theo phòng nhưng mở cho mọi khách. `data/taxonomy/` không chứa `safety_keywords.json`; file keyword này chỉ nằm trong `data/auxiliary/data2/taxonomy/` để thí nghiệm Data_2. Xem [agents-guide.md](agents-guide.md), [rbac-departments.md](rbac-departments.md), và [`../data/README.md`](../data/README.md).
+Mỗi file trong `knowledge_base/` có YAML frontmatter `department` để RAG lọc theo phòng. KB nội bộ hiện dùng nhãn legacy (`Safety`, `CSKH`, `Vận hành`, `IT`) vì được soạn trước khi chuyển sang 6 phòng ban chuẩn; các phòng Tài chính & Thanh toán, Sản phẩm, Quản lý Rủi ro & Gian lận chưa có tài liệu KB riêng. `public_kb/` gắn `topic_group` theo phòng nhưng mở cho mọi khách. `data/taxonomy/` không chứa `safety_keywords.json`; file keyword này chỉ nằm trong `data/auxiliary/data2/taxonomy/` để thí nghiệm Data_2. Xem [agents-guide.md](agents-guide.md), [rbac-departments.md](rbac-departments.md), và [`data/README.md`](../../data/README.md).
 
-## Hạ tầng: 6 Railway service
+## Hạ tầng: 6 Railway service + `customer-web`
 
-Hệ thống deploy thành 6 service riêng (xem chi tiết ở [deploy-railway.md](deploy-railway.md)):
+Hệ thống deploy thành 6 service riêng, cộng service `customer-web` mới đã có Dockerfile nhưng chưa tạo trên Railway (xem chi tiết ở [deploy-railway.md](deploy-railway.md)):
 
-- `frontend` → `app/Dockerfile`
+- `frontend` (Staff web) → `app/Dockerfile`
+- `customer-web` (Customer web) → `customer-web/Dockerfile`, file tĩnh, chưa deploy
 - `backend` (web API) → `pipeline/Dockerfile`
 - `backend-worker`, `ingest-worker`, `ml-worker`, `agent-worker` → cùng `pipeline/Dockerfile.workers`, chọn entrypoint qua biến `WORKER_MODULE`
 
@@ -71,7 +75,7 @@ app/src/
 ## Luồng xử lý
 
 ```
-Review (form thủ công / demo 150 / dataset 4837 / streaming)
+Review (Customer web / form thủ công / demo 150 / dataset 4837 / streaming)
    │
    ▼
 [1] clean.py        mask PII (SĐT, email), chuẩn hóa text
@@ -159,10 +163,19 @@ Endpoint: `GET /api/insights/departments`, `GET /api/insights/departments/{team}
 
 ## RBAC — 4 vai trò
 
-`pipeline/auth_guard.py` xác thực Supabase JWT + đọc role từ `profiles`. 4 role: **admin / manager / staff / guest**.
+`pipeline/auth_guard.py` xác thực Supabase JWT + đọc role từ `profiles`. 4 role: **admin / manager / staff / pending**. `pending` là tài khoản chờ cấp quyền: 403 ở mọi endpoint trừ `GET /api/me`, `POST /api/me/password` và `/health`. Tài khoản còn mật khẩu tạm (`app_metadata.must_change_password`) bị mọi role guard trả 403 cho tới khi đổi mật khẩu qua `POST /api/me/password`. Role thiếu hoặc không hợp lệ rơi về `pending`.
 - Backend dùng SERVICE_ROLE_KEY (bypass RLS) nên gate quyền ở tầng API: `require_admin`, `require_ops_staff`.
-- `pipeline/users_admin.py` — CRUD user (admin only).
-- Bootstrap: user đăng ký đầu tiên = admin, còn lại = guest (mặc định theo migration `default_role_guest`).
+- `pipeline/users_admin.py` — CRUD user (admin only), gồm tạo tài khoản `POST /api/admin/users` (mật khẩu tạm, bắt đổi ở lần đăng nhập đầu). Staff web không còn tự đăng ký.
+- Bootstrap: profile đầu tiên = admin, còn lại = `pending` (trigger `handle_new_user`).
+
+## Customer web và API công khai
+
+Khách hàng không có tài khoản. `customer-web/` là SPA tĩnh riêng, không có Supabase client, gọi thẳng backend từ trình duyệt qua `VITE_BACKEND_API_URL` (không qua proxy, vì rate limit tính theo IP client lấy từ entry bên phải nhất của `X-Forwarded-For`). Hai route công khai nằm ở `pipeline/public_intake.py`:
+
+- `POST /api/public/feedback` — gửi phản hồi, trả mã tra cứu. Có honeypot `website`: có nội dung thì 400, không lưu.
+- `GET /api/public/feedback/{public_ref}` — trả đúng `public_ref`, `status` (`received` / `under_review` / `reviewed`), `created_at`. Mã hết hạn hoặc đã xoá nội dung trả 404.
+
+Phản hồi ẩn danh đi qua đúng pipeline phân loại, chấm rủi ro, spike và định tuyến như mọi phản hồi khác. `backend-worker` xoá nội dung các dòng quá `retention_until` lúc 03:00 hằng ngày, giữ nguyên nhãn. Quyết định: [decisions/0016](../harness/decisions/0016-anonymous-public-feedback-intake.md), [decisions/0017](../harness/decisions/0017-separate-customer-web-retire-guest.md).
 
 ## Region mapping (code ↔ label)
 

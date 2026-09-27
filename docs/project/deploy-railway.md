@@ -1,19 +1,22 @@
 # Deploy lên Railway
 
 > **Cập nhật 2026-06-27:** đồng bộ env-var (.env.example) và luồng deploy. Push lên `main` là đường deploy chính (GitHub Actions tự kích hoạt).
+>
+> **Cập nhật 2026-09-27 (US-077 / decision 0017):** thêm service `customer-web` (Customer web, chưa tạo trên Railway) và sửa mục CORS. Hiện trạng: repo không có self-hosted runner nào nên workflow deploy không chạy, và production không phục vụ request (backlog #7). Mọi hướng dẫn deploy dưới đây chỉ áp dụng lại được sau khi xử lý xong backlog #7.
 
 Hệ thống chạy trên Railway dưới dạng **6 service riêng**, build từ Docker, deploy tự động qua GitHub Actions khi push lên `main`. Supabase là dịch vụ ngoài (cloud), không nằm trong Railway.
 
-## Kiến trúc 6 service
+## Kiến trúc 6 service (+ `customer-web`)
 
 | Railway service | Build từ | Chạy gì | Public domain |
 |-----------------|----------|---------|:-------------:|
 | `frontend` | `app/Dockerfile` | TanStack Start node-server (port 3000) | ✅ |
 | `backend` | `pipeline/Dockerfile` | FastAPI uvicorn `main:app` (port 8000) | ✅ |
-| `backend-worker` | `pipeline/Dockerfile.workers` | `worker_ticket.py` — vòng đời ticket | ❌ |
+| `backend-worker` | `pipeline/Dockerfile.workers` | `worker_ticket.py` — vòng đời ticket + job 03:00 xoá nội dung phản hồi ẩn danh quá hạn | ❌ |
 | `ingest-worker` | `pipeline/Dockerfile.workers` | `worker_ingest.py` — live stream nạp dataset | ❌ |
 | `ml-worker` | `pipeline/Dockerfile.workers` | `worker_ml.py` — chấm risk bằng LLM | ❌ |
 | `agent-worker` | `pipeline/Dockerfile.workers` | `worker_agent.py` — multi-agent pipeline | ❌ |
+| `customer-web` *(mới, chưa tạo)* | `customer-web/Dockerfile` | Customer web: file tĩnh, SPA fallback, nghe cổng `$PORT` | ✅ |
 
 `backend` và 4 worker dùng **chung source** (`pipeline/` + `data/`). Bốn worker build từ cùng một Dockerfile (`Dockerfile.workers`); mỗi service chọn entrypoint bằng biến `WORKER_MODULE` (ví dụ `worker_ticket`, `worker_agent`).
 
@@ -24,7 +27,8 @@ Railway Project
 ├── backend-worker  Dockerfile.workers       → WORKER_MODULE=worker_ticket
 ├── ingest-worker   Dockerfile.workers       → WORKER_MODULE=worker_ingest
 ├── ml-worker       Dockerfile.workers       → WORKER_MODULE=worker_ml
-└── agent-worker    Dockerfile.workers       → WORKER_MODULE=worker_agent
+├── agent-worker    Dockerfile.workers       → WORKER_MODULE=worker_agent
+└── customer-web    customer-web/Dockerfile  → $PORT, public (chưa tạo; Root Directory = customer-web)
 
 Supabase (external cloud) ← tất cả service kết nối qua env var
 ```
@@ -119,6 +123,32 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 
 `VITE_BACKEND_API_URL` là URL public (browser gọi trực tiếp). `BACKEND_API_URL` dùng internal networking cho server-side call.
 
+Thêm cho Staff web (US-077): `VITE_CUSTOMER_WEB_URL` là URL public của Customer web, dùng cho nút "Gửi phản hồi" ở trang chủ và câu trả lời mẫu của widget chat. Biến này cũng nhúng lúc build; nếu thiếu thì rơi về `http://localhost:5175`, nên phải set trước khi build production.
+
+```env
+VITE_CUSTOMER_WEB_URL=https://customer-web-xxx.up.railway.app
+```
+
+### customer-web (chưa tạo)
+
+Customer web là site tĩnh, không có Supabase client và **không cần biến Supabase nào**. Chỉ có một biến build-time, truyền vào Docker dưới dạng build `ARG`:
+
+```env
+VITE_BACKEND_API_URL=https://backend-xxx.up.railway.app
+```
+
+Railway tự cấp `PORT` lúc chạy; image dùng nginx render cấu hình từ `nginx.conf.template` để nghe đúng cổng đó (mặc định 8080 khi chạy local). Trình duyệt gọi thẳng backend, **không** đặt proxy hay BFF phía trước: rate limit công khai tính theo IP client lấy từ entry bên phải nhất của `X-Forwarded-For`, nên proxy sẽ gom mọi khách vào chung một bucket 5 lần/giờ.
+
+Các bước tạo service (ghi lại để làm sau backlog #7, chưa thực hiện):
+
+1. Tạo service `customer-web` trong Railway project, đặt **Root Directory** là `customer-web` (Dockerfile build với context là chính thư mục đó; cấu hình này nằm trên dashboard Railway, không nằm trong repo).
+2. Set `VITE_BACKEND_API_URL` là URL public của `backend`.
+3. Tạo public domain. Chốt domain ổn định trước khi in mã QR, vì QR mã hoá thẳng URL này.
+4. Set `VITE_CUSTOMER_WEB_URL` của service `frontend` bằng domain đó rồi build lại `frontend`.
+5. Workflow `railway.yml` hiện chưa biết thư mục `customer-web/` (path filter, detect rule và danh sách target đều cố định), nên phải bổ sung trước khi dựa vào deploy tự động.
+
+Chi tiết build và chạy local: [`customer-web/README.md`](../../customer-web/README.md).
+
 ---
 
 ## Test local với Docker Compose
@@ -140,7 +170,7 @@ docker compose down
 
 **Backend crash "No module named sklearn":** `requirements.txt` cần `scikit-learn`; model `.joblib` phải khớp version.
 
-**Frontend không gọi được backend:** `VITE_BACKEND_API_URL` phải là URL public có `https`, backend phải có domain public, và CORS trong `main.py` allow origin frontend.
+**Frontend hoặc Customer web không gọi được backend:** `VITE_BACKEND_API_URL` phải là URL public có `https` và đã được set **trước khi build** (Staff web thiếu biến này thì bundle âm thầm rơi về `http://127.0.0.1:8000`); backend phải có domain public. CORS không phải nguyên nhân: `main.py` đang để `allow_origins=["*"]` kèm `allow_credentials=True`, không có allowlist nào để cập nhật, nên mọi origin (Staff web lẫn Customer web) đều gọi được. Nếu sau này siết CORS thành allowlist thì phải liệt kê cả hai origin, nếu không Customer web sẽ hỏng mà không báo lỗi rõ.
 
 **Worker chạy sai entrypoint:** kiểm tra biến `WORKER_MODULE` của service đó trên Railway (ví dụ `agent-worker` phải set `WORKER_MODULE=worker_agent`).
 
