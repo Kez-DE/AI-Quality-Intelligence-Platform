@@ -1,6 +1,8 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import AppShell from "@/components/AppShell";
+import { ChangePasswordScreen, PendingAccountScreen } from "@/components/AccountGate";
+import { staffWebGate, toRole } from "@/lib/access";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -22,52 +24,42 @@ export const Route = createFileRoute("/_authenticated")({
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) throw redirect({ to: "/auth" });
 
-    let role = "guest";
+    // Fail closed: a failed or empty profile read leaves role unknown → pending.
+    let profileRole: unknown = null;
     try {
       const { data: profile } = await supabase
         .from("profiles")
         .select("role")
         .eq("id", data.user.id)
         .maybeSingle();
-
-      role = profile?.role || "guest";
+      profileRole = profile?.role;
     } catch {
-      role = "guest";
+      profileRole = null;
     }
 
-    // Route Guard for Guests — Khách chỉ dùng Dashboard (đã gồm form phản hồi + trợ lý CSKH nổi).
-    const restrictedForGuests = [
-      "/alerts",
-      "/insights",
-      "/admin",
-      "/tasks",
-      "/reports",
-      "/completion-reports",
-      "/support",
-      "/live-stream",
-      "/feedback",
-      "/chat",
-    ];
-    if (role === "guest" && restrictedForGuests.some((p) => location.pathname.startsWith(p))) {
-      throw redirect({ to: "/dashboard" });
-    }
+    const gate = staffWebGate({
+      role: profileRole,
+      // app_metadata: only the backend (service role) can set or clear it.
+      mustChangePassword: data.user.app_metadata?.must_change_password === true,
+      pathname: location.pathname,
+    });
+    if (gate === "to-dashboard") throw redirect({ to: "/dashboard" });
 
-    // Route Guard for Staff/Manager
-    if ((role === "staff" || role === "manager") && location.pathname.startsWith("/admin")) {
-      throw redirect({ to: "/dashboard" });
-    }
-
-    // Phân tích & báo cáo là việc của quản lý/admin. Nhân viên tập trung xử lý phản hồi + task.
-    const managerOnlyForStaff = ["/insights", "/reports", "/completion-reports"];
-    if (role === "staff" && managerOnlyForStaff.some((p) => location.pathname.startsWith(p))) {
-      throw redirect({ to: "/dashboard" });
-    }
-
-    return { user: data.user, role };
+    return { user: data.user, role: toRole(profileRole), gate };
   },
-  component: () => (
+  component: AuthenticatedLayout,
+});
+
+// Only an allowed Staff account gets AppShell (nav, data, chat widget) and the
+// child route. The other gates render a standalone screen, so no child route
+// mounts and nothing is fetched from the backend.
+function AuthenticatedLayout() {
+  const { gate, user } = Route.useRouteContext();
+  if (gate === "change-password") return <ChangePasswordScreen />;
+  if (gate === "pending") return <PendingAccountScreen email={user.email} />;
+  return (
     <AppShell>
       <Outlet />
     </AppShell>
-  ),
-});
+  );
+}

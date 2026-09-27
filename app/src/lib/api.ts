@@ -7,7 +7,14 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const API_BASE = import.meta.env.VITE_BACKEND_API_URL ?? "http://127.0.0.1:8000";
 
-export type Role = "admin" | "manager" | "staff" | "guest";
+// URL of the Customer web (separate app, `customer-web/`). Baked at build time;
+// `||` so an empty Docker build arg also falls back to the local dev server.
+export const CUSTOMER_WEB_URL = import.meta.env.VITE_CUSTOMER_WEB_URL || "http://localhost:5175";
+
+/** Roles with access to the Staff web. */
+export type StaffRole = "admin" | "manager" | "staff";
+/** `pending` = Pending account: logged in, no access until an admin grants a StaffRole. */
+export type Role = StaffRole | "pending";
 
 export type Department =
   | "IT"
@@ -56,7 +63,7 @@ async function getAccessToken(): Promise<string | null> {
   return data.session?.access_token ?? null;
 }
 
-/** fetch tới backend, tự gắn Bearer token. Ném Error với message từ `detail` nếu lỗi.
+/** fetch tới backend, tự gắn Bearer token. Ném Error với message backend trả về nếu lỗi.
  *  timeoutMs mặc định 15s; agent chat có thể chạy nhiều vòng gọi tool nên cần lâu hơn. */
 export async function apiFetch<T = unknown>(
   path: string,
@@ -75,44 +82,7 @@ export async function apiFetch<T = unknown>(
     if (!res.ok) {
       let detail = `${res.status} ${res.statusText}`;
       try {
-        const body = (await res.json()) as { detail?: string };
-        if (body?.detail) detail = body.detail;
-      } catch {
-        // body không phải JSON — giữ status text.
-      }
-      throw new Error(detail);
-    }
-    return (await res.json()) as T;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-/** Gọi endpoint công khai (`/api/public/*`) — KHÔNG gắn token.
- *
- *  `apiFetch` gắn Bearer token khi tình cờ có session, nên một nhân viên đang
- *  đăng nhập mở trang gửi phản hồi ẩn danh sẽ gửi kèm JWT tới route không cần
- *  nó. Hàm này giữ trang công khai hành xử giống hệt nhau cho người lạ và cho
- *  người đã đăng nhập.
- *
- *  Backend override handler lỗi thành `{ error: { message } }`, không phải
- *  `{ detail }` mặc định của FastAPI — đọc đúng chỗ để người gửi thấy thông báo
- *  thật (vd lý do bị chặn khi quá hạn mức). */
-export async function publicFetch<T = unknown>(
-  path: string,
-  init: RequestInit = {},
-  timeoutMs = 15_000,
-): Promise<T> {
-  const headers = new Headers(init.headers);
-  if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(`${API_BASE}${path}`, { ...init, headers, signal: controller.signal });
-    if (!res.ok) {
-      let detail = `${res.status} ${res.statusText}`;
-      try {
+        // Backend overrides FastAPI errors as `{ error: { message } }`; `detail` is the default shape.
         const body = (await res.json()) as { error?: { message?: string }; detail?: string };
         detail = body?.error?.message ?? body?.detail ?? detail;
       } catch {
@@ -127,7 +97,7 @@ export async function publicFetch<T = unknown>(
 }
 
 /** Đọc danh tính + role của user đang đăng nhập. Dùng để render nav/route theo quyền. */
-export function useMe() {
+export function useMe({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ["me"],
     queryFn: async () => {
@@ -136,6 +106,7 @@ export function useMe() {
     },
     staleTime: 60_000,
     retry: false,
+    enabled,
   });
 }
 
@@ -143,5 +114,5 @@ export const ROLE_LABELS: Record<Role, string> = {
   admin: "Quản trị viên",
   manager: "Quản lý",
   staff: "Nhân viên",
-  guest: "Khách",
+  pending: "Chờ cấp quyền",
 };

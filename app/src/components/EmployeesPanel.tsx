@@ -73,7 +73,7 @@ export default function EmployeesPanel({ me }: { me: Me }) {
     retry: false,
   });
 
-  const employees = (usersQuery.data?.data || []).filter((u) => u.role !== "guest");
+  const employees = (usersQuery.data?.data || []).filter((u) => u.role !== "pending");
   const leaders = lbQuery.data?.data || [];
 
   return (

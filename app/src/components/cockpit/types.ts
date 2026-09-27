@@ -1,10 +1,9 @@
 // Kiểu dữ liệu khớp response của GET /api/cockpit/overview (pipeline/main.py).
 
 export interface CockpitScope {
-  team: string | null; // null = toàn bộ (admin) hoặc guest
-  role: "admin" | "manager" | "staff" | "guest";
+  team: string | null; // null = toàn bộ (admin)
+  role: "admin" | "manager" | "staff";
   unassigned: boolean; // ops chưa gán phòng
-  restricted: boolean; // guest
 }
 
 export interface CockpitKpis {

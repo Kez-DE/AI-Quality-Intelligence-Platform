@@ -23,7 +23,7 @@ import {
   srcContent,
   srcTitle,
 } from "@/components/SourceCitation";
-import { apiFetch, useMe, type Role } from "@/lib/api";
+import { apiFetch, useMe, type StaffRole } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/chat")({
   component: ChatPage,
@@ -56,19 +56,7 @@ type ChatRoleConfig = {
   suggestions: string[];
 };
 
-const CHAT_ROLE_CONFIG: Record<Role, ChatRoleConfig> = {
-  guest: {
-    title: "Hỗ trợ Trực tuyến",
-    subtitle: "Giải đáp hướng dẫn dùng dịch vụ và gửi khiếu nại.",
-    emptyTitle: "Xin chào! Tôi có thể giúp gì cho bạn?",
-    placeholder: "Nhập câu hỏi về đặt xe, thanh toán, tài khoản hoặc khiếu nại...",
-    suggestions: [
-      "Làm sao để gửi phản hồi về tài xế?",
-      "Làm sao để biết khiếu nại đã được xử lý chưa?",
-      "Tôi muốn báo cáo sự cố an toàn",
-      "Tôi cần hỗ trợ về thanh toán chuyến đi",
-    ],
-  },
+const CHAT_ROLE_CONFIG: Record<StaffRole, ChatRoleConfig> = {
   staff: {
     title: "AI Tác nghiệp",
     subtitle: "Trả lời theo checklist xử lý, ticket và việc cần làm của phòng bạn.",
@@ -245,16 +233,16 @@ function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const { data: me } = useMe();
 
-  const role = me?.role ?? "guest";
+  // Only Staff roles pass the layout gate; while /api/me loads, show the
+  // least-privileged copy (the backend enforces the real scope).
+  const role: StaffRole = me?.role && me.role !== "pending" ? me.role : "staff";
   const chatConfig = CHAT_ROLE_CONFIG[role];
   const scopeText =
     role === "admin"
       ? "Toàn hệ thống"
-      : role === "guest"
-        ? "Khách hàng"
-        : me?.department
-          ? `Phòng ${me.department}`
-          : "Chưa gán phòng ban";
+      : me?.department
+        ? `Phòng ${me.department}`
+        : "Chưa gán phòng ban";
 
   useEffect(() => {
     supabase
@@ -341,7 +329,7 @@ function ChatPage() {
     await supabase.from("chat_messages").insert({ user_id: u.user.id, role: "user", content });
 
     try {
-      const endpoint = "/api/agent/chat"; // backend tự phân tầng: guest→RAG công khai, ops/admin→ReAct Agent
+      const endpoint = "/api/agent/chat"; // backend tự phân tầng theo role + phòng ban (ReAct Agent)
       const reply = await apiFetch<AgentChatResponse>(
         endpoint,
         {
@@ -502,7 +490,7 @@ function ChatPage() {
           </button>
         </form>
         </div>
-        {(role !== "guest" && (messages.some(m => m.sources?.length) || loading)) && (
+        {(messages.some(m => m.sources?.length) || loading) && (
           <div className="flex-[4] rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] overflow-hidden flex flex-col">
             <div className="p-4 border-b border-border bg-muted/30">
               <h3 className="font-semibold text-sm flex items-center gap-2">
