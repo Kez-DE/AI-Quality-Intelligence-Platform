@@ -260,9 +260,11 @@ async def patch_role(user_id, role):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("role", ["admin", "manager", "staff"])
-async def test_customer_account_is_never_promoted_to_staff(db, as_admin, role):
-    """Decision 0018: a Staff account only comes from the create-user form."""
+@pytest.mark.parametrize("role", ["admin", "manager", "staff", "pending"])
+async def test_customer_account_role_never_changes(db, as_admin, role):
+    """Decision 0018 §7: a Staff account only comes from the create-user form.
+    'pending' is refused too, or guest -> pending -> staff (PATCH or
+    bulk-approve) would promote a Customer account in two steps."""
     db.tables["profiles"].append({"id": "cust-1", "email": "khach@local.test", "role": "guest"})
 
     res = await patch_role("cust-1", role)
@@ -274,10 +276,12 @@ async def test_customer_account_is_never_promoted_to_staff(db, as_admin, role):
 
 
 @pytest.mark.asyncio
-async def test_customer_account_can_still_be_set_pending(db, as_admin):
+async def test_bulk_approve_skips_customer_accounts(db, as_admin):
     db.tables["profiles"].append({"id": "cust-1", "email": "khach@local.test", "role": "guest"})
 
-    res = await patch_role("cust-1", "pending")
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        res = await c.post("/api/users/bulk-approve", json={"user_ids": ["cust-1"], "role": "staff"})
 
     assert res.status_code == 200
-    assert db.tables["profiles"][-1]["role"] == "pending"
+    assert res.json()["data"]["approved_count"] == 0
+    assert db.tables["profiles"][-1]["role"] == "guest"

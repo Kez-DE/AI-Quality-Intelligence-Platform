@@ -89,16 +89,16 @@ def test_require_customer_rejects_a_temporary_password():
     assert exc.value.status_code == 403
 
 
+CUSTOMER_ROUTES = [
+    ("POST", "/api/customer/feedback", {"text": "x"}),
+    ("GET", "/api/customer/feedback", None),
+    ("POST", "/api/customer/chat", {"messages": [{"role": "user", "content": "hi"}]}),
+]
+
+
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "method,path,body",
-    [
-        ("POST", "/api/customer/feedback", {"text": "x"}),
-        ("GET", "/api/customer/feedback", None),
-        ("POST", "/api/customer/chat", {"messages": [{"role": "user", "content": "hi"}]}),
-    ],
-)
-@pytest.mark.parametrize("role", ["admin", "staff", "pending"])
+@pytest.mark.parametrize("method,path,body", CUSTOMER_ROUTES)
+@pytest.mark.parametrize("role", ["admin", "manager", "staff", "pending"])
 async def test_customer_routes_refuse_non_guests(db, as_user, method, path, body, role):
     as_user(AuthUser(id="u", email=None, role=role, department="CSKH"))
     async with client() as c:
@@ -108,10 +108,12 @@ async def test_customer_routes_refuse_non_guests(db, as_user, method, path, body
 
 
 @pytest.mark.asyncio
-async def test_customer_routes_need_a_session(db):
+@pytest.mark.parametrize("method,path,body", CUSTOMER_ROUTES)
+async def test_customer_routes_need_a_session(db, method, path, body):
     async with client() as c:
-        res = await c.get("/api/customer/feedback")
+        res = await c.request(method, path, json=body)
     assert res.status_code == 401
+    assert db.tables["feedback"] == []
 
 
 # ---------------------------------------------------------------------------

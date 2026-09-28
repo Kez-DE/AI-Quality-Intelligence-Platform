@@ -16,7 +16,7 @@ from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
-from auth_guard import OPS_ROLES, AuthUser, VALID_ROLES, get_current_user, require_admin
+from auth_guard import AuthUser, VALID_ROLES, get_current_user, require_admin
 from departments import DEPARTMENTS
 from ingest import get_supabase
 
@@ -75,10 +75,14 @@ def update_user_role(user_id: str, payload: dict, user: AuthUser = Depends(requi
         raise HTTPException(status_code=404, detail="User not found")
     old_role = old_profile[0].get("role", "pending")
     target_email = old_profile[0].get("email")
-    # A self-signed-up Customer account never becomes Staff: Staff accounts come
-    # from POST /api/admin/users, with a temp password the owner must change.
-    if old_role == "guest" and new_role in OPS_ROLES:
-        raise HTTPException(status_code=400, detail="Tạo tài khoản nhân viên qua form Tạo tài khoản")
+    # A Customer account's role never changes (decision 0018 §7): Staff accounts
+    # come from POST /api/admin/users, with a temp password the owner must change.
+    # Refusing 'pending' too closes guest -> pending -> staff (PATCH or bulk-approve).
+    if old_role == "guest" and new_role != "guest":
+        raise HTTPException(
+            status_code=400,
+            detail="Không đổi được vai trò của tài khoản khách hàng. Tạo tài khoản nhân viên qua form Tạo tài khoản",
+        )
 
     try:
         data = db.table("profiles") \
