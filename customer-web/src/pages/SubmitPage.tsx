@@ -1,10 +1,12 @@
-// `/`: a Customer reports Feedback with no account (US-076, US-077).
+// `/`: a Customer reports Feedback with no account (US-076, US-077), or from a
+// logged-in Customer account, which saves it to "Phản hồi của tôi" (US-078).
 //
 // The success state shows the Lookup code and nothing the backend classified:
 // no topic, sentiment or severity ever reaches this page (SPEC item 5).
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { MAX_TEXT, errorText, submitFeedback } from "../api";
+import { settling, useAuth } from "../auth";
 import { AREA_GROUPS } from "../regions";
 import { Link, statusPath } from "../router";
 import { CodeText, Icon, LookupForm, Spinner, WarningMark } from "../ui";
@@ -20,6 +22,10 @@ const CHANNELS = [
 const TEXT_ERROR = "Vui lòng mô tả chuyện đã xảy ra";
 
 export default function SubmitPage() {
+  const auth = useAuth();
+  // Only a Customer account sends its token. A staff or pending login posts
+  // through the public route like anyone logged out.
+  const token = auth.kind === "customer" ? auth.token : undefined;
   const [text, setText] = useState("");
   const [channel, setChannel] = useState(CHANNELS[0].value);
   const [area, setArea] = useState("");
@@ -43,7 +49,7 @@ export default function SubmitPage() {
     const website = String(new FormData(e.currentTarget).get("website") ?? "");
     setSubmitting(true);
     try {
-      const data = await submitFeedback({ text: body, channel, area, website });
+      const data = await submitFeedback({ text: body, channel, area, website }, token);
       setCode(data.public_ref);
       setText("");
     } catch (err) {
@@ -53,7 +59,7 @@ export default function SubmitPage() {
     }
   }
 
-  if (code) return <Confirmation code={code} onAnother={() => setCode(null)} />;
+  if (code) return <Confirmation code={code} saved={!!token} onAnother={() => setCode(null)} />;
 
   const remaining = MAX_TEXT - text.length;
 
@@ -63,9 +69,15 @@ export default function SubmitPage() {
 
       <h1 className="page-title">Gửi phản hồi về chuyến đi</h1>
       <ul className="mt-4 space-y-2 text-[0.9375rem] text-muted-foreground">
-        <Assurance icon="user">Không cần tài khoản.</Assurance>
+        <Assurance icon="user">
+          {token ? "Phản hồi được lưu vào mục Phản hồi của tôi." : "Không cần tài khoản."}
+        </Assurance>
         <Assurance icon="mask">Số điện thoại, email, biển số được che tự động.</Assurance>
-        <Assurance icon="clock">Nội dung tự xoá sau 180 ngày.</Assurance>
+        {/* The 180-day redaction covers source='public' only. Customer rows have
+            no retention clock yet (decision 0018, Follow-Up); change this copy with it. */}
+        <Assurance icon="clock">
+          {token ? "Nội dung được lưu đến khi tài khoản bị xoá." : "Nội dung tự xoá sau 180 ngày."}
+        </Assurance>
       </ul>
 
       <form onSubmit={submit} noValidate className="aurora-card surface mt-7 space-y-7 p-5 md:p-8">
@@ -155,7 +167,13 @@ export default function SubmitPage() {
           </p>
         </div>
 
-        <button type="submit" className="btn btn-primary w-full" disabled={submitting} aria-busy={submitting}>
+        {/* While the role is being checked we do not yet know which route to use. */}
+        <button
+          type="submit"
+          className="btn btn-primary w-full"
+          disabled={submitting || settling(auth)}
+          aria-busy={submitting}
+        >
           {submitting ? <Spinner /> : null}
           {submitting ? "Đang gửi…" : "Gửi phản hồi"}
         </button>
@@ -205,7 +223,7 @@ function ErrorSummary() {
   );
 }
 
-function Confirmation({ code, onAnother }: { code: string; onAnother: () => void }) {
+function Confirmation({ code, saved, onAnother }: { code: string; saved: boolean; onAnother: () => void }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [copied, setCopied] = useState(false);
 
@@ -252,10 +270,20 @@ function Confirmation({ code, onAnother }: { code: string; onAnother: () => void
       <h2 className="section-title mt-10">Điều gì xảy ra tiếp theo</h2>
       <div className="mt-3 max-w-prose space-y-3 leading-relaxed">
         <p>Phản hồi đã vào hệ thống và đang được phân loại tự động tới đội phụ trách.</p>
-        <p>
-          Hãy lưu lại mã này. Đây là cách duy nhất để xem trạng thái: chúng tôi không gửi email hay
-          tin nhắn.
-        </p>
+        {saved ? (
+          <p>
+            Phản hồi đã được lưu vào tài khoản. Bạn có thể xem lại trong{" "}
+            <Link href="/cua-toi" className="back-link">
+              Phản hồi của tôi
+            </Link>
+            .
+          </p>
+        ) : (
+          <p>
+            Hãy lưu lại mã này. Đây là cách duy nhất để xem trạng thái: chúng tôi không gửi email hay
+            tin nhắn.
+          </p>
+        )}
       </div>
 
       <div className="mt-7 flex flex-col gap-3 sm:flex-row">

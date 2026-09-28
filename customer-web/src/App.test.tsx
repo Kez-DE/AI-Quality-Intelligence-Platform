@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
-import App, { STATUS_ROUTE } from "./App";
+import App, { STATUS_ROUTE, matchRoute } from "./App";
 import { navigate } from "./router";
 
 afterEach(() => {
@@ -16,6 +16,25 @@ describe("STATUS_ROUTE", () => {
     expect(STATUS_ROUTE.exec("/status/ABC123/")?.[1]).toBe("ABC123");
     for (const path of ["/statuss", "/status-faq", "/statusABC", "/status/a/b"]) {
       expect(STATUS_ROUTE.exec(path)).toBeNull();
+    }
+  });
+});
+
+describe("matchRoute", () => {
+  it("matches the Customer account pages, with or without a trailing slash", () => {
+    for (const page of ["/", "/dang-nhap", "/dang-ky", "/quen-mat-khau", "/dat-lai-mat-khau", "/cua-toi"]) {
+      expect(matchRoute(page)).toEqual({ page });
+      if (page !== "/") expect(matchRoute(`${page}/`)).toEqual({ page });
+    }
+  });
+
+  it("matches the status page with its decoded code", () => {
+    expect(matchRoute("/status/AB%20C")).toEqual({ page: "status", code: "AB C" });
+  });
+
+  it("returns null for unknown or near-miss paths", () => {
+    for (const path of ["/dang-nhapx", "/cua-toi/1", "/Dang-Nhap", "/dang-ky/x", "/login"]) {
+      expect(matchRoute(path)).toBeNull();
     }
   });
 });

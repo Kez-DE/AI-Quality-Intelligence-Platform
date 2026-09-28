@@ -435,6 +435,82 @@
     outline-offset: 2px;
   }
 
+  /* customer web: a neutral callout (the staff-account message). */
+  .notice {
+    padding: 1rem 1.25rem;
+    border: 1.5px solid var(--primary-strong);
+    border-radius: var(--radius-lg);
+    background: var(--card);
+  }
+
+  /* customer web: one row of "Phản hồi của tôi", the whole card is the link. */
+  .history-row {
+    display: block;
+    padding: 1rem 1.25rem;
+    border: 1.5px solid var(--border);
+    color: inherit;
+    text-decoration: none;
+    box-shadow: var(--shadow-card);
+    transition: border-color 150ms ease;
+  }
+  .history-row:hover {
+    border-color: var(--primary-strong);
+  }
+
+  /* customer web: the assistant. Floating button, panel above it. */
+  .chat-fab {
+    position: fixed;
+    right: max(1rem, env(safe-area-inset-right));
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    z-index: 40;
+    display: grid;
+    place-items: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 9999px;
+    background: var(--band);
+    color: var(--on-band);
+    box-shadow: var(--shadow-elevated);
+    cursor: pointer;
+  }
+  .chat-panel {
+    position: fixed;
+    inset-inline: max(0.75rem, env(safe-area-inset-right));
+    bottom: calc(max(1rem, env(safe-area-inset-bottom)) + 4.25rem);
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    max-height: min(34rem, calc(100dvh - 7rem));
+    border: 1.5px solid var(--border);
+    box-shadow: var(--shadow-elevated);
+    overflow: hidden;
+  }
+  @media (min-width: 40rem) {
+    .chat-panel {
+      left: auto;
+      width: 24rem;
+    }
+  }
+  textarea.chat-input {
+    min-height: 3rem;
+    max-height: 8rem;
+  }
+  .chat-bubble {
+    max-width: 85%;
+    padding: 0.6rem 0.9rem;
+    border-radius: var(--radius-lg);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .chat-bubble[data-role="user"] {
+    margin-left: auto;
+    background: color-mix(in oklab, var(--primary) 22%, var(--card));
+  }
+  .chat-bubble[data-role="assistant"] {
+    background: var(--muted);
+  }
+
   /* The confirmation panel: the Lookup code handed over on the deep field. */
   .confirm-panel {
     border-radius: var(--radius-2xl);

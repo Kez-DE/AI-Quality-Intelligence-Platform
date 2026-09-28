@@ -7,7 +7,9 @@ import {
   NETWORK_MESSAGE,
   STATUS_LABEL,
   TIMEOUT_MESSAGE,
+  customerChat,
   getFeedbackStatus,
+  listMyFeedback,
   statusLabel,
   submitFeedback,
 } from "./api";
@@ -59,6 +61,56 @@ describe("submitFeedback", () => {
   it("returns only the Lookup code it needs", async () => {
     mockFetch(200, { data: { public_ref: "8kQ2rT7xLm4A", status: "received" } });
     await expect(submitFeedback(input)).resolves.toMatchObject({ public_ref: "8kQ2rT7xLm4A" });
+  });
+});
+
+describe("Customer account routes", () => {
+  it("sends a Customer account's token to /api/customer/feedback", async () => {
+    const spy = mockFetch(200, { data: { public_ref: "8kQ2rT7xLm4A" } });
+
+    await submitFeedback(input, "tok-123");
+
+    const [url, init] = spy.mock.calls[0];
+    expect(String(url)).toMatch(/\/api\/customer\/feedback$/);
+    expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer tok-123");
+    expect(init?.credentials).toBe("omit");
+    expect(JSON.parse(String(init?.body))).toEqual(input);
+  });
+
+  it("keeps only the four history fields, dropping any AI label", async () => {
+    mockFetch(200, {
+      data: [
+        {
+          public_ref: "A",
+          status: "received",
+          created_at: "2026-09-28T01:00:00Z",
+          text: "xe bẩn",
+          topic: "Vệ sinh",
+          sentiment: "negative",
+          severity: "P2",
+        },
+      ],
+    });
+    expect(await listMyFeedback("tok")).toEqual([
+      { public_ref: "A", status: "received", created_at: "2026-09-28T01:00:00Z", text: "xe bẩn" },
+    ]);
+  });
+
+  it("posts chat messages with the token and returns data.content", async () => {
+    const spy = mockFetch(200, { status: "success", data: { content: " Chào bạn ", provider: "x", model: "y" } });
+    const messages = [{ role: "user" as const, content: "hoàn tiền?" }];
+
+    await expect(customerChat("tok", messages)).resolves.toBe("Chào bạn");
+
+    const [url, init] = spy.mock.calls[0];
+    expect(String(url)).toMatch(/\/api\/customer\/chat$/);
+    expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer tok");
+    expect(JSON.parse(String(init?.body))).toEqual({ messages });
+  });
+
+  it("maps 401 to a log-in-again message", async () => {
+    mockFetch(401, { error: { code: "HTTP_ERROR", message: "Invalid token" } });
+    await expect(listMyFeedback("old")).rejects.toThrow("Phiên đăng nhập đã hết hạn");
   });
 });
 

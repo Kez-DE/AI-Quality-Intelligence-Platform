@@ -1,5 +1,9 @@
 import { useEffect, useRef } from "react";
 import { Toaster } from "sonner";
+import ChatWidget from "./ChatWidget";
+import { AuthProvider } from "./auth";
+import { ForgotPasswordPage, LoginPage, ResetPasswordPage, SignupPage } from "./pages/AuthPages";
+import MyFeedbackPage from "./pages/MyFeedbackPage";
 import SubmitPage from "./pages/SubmitPage";
 import StatusPage from "./pages/StatusPage";
 import { navigate, usePath } from "./router";
@@ -7,6 +11,26 @@ import { Shell } from "./ui";
 
 // /status, /status/, /status/CODE, /status/CODE/ — not /statuss or /status-faq.
 export const STATUS_ROUTE = /^\/status(?:\/([^/]*))?\/?$/;
+
+// Customer account pages (US-078). A trailing slash is allowed, nothing else.
+const PAGES = {
+  "/": SubmitPage,
+  "/dang-nhap": LoginPage,
+  "/dang-ky": SignupPage,
+  "/quen-mat-khau": ForgotPasswordPage,
+  "/dat-lai-mat-khau": ResetPasswordPage,
+  "/cua-toi": MyFeedbackPage,
+} as const;
+
+export type Route = { page: keyof typeof PAGES } | { page: "status"; code: string } | null;
+
+/** The page for a path, or null for an unknown path (redirected to `/`). */
+export function matchRoute(path: string): Route {
+  const status = STATUS_ROUTE.exec(path);
+  if (status) return { page: "status", code: decode(status[1] ?? "") };
+  const bare = path.length > 1 ? path.replace(/\/$/, "") : path;
+  return bare in PAGES ? { page: bare as keyof typeof PAGES } : null;
+}
 
 function decode(segment: string): string {
   try {
@@ -18,10 +42,10 @@ function decode(segment: string): string {
 
 export default function App() {
   const path = usePath();
-  const status = STATUS_ROUTE.exec(path);
-  const unknownPath = !status && path !== "/";
+  const route = matchRoute(path);
+  const unknownPath = route === null;
 
-  // Two pages only; any other path is the form.
+  // Any other path is the form.
   useEffect(() => {
     if (unknownPath) navigate("/", { replace: true });
   }, [unknownPath]);
@@ -40,11 +64,14 @@ export default function App() {
     heading.focus();
   }, [path]);
 
+  const Page = route && route.page !== "status" ? PAGES[route.page] : SubmitPage;
+
   return (
-    <>
-      <Shell>{status ? <StatusPage code={decode(status[1] ?? "")} /> : <SubmitPage />}</Shell>
+    <AuthProvider>
+      <Shell>{route?.page === "status" ? <StatusPage code={route.code} /> : <Page />}</Shell>
+      <ChatWidget />
       {/* Mounted once. The Staff web never mounted one, so its toasts were invisible. */}
       <Toaster position="top-center" richColors closeButton theme="system" />
-    </>
+    </AuthProvider>
   );
 }

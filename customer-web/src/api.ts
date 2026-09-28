@@ -1,12 +1,16 @@
-// Anonymous client for the two public backend routes (US-076, US-077).
+// Client for the public backend routes (US-076, US-077) and, for a logged-in
+// Customer account, the /api/customer routes (US-078).
 //
 // Copied from `publicFetch` in app/src/lib/api.ts, then narrowed for the
 // Customer web:
-// - A Customer has no account, so nothing here ever attaches Authorization.
+// - The public routes never get Authorization. Only the customerFetch calls
+//   below attach the Supabase access token, and only to /api/me and
+//   /api/customer/*. Cookies are never sent.
 // - The browser calls the backend directly. The public rate limit keys on the
 //   client IP, so a proxy in front would put every Customer in one bucket.
 // - Errors are mapped from the HTTP status to Vietnamese copy. The backend's
 //   own messages are partly English (the 429 and the honeypot 400).
+import { supabase } from "./supabase";
 
 export const API_BASE = (import.meta.env.VITE_BACKEND_API_URL ?? "http://127.0.0.1:8000").replace(
   /\/+$/,
@@ -67,6 +71,8 @@ export function messageFor(status: number, retryAfter?: string | null): string {
   if (status === 400 || status === 422) {
     return "Phản hồi chưa hợp lệ. Vui lòng kiểm tra nội dung rồi gửi lại.";
   }
+  if (status === 401) return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+  if (status === 403) return "Tài khoản này không có quyền thực hiện thao tác này.";
   if (status === 404) return "Không tìm thấy phản hồi với mã này.";
   if (status === 429) {
     const seconds = Number(retryAfter);
@@ -105,12 +111,59 @@ export async function publicFetch<T>(
   }
 }
 
-export async function submitFeedback(input: SubmitInput): Promise<{ public_ref: string }> {
-  const json = await publicFetch<{ data: { public_ref: string } }>("/api/public/feedback", {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
+async function customerFetch<T>(path: string, token: string, init: RequestInit = {}, timeoutMs?: number) {
+  // The token in React state can be expired just after a tab resumes, before
+  // TOKEN_REFRESHED lands. getSession refreshes an expired session first.
+  const fresh = await supabase?.auth.getSession().then(
+    ({ data }) => data.session?.access_token,
+    () => undefined,
+  );
+  const headers = new Headers(init.headers);
+  headers.set("Authorization", `Bearer ${fresh ?? token}`);
+  return publicFetch<T>(path, { ...init, headers }, timeoutMs);
+}
+
+/** A Customer account's token sends to /api/customer/feedback (saved to the
+ *  account); no token sends to the public route, exactly as before. */
+export async function submitFeedback(input: SubmitInput, token?: string): Promise<{ public_ref: string }> {
+  const init = { method: "POST", body: JSON.stringify(input) };
+  const json = token
+    ? await customerFetch<{ data: { public_ref: string } }>("/api/customer/feedback", token, init)
+    : await publicFetch<{ data: { public_ref: string } }>("/api/public/feedback", init);
   return json.data;
+}
+
+export type MyFeedback = FeedbackStatus & { text: string };
+
+/** Own Feedback, newest first. Only these four fields are ever read. */
+export async function listMyFeedback(token: string): Promise<MyFeedback[]> {
+  const json = await customerFetch<{ data: MyFeedback[] }>("/api/customer/feedback", token);
+  return (json.data ?? []).map(({ public_ref, status, created_at, text }) => ({
+    public_ref,
+    status,
+    created_at,
+    text,
+  }));
+}
+
+export type Me = { id: string; email: string | null; role: string };
+
+export async function getMe(token: string): Promise<Me> {
+  const json = await customerFetch<{ data: Me }>("/api/me", token);
+  return json.data;
+}
+
+export type ChatMessage = { role: "user" | "assistant"; content: string };
+
+/** The Customer assistant. Mirrors /api/agent/chat: `data.content` is the reply. */
+export async function customerChat(token: string, messages: ChatMessage[]): Promise<string> {
+  const json = await customerFetch<{ data?: { content?: string } }>(
+    "/api/customer/chat",
+    token,
+    { method: "POST", body: JSON.stringify({ messages }) },
+    60_000,
+  );
+  return json.data?.content?.trim() ?? "";
 }
 
 export async function getFeedbackStatus(code: string): Promise<FeedbackStatus> {

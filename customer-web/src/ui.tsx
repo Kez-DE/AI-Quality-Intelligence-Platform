@@ -1,7 +1,9 @@
-// Shared pieces for the two Customer web pages: the page frame, the lookup box,
+// Shared pieces for the Customer web pages: the page frame, the lookup box,
 // the grouped Lookup code, and a small authored icon set (one stroke weight).
 import { useState, type ReactNode } from "react";
+import { STAFF_MESSAGE, signOut, useAuth } from "./auth";
 import { Link, navigate, statusPath } from "./router";
+import { supabase } from "./supabase";
 
 const ICONS = {
   check: <path d="M20 6 9 17l-5-5" />,
@@ -53,6 +55,20 @@ const ICONS = {
     <>
       <path d="M19 12H5" />
       <path d="m11 6-6 6 6 6" />
+    </>
+  ),
+  chat: <path d="M20 14.5a2 2 0 0 1-2 2H8.5L4 20V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2Z" />,
+  close: <path d="M6 6l12 12M18 6 6 18" />,
+  send: (
+    <>
+      <path d="M21 3 10 14" />
+      <path d="m21 3-7 18-4-7-7-4Z" />
+    </>
+  ),
+  logout: (
+    <>
+      <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" />
+      <path d="M10 17l-5-5 5-5M5 12h10" />
     </>
   ),
 } as const;
@@ -153,18 +169,70 @@ export function LookupForm({ initial = "", id = "lookup-code" }: { initial?: str
   );
 }
 
+function AccountNav() {
+  const auth = useAuth();
+  if (!supabase) return <span className="text-sm font-medium text-on-band-muted">Phản hồi khách hàng</span>;
+  if (auth.kind === "loading") return null;
+  if (auth.kind === "anon")
+    return (
+      <Link href="/dang-nhap" className="btn btn-on-band">
+        Đăng nhập
+      </Link>
+    );
+  return (
+    <button
+      type="button"
+      className="btn btn-on-band"
+      onClick={() => void signOut().then(() => navigate("/"))}
+    >
+      <Icon name="logout" className="size-4" />
+      Đăng xuất
+    </button>
+  );
+}
+
 export function Shell({ children }: { children: ReactNode }) {
+  const auth = useAuth();
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="band">
-        <div className="mx-auto flex h-14 w-full max-w-2xl items-center justify-between gap-4 px-4">
+        <div className="mx-auto flex h-16 w-full max-w-2xl items-center justify-between gap-4 px-4">
           <Link href="/" className="wordmark" aria-label="AI-Quality, về trang gửi phản hồi">
             AI-<span>Quality</span>
           </Link>
-          <span className="text-sm font-medium text-on-band-muted">Phản hồi khách hàng</span>
+          <AccountNav />
         </div>
+        {"email" in auth && (
+          <nav aria-label="Tài khoản" className="mx-auto flex w-full max-w-2xl items-center justify-between gap-3 px-4 pb-3 text-sm">
+            <span className="min-w-0 truncate text-on-band-muted" title={auth.email}>
+              {auth.email}
+            </span>
+            <Link href="/cua-toi" className="shrink-0 font-semibold text-on-band underline">
+              Phản hồi của tôi
+            </Link>
+          </nav>
+        )}
       </header>
-      <main className="mx-auto w-full max-w-2xl flex-1 px-4 pb-16 pt-8 md:pt-12">{children}</main>
+      <main className="mx-auto w-full max-w-2xl flex-1 px-4 pb-16 pt-8 md:pt-12">
+        {/* A staff or pending login: no customer API calls anywhere (US-078). */}
+        {auth.kind === "staff" && (
+          <p role="status" className="notice mb-8">
+            <strong>{STAFF_MESSAGE}.</strong> Trang này dành cho khách hàng; bạn vẫn có thể gửi phản hồi
+            không kèm tài khoản.
+          </p>
+        )}
+        {/* /api/me failed: until a retry works, the form posts without the account. */}
+        {auth.kind === "error" && (
+          <p role="alert" className="notice mb-8">
+            <strong>Không kiểm tra được tài khoản.</strong> Phản hồi gửi lúc này sẽ không được lưu vào tài
+            khoản.{" "}
+            <button type="button" className="back-link" onClick={auth.retry}>
+              Thử lại
+            </button>
+          </p>
+        )}
+        {children}
+      </main>
       <footer className="border-t border-border">
         <p className="mx-auto max-w-2xl px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 text-sm text-muted-foreground">
           AI-Quality · Gửi phản hồi không cần tài khoản

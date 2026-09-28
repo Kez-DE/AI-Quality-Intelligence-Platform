@@ -8,8 +8,9 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "DENY" always;
     # The app renders no HTML from data; this is the backstop. connect-src is the
-    # backend baked into the bundle. 'unsafe-inline' styles: sonner injects a <style>.
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; connect-src 'self' ${BACKEND_ORIGIN}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
+    # backend and the Supabase Auth URL baked into the bundle. 'unsafe-inline'
+    # styles: sonner injects a <style>.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; connect-src 'self' ${BACKEND_ORIGIN} ${SUPABASE_ORIGIN}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
     add_header Strict-Transport-Security "max-age=31536000" always;
     server_tokens off;
 
