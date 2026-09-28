@@ -1506,6 +1506,9 @@ def run_public_chat(messages: list[ChatMessageReq], execute_fn, log_team: str = 
         "",
     )
     normalized = [{"role": "system", "content": PUBLIC_SYSTEM_PROMPT}]
+    # Public KB offers carry end dates; the model has no clock of its own.
+    today_vn = datetime.now(timezone(timedelta(hours=7))).strftime("%d/%m/%Y")
+    normalized.append({"role": "system", "content": f"Hôm nay là ngày {today_vn}."})
     if last_user_q:
         try:
             from agent.public_kb import search_public_knowledge, format_public_for_prompt

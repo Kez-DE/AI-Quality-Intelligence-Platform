@@ -425,3 +425,15 @@ def test_public_prompt_introduces_the_ai_quality_assistant_in_plain_text():
 
     assert "Xin chào, tôi là trợ lý AI-Quality" in PUBLIC_SYSTEM_PROMPT
     assert "KHÔNG dùng markdown" in PUBLIC_SYSTEM_PROMPT
+
+
+@pytest.mark.asyncio
+async def test_chat_tells_the_model_today_so_expired_offers_stay_out(db, as_user, fake_agent):
+    """The public KB lists offers with end dates; the model has no clock of its own."""
+    from datetime import datetime, timedelta, timezone
+
+    async with client() as c:
+        await c.post("/api/customer/chat", json={"messages": [{"role": "user", "content": "có ưu đãi gì"}]})
+
+    today = datetime.now(timezone(timedelta(hours=7))).strftime("%d/%m/%Y")
+    assert {"role": "system", "content": f"Hôm nay là ngày {today}."} in fake_agent["messages"]
