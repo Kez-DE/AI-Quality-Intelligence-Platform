@@ -402,3 +402,26 @@ async def test_customer_chat_text_never_reaches_the_agent_log(db, as_user, monke
     assert logged, "chat_completion should have run and logged its call"
     assert all("prompt_preview" not in event for event in logged)
     assert "Cầu Giấy" not in str(logged)
+
+
+@pytest.mark.asyncio
+async def test_chat_reply_is_plain_text(db, as_user, monkeypatch):
+    """The widgets render text, never markdown, so '**' or '#' would show as-is."""
+    reply = "## Hướng dẫn\n1. **Kiểm tra** lịch sử chuyến đi.\n* Liên hệ __tài xế__ qua ứng dụng."
+    monkeypatch.setattr(main, "run_chat_agent", lambda *_a, **_k: {"content": reply, "provider": "x", "model": "x"})
+    monkeypatch.setattr("agent.public_kb.search_public_knowledge", lambda *_a, **_k: [])
+    monkeypatch.setattr("agent.public_kb.format_public_for_prompt", lambda *_a, **_k: "")
+
+    async with client() as c:
+        res = await c.post("/api/customer/chat", json={"messages": [{"role": "user", "content": "hi"}]})
+
+    assert res.json()["data"]["content"] == (
+        "Hướng dẫn\n1. Kiểm tra lịch sử chuyến đi.\n- Liên hệ tài xế qua ứng dụng."
+    )
+
+
+def test_public_prompt_introduces_the_ai_quality_assistant_in_plain_text():
+    from services.agent_context import PUBLIC_SYSTEM_PROMPT
+
+    assert "Xin chào, tôi là trợ lý AI-Quality" in PUBLIC_SYSTEM_PROMPT
+    assert "KHÔNG dùng markdown" in PUBLIC_SYSTEM_PROMPT

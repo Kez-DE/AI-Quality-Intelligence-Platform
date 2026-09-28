@@ -15,7 +15,8 @@ type Bubble = ChatMessage & { local?: true };
 
 const GREETING: Bubble = {
   role: "assistant",
-  content: "Xin chào! Mình có thể giải đáp chính sách, cách gửi phản hồi, hoặc ghi nhận phản hồi giúp bạn.",
+  content:
+    "Xin chào, tôi là trợ lý AI-Quality. Tôi có thể giới thiệu dịch vụ, giải đáp thắc mắc hoặc ghi nhận phản hồi giúp bạn. Bạn cần hỗ trợ gì?",
   local: true,
 };
 // Same window the Staff web widget sends.

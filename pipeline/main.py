@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 import logging
 import os
+import re
 import time
 from datetime import datetime, timezone, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -1477,6 +1478,18 @@ def _append_safe_client_history(normalized: list[dict], messages: list[ChatMessa
         normalized.append({"role": role, "content": safe_content[:8000]})
 
 
+_MD_EMPHASIS = re.compile(r"\*\*|__")
+_MD_HEADING = re.compile(r"^[ \t]{0,3}#{1,6}[ \t]+", re.M)
+_MD_STAR_BULLET = re.compile(r"^([ \t]*)\*[ \t]+", re.M)
+
+
+def _plain_text(text: str) -> str:
+    """Customer-facing chat renders plain text, so markdown marks would show as-is.
+    The prompt asks for plain text; this catches a model that ignores it."""
+    text = _MD_HEADING.sub("", _MD_EMPHASIS.sub("", text))
+    return _MD_STAR_BULLET.sub(r"\1- ", text)
+
+
 def run_public_chat(messages: list[ChatMessageReq], execute_fn, log_team: str = "public") -> dict:
     """TẦNG CÔNG KHAI: Public KB + PUBLIC_SYSTEM_PROMPT + chỉ PUBLIC_TOOLS (submit_feedback).
 
@@ -1517,7 +1530,7 @@ def run_public_chat(messages: list[ChatMessageReq], execute_fn, log_team: str = 
         # Customer-facing tier: provider error text stays in ai-log, never in the response.
         raise HTTPException(status_code=502, detail="Trợ lý tạm thời không phản hồi, vui lòng thử lại") from exc
     if isinstance(result.get("content"), str):
-        result["content"] = mask_pii(result["content"])
+        result["content"] = _plain_text(mask_pii(result["content"]))
     _log_chat_event(log_team, "success", int((time.time() - _t0) * 1000),
                     provider=result.get("provider", ""), model=result.get("model", ""))
     return {"status": "success", "data": result}
