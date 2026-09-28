@@ -411,8 +411,8 @@ PostgREST và realtime cho tới khi đổi mật khẩu và refresh session.
 | `alerts` | Chỉ ops staff (từ migration `20260928000000`) | Chỉ qua backend (service role) |
 | `tasks` | Ops staff | INSERT chỉ service role; UPDATE ops; DELETE admin |
 | `department_reports` | Admin và manager | Chỉ service role |
-| `task_completion_reports` | Authenticated (gate phòng ở API) | Service role; cho phép authenticated insert dự phòng |
-| `task_events` | Authenticated (gate phòng ở API) | Service role; cho phép authenticated insert dự phòng |
+| `task_completion_reports` | Chỉ ops staff | Chỉ service role |
+| `task_events` | Chỉ ops staff | Chỉ service role |
 | `correction_logs` | Ops staff | Ops staff, đúng danh tính người sửa |
 | `agent_run_logs` | Admin và manager | Chỉ service role |
 | `audit_logs` | Chỉ admin | Chỉ service role |
