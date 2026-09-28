@@ -443,12 +443,13 @@ async def test_chat_tells_the_model_today_so_expired_offers_stay_out(db, as_user
 @pytest.mark.parametrize(
     "history,expected",
     [
-        ([("user", "đi sân bay")], "Chào bạn, tôi là trợ lý AI-Quality.\n\nBạn chọn Green Airport."),
+        ([("user", "đi sân bay")], "Bạn chọn Green Airport."),
         ([("user", "hi"), ("assistant", "Xin chào"), ("user", "đi sân bay")], "Bạn chọn Green Airport."),
     ],
 )
-async def test_chat_greets_only_on_the_first_reply(db, as_user, monkeypatch, history, expected):
-    """The model re-introduced itself on every turn; later turns drop that line."""
+async def test_chat_never_repeats_the_widget_greeting(db, as_user, monkeypatch, history, expected):
+    """Both chat widgets open with a local greeting bubble the server never sees,
+    so a self-introduction in any reply is the second one the customer reads."""
     reply = "Chào bạn, tôi là trợ lý AI-Quality.\n\nBạn chọn Green Airport."
     monkeypatch.setattr(main, "run_chat_agent", lambda *_a, **_k: {"content": reply, "provider": "x", "model": "x"})
     monkeypatch.setattr("agent.public_kb.search_public_knowledge", lambda *_a, **_k: [])

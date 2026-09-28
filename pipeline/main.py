@@ -1490,7 +1490,8 @@ def _plain_text(text: str) -> str:
     return _MD_STAR_BULLET.sub(r"\1- ", text)
 
 
-# The model re-introduces itself on every turn despite the prompt.
+# Both chat widgets open with a local greeting bubble the server never sees, so a
+# self-introduction in a reply is always the second one; the model adds it anyway.
 _REPEAT_GREETING = re.compile(r"^\s*(?:xin\s+)?chào(?:\s+bạn)?[,!.]?\s*tôi là trợ lý AI-Quality[.!]?\s*", re.I)
 
 
@@ -1538,8 +1539,7 @@ def run_public_chat(messages: list[ChatMessageReq], execute_fn, log_team: str = 
         raise HTTPException(status_code=502, detail="Trợ lý tạm thời không phản hồi, vui lòng thử lại") from exc
     if isinstance(result.get("content"), str):
         content = _plain_text(mask_pii(result["content"]))
-        if any(m.role == "assistant" for m in messages):
-            content = _REPEAT_GREETING.sub("", content, count=1) or content
+        content = _REPEAT_GREETING.sub("", content, count=1) or content
         result["content"] = content
     _log_chat_event(log_team, "success", int((time.time() - _t0) * 1000),
                     provider=result.get("provider", ""), model=result.get("model", ""))
