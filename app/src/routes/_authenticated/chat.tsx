@@ -235,7 +235,8 @@ function ChatPage() {
 
   // Only Staff roles pass the layout gate; while /api/me loads, show the
   // least-privileged copy (the backend enforces the real scope).
-  const role: StaffRole = me?.role && me.role !== "pending" ? me.role : "staff";
+  const role: StaffRole =
+    me?.role && me.role !== "pending" && me.role !== "guest" ? me.role : "staff";
   const chatConfig = CHAT_ROLE_CONFIG[role];
   const scopeText =
     role === "admin"

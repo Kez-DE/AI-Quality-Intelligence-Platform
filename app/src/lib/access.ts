@@ -1,4 +1,4 @@
-// Staff web access gate (US-077). Pure so the decision is unit-tested; the
+// Staff web access gate (US-077, US-078). Pure so the decision is unit-tested; the
 // `_authenticated` layout feeds it the profile role and the auth user metadata.
 import type { Role, StaffRole } from "@/lib/api";
 
@@ -12,15 +12,21 @@ const BLOCKED_PREFIXES: Record<StaffRole, readonly string[]> = {
   staff: ["/admin", "/insights", "/reports", "/completion-reports"],
 };
 
-/** Fail closed: anything that is not a Staff role (pending, a leftover "guest",
- *  null after a failed profile read, a typo) is treated as a Pending account. */
+export function isStaffRole(value: unknown): value is StaffRole {
+  return STAFF_ROLES.includes(value as StaffRole);
+}
+
+/** Staff roles and `guest` (Customer account, US-078) pass through. Fail closed:
+ *  anything else (pending, null after a failed profile read, a typo) is Pending. */
 export function toRole(value: unknown): Role {
-  return STAFF_ROLES.includes(value as StaffRole) ? (value as StaffRole) : "pending";
+  if (value === "guest") return "guest";
+  return isStaffRole(value) ? value : "pending";
 }
 
 export type Gate =
   | "change-password" // admin-created account still on its temporary password
   | "pending" // no Staff role yet: only the waiting screen
+  | "customer" // Customer account (role guest): pointed to the Customer web
   | "to-dashboard" // Staff role, but not for this path
   | "allow";
 
@@ -33,6 +39,7 @@ export function staffWebGate(input: {
   if (input.mustChangePassword) return "change-password";
   const role = toRole(input.role);
   if (role === "pending") return "pending";
+  if (role === "guest") return "customer";
   if (BLOCKED_PREFIXES[role].some((p) => input.pathname.startsWith(p))) return "to-dashboard";
   return "allow";
 }

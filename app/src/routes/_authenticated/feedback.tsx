@@ -443,8 +443,10 @@ function FeedbackRow({
         )}
       </div>
       <div className="col-span-12 sm:col-span-5 flex flex-wrap justify-start sm:justify-end gap-1.5 items-center">
-        {/* source='public' = sent by a Customer through the Customer web (no account). */}
-        {f.source === "public" && <Pill tone="green">Khách hàng</Pill>}
+        {/* Sent through the Customer web: 'public' = no account, 'customer' = Customer account. */}
+        {(f.source === "public" || f.source === "customer") && (
+          <Pill tone="green">Khách hàng</Pill>
+        )}
         {f.topic && <Pill icon={Tag}>{topicLabel(f.topic)}</Pill>}
         {f.sentiment && (
           <Pill tone={f.sentiment === "negative" ? "coral" : f.sentiment === "positive" ? "green" : "mint"}>

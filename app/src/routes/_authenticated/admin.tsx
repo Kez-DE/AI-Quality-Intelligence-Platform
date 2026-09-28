@@ -265,6 +265,9 @@ function AdminPage() {
         {users.map((u) => {
           const isSelf = u.id === me.data?.id;
           const busy = pendingId === u.id;
+          // Customer account (US-078): self sign-up, read-only here. A Staff account is
+          // created with the form, never promoted from a Customer account (decision 0018).
+          const isCustomer = u.role === "guest";
           return (
             <div
               key={u.id}
@@ -282,39 +285,51 @@ function AdminPage() {
                 <div className="text-xs font-mono text-muted-foreground truncate">{u.email}</div>
               </div>
               <div className="col-span-2">
-                <select
-                  value={u.role}
-                  disabled={busy || isSelf}
-                  onChange={(e) => {
-                    setPendingId(u.id);
-                    roleMutation.mutate({ id: u.id, role: e.target.value as Role });
-                  }}
-                  className="h-8 px-2 rounded-lg border border-border bg-card text-xs font-medium focus:outline-none focus:ring-2 focus:ring-xanh-green/40 disabled:opacity-60 w-full"
-                >
-                  {ROLES.map((r) => (
-                    <option key={r} value={r}>
-                      {ROLE_LABELS[r]}
-                    </option>
-                  ))}
-                </select>
+                {isCustomer ? (
+                  <span
+                    className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${getRoleBadgeColor(u.role)}`}
+                  >
+                    {ROLE_LABELS.guest}
+                  </span>
+                ) : (
+                  <select
+                    value={u.role}
+                    disabled={busy || isSelf}
+                    onChange={(e) => {
+                      setPendingId(u.id);
+                      roleMutation.mutate({ id: u.id, role: e.target.value as Role });
+                    }}
+                    className="h-8 px-2 rounded-lg border border-border bg-card text-xs font-medium focus:outline-none focus:ring-2 focus:ring-xanh-green/40 disabled:opacity-60 w-full"
+                  >
+                    {ROLES.map((r) => (
+                      <option key={r} value={r}>
+                        {ROLE_LABELS[r]}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div className="col-span-2">
-                <select
-                  value={u.department ?? ""}
-                  disabled={busy}
-                  onChange={(e) => {
-                    setPendingId(u.id);
-                    departmentMutation.mutate({ id: u.id, department: e.target.value || null });
-                  }}
-                  className="h-8 px-2 rounded-lg border border-border bg-card text-xs font-medium focus:outline-none focus:ring-2 focus:ring-xanh-green/40 disabled:opacity-60 w-full"
-                >
-                  <option value="">Chưa gán</option>
-                  {DEPARTMENTS.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
+                {isCustomer ? (
+                  <span className="text-xs text-muted-foreground">—</span>
+                ) : (
+                  <select
+                    value={u.department ?? ""}
+                    disabled={busy}
+                    onChange={(e) => {
+                      setPendingId(u.id);
+                      departmentMutation.mutate({ id: u.id, department: e.target.value || null });
+                    }}
+                    className="h-8 px-2 rounded-lg border border-border bg-card text-xs font-medium focus:outline-none focus:ring-2 focus:ring-xanh-green/40 disabled:opacity-60 w-full"
+                  >
+                    <option value="">Chưa gán</option>
+                    {DEPARTMENTS.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div className="col-span-2 text-xs text-muted-foreground">
                 {new Date(u.created_at).toLocaleDateString("vi-VN")}

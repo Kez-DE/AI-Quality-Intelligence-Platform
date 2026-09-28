@@ -1,7 +1,11 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import AppShell from "@/components/AppShell";
-import { ChangePasswordScreen, PendingAccountScreen } from "@/components/AccountGate";
+import {
+  ChangePasswordScreen,
+  CustomerAccountScreen,
+  PendingAccountScreen,
+} from "@/components/AccountGate";
 import { staffWebGate, toRole } from "@/lib/access";
 
 export const Route = createFileRoute("/_authenticated")({
@@ -57,6 +61,7 @@ function AuthenticatedLayout() {
   const { gate, user } = Route.useRouteContext();
   if (gate === "change-password") return <ChangePasswordScreen />;
   if (gate === "pending") return <PendingAccountScreen email={user.email} />;
+  if (gate === "customer") return <CustomerAccountScreen email={user.email} />;
   return (
     <AppShell>
       <Outlet />

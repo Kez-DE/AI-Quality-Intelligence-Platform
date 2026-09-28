@@ -1,12 +1,21 @@
 // Full-page screens the `_authenticated` layout shows instead of AppShell when
-// `staffWebGate` does not allow the cockpit (US-077). Neither renders nav or
-// fetches backend data.
+// `staffWebGate` does not allow the cockpit (US-077, US-078). None renders nav
+// or fetches backend data on mount.
 import { useState } from "react";
 import { useRouter } from "@tanstack/react-router";
-import { AlertCircle, Car, Clock, KeyRound, Loader2, LogOut } from "lucide-react";
+import {
+  AlertCircle,
+  Car,
+  Clock,
+  ExternalLink,
+  KeyRound,
+  Loader2,
+  LogOut,
+  UserRound,
+} from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, CUSTOMER_WEB_URL } from "@/lib/api";
 import { isStrongPassword } from "@/lib/password";
 import { PasswordStrengthHint } from "@/components/PasswordStrengthHint";
 import { Input } from "@/components/ui/input";
@@ -177,6 +186,46 @@ export function PendingAccountScreen({ email }: { email?: string | null }) {
         type="button"
         onClick={signOut}
         className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium hover:bg-muted"
+      >
+        <LogOut className="h-4 w-4" />
+        Đăng xuất
+      </button>
+    </GateFrame>
+  );
+}
+
+/** Customer account (role guest, US-078): the Staff web is not for it. */
+export function CustomerAccountScreen({ email }: { email?: string | null }) {
+  const signOut = useSignOut();
+  return (
+    <GateFrame>
+      <UserRound className="h-8 w-8 text-xanh-green" />
+      <h1 className="mt-3 font-display text-2xl font-bold tracking-tight">
+        Đây là tài khoản khách hàng
+      </h1>
+      <p className="mt-1.5 text-sm text-muted-foreground">
+        {email ? (
+          <>
+            Tài khoản <span className="font-mono text-foreground">{email}</span> là tài khoản khách
+            hàng.
+          </>
+        ) : (
+          "Tài khoản của bạn là tài khoản khách hàng."
+        )}{" "}
+        Hãy gửi và theo dõi phản hồi trên trang dành cho khách hàng.
+      </p>
+      <a
+        href={CUSTOMER_WEB_URL}
+        className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-[var(--shadow-green)]"
+        style={{ background: "var(--gradient-green)" }}
+      >
+        <ExternalLink className="h-4 w-4" />
+        Mở trang khách hàng
+      </a>
+      <button
+        type="button"
+        onClick={signOut}
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium hover:bg-muted"
       >
         <LogOut className="h-4 w-4" />
         Đăng xuất

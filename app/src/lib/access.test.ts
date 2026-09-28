@@ -11,8 +11,12 @@ describe("toRole", () => {
     expect(toRole("staff")).toBe("staff");
   });
 
+  it("keeps guest (Customer account)", () => {
+    expect(toRole("guest")).toBe("guest");
+  });
+
   it("fails closed to pending for anything else", () => {
-    for (const v of ["pending", "guest", "", "Admin", null, undefined, 42]) {
+    for (const v of ["pending", "", "Admin", "Guest", null, undefined, 42]) {
       expect(toRole(v)).toBe("pending");
     }
   });
@@ -22,6 +26,7 @@ describe("staffWebGate", () => {
   it("forces the password change first, even for admin or pending", () => {
     expect(gate("admin", "/dashboard", true)).toBe("change-password");
     expect(gate("pending", "/dashboard", true)).toBe("change-password");
+    expect(gate("guest", "/dashboard", true)).toBe("change-password");
     expect(gate("staff", "/admin", true)).toBe("change-password");
   });
 
@@ -31,9 +36,14 @@ describe("staffWebGate", () => {
     }
   });
 
-  it("treats a leftover guest or a missing role as pending", () => {
-    expect(gate("guest", "/dashboard")).toBe("pending");
+  it("treats a missing role as pending", () => {
     expect(gate(null, "/dashboard")).toBe("pending");
+  });
+
+  it("sends a Customer account (guest) to the customer screen on every path", () => {
+    for (const p of ["/dashboard", "/feedback", "/chat", "/admin", "/support"]) {
+      expect(gate("guest", p)).toBe("customer");
+    }
   });
 
   it("lets admin open every route", () => {

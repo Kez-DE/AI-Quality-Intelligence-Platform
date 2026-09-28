@@ -13,8 +13,9 @@ export const CUSTOMER_WEB_URL = import.meta.env.VITE_CUSTOMER_WEB_URL || "http:/
 
 /** Roles with access to the Staff web. */
 export type StaffRole = "admin" | "manager" | "staff";
-/** `pending` = Pending account: logged in, no access until an admin grants a StaffRole. */
-export type Role = StaffRole | "pending";
+/** `pending` = Pending account: logged in, no access until an admin grants a StaffRole.
+ *  `guest` = Customer account (US-078): uses the Customer web, never the Staff web. */
+export type Role = StaffRole | "pending" | "guest";
 
 export type Department =
   | "IT"
@@ -115,4 +116,5 @@ export const ROLE_LABELS: Record<Role, string> = {
   manager: "Quản lý",
   staff: "Nhân viên",
   pending: "Chờ cấp quyền",
+  guest: "Khách hàng",
 };
