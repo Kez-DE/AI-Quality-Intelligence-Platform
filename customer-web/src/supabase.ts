@@ -44,6 +44,8 @@ export function authErrorText(err: unknown): string {
     case "user_already_exists":
     case "email_exists":
       return "Email này đã có tài khoản. Hãy đăng nhập.";
+    case "email_address_invalid":
+      return "Không gửi được thư tới email này. Kiểm tra lại địa chỉ email.";
     case "weak_password":
       return "Mật khẩu chưa đủ mạnh.";
     case "same_password":
