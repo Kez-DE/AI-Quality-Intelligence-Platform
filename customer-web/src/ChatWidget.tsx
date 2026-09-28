@@ -39,7 +39,11 @@ export default function ChatWidget() {
   useEffect(() => {
     if (open) (inputRef.current ?? titleRef.current)?.focus();
   }, [open]);
-  useEffect(() => endRef.current?.scrollIntoView?.({ block: "end" }), [msgs, busy]);
+  // Block body on purpose: Chrome's scrollIntoView returns a Promise, which an
+  // arrow expression would hand to React as the effect's cleanup.
+  useEffect(() => {
+    endRef.current?.scrollIntoView?.({ block: "end" });
+  }, [msgs, busy]);
 
   if (!supabase) return null;
 

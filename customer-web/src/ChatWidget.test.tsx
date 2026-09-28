@@ -63,6 +63,24 @@ describe("ChatWidget", () => {
     expect(screen.queryByText("Hoàn tiền thế nào?")).toBeNull();
   });
 
+  it("survives a scrollIntoView that returns a Promise (Chrome 153)", async () => {
+    // A Promise returned from an effect is taken as its cleanup; React then
+    // throws "destroy is not a function" on the next run and blanks the page.
+    const proto = Element.prototype as unknown as { scrollIntoView?: () => Promise<void> };
+    const original = proto.scrollIntoView;
+    proto.scrollIntoView = () => Promise.resolve();
+    try {
+      stubChat("Trả lời một.", "Trả lời hai.");
+      renderAs(customer());
+      openPanel();
+      await ask("Câu một");
+      await ask("Câu hai");
+      expect(screen.getByText("Trả lời hai.")).toBeTruthy();
+    } finally {
+      proto.scrollIntoView = original;
+    }
+  });
+
   it("shows an error as a bubble but never sends it, or the greeting, to the model", async () => {
     const spy = stubChat(502, "Có, bạn gửi được qua đây.");
     renderAs(customer());
