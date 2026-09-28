@@ -46,6 +46,9 @@ export function authErrorText(err: unknown): string {
       return "Email này đã có tài khoản. Hãy đăng nhập.";
     case "email_address_invalid":
       return "Không gửi được thư tới email này. Kiểm tra lại địa chỉ email.";
+    // Built-in Supabase SMTP mails only the project's own team; retrying never helps.
+    case "email_address_not_authorized":
+      return "Hệ thống chưa gửi được thư tới email này. Vui lòng liên hệ hỗ trợ.";
     case "weak_password":
       return "Mật khẩu chưa đủ mạnh.";
     case "same_password":
