@@ -159,6 +159,8 @@ Với Tài khoản Gia đình, khi thêm thành viên dưới 18 tuổi, chủ t
 
 ## Đặt xe cho bố mẹ, người già hoặc người thân
 
+Dịch vụ chỉ có ở khu vực Green SM đang hoạt động: nhập điểm đón của người thân để ứng dụng cho biết có xe hay không.
+
 Bạn có thể đặt xe hộ người thân bằng tài khoản Green SM của mình:
 - Chọn dịch vụ di chuyển, nhập điểm đón và điểm đến.
 - Bấm biểu tượng "Đặt hộ" ở góc dưới bên trái bản đồ, điền tên và số điện thoại người đi xe.

@@ -44,6 +44,8 @@ Nếu cảm thấy chuyến xe không an toàn, hãy giữ bình tĩnh và liên
 
 ## Đặt xe cho bố mẹ hoặc người thân
 
+Dịch vụ chỉ có ở khu vực Green SM đang hoạt động: nhập điểm đón của người thân để ứng dụng cho biết có xe hay không.
+
 Bạn có thể dùng tài khoản của mình để đặt xe cho người thân:
 - Chọn dịch vụ, nhập điểm đón và điểm đến.
 - Bấm biểu tượng Đặt hộ ở góc dưới bên trái bản đồ, điền tên và số điện thoại người đi xe.
