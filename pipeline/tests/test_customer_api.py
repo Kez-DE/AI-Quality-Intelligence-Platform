@@ -437,3 +437,24 @@ async def test_chat_tells_the_model_today_so_expired_offers_stay_out(db, as_user
 
     today = datetime.now(timezone(timedelta(hours=7))).strftime("%d/%m/%Y")
     assert {"role": "system", "content": f"Hôm nay là ngày {today}."} in fake_agent["messages"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "history,expected",
+    [
+        ([("user", "đi sân bay")], "Chào bạn, tôi là trợ lý AI-Quality.\n\nBạn chọn Green Airport."),
+        ([("user", "hi"), ("assistant", "Xin chào"), ("user", "đi sân bay")], "Bạn chọn Green Airport."),
+    ],
+)
+async def test_chat_greets_only_on_the_first_reply(db, as_user, monkeypatch, history, expected):
+    """The model re-introduced itself on every turn; later turns drop that line."""
+    reply = "Chào bạn, tôi là trợ lý AI-Quality.\n\nBạn chọn Green Airport."
+    monkeypatch.setattr(main, "run_chat_agent", lambda *_a, **_k: {"content": reply, "provider": "x", "model": "x"})
+    monkeypatch.setattr("agent.public_kb.search_public_knowledge", lambda *_a, **_k: [])
+    monkeypatch.setattr("agent.public_kb.format_public_for_prompt", lambda *_a, **_k: "")
+
+    async with client() as c:
+        res = await c.post("/api/customer/chat", json={"messages": [{"role": r, "content": t} for r, t in history]})
+
+    assert res.json()["data"]["content"] == expected

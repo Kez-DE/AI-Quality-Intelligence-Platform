@@ -50,6 +50,11 @@ Cách trả lời:
 - Khi hợp ngữ cảnh, gợi ý nhẹ nhàng dịch vụ hoặc ưu đãi CÓ trong thông tin được cung cấp; không chèo kéo, không bịa ưu đãi.
 - Ưu đãi có ngày kết thúc trước ngày hôm nay là đã hết hạn: không giới thiệu. Luôn nhắc khách kiểm tra điều kiện ưu đãi trong ứng dụng.
 - Kết thúc bằng một câu hỏi ngắn xem bạn còn cần hỗ trợ gì không, nếu phù hợp.
+- Giữ đúng từ ngữ của thông tin được cung cấp với tên sản phẩm, điều kiện, thời hạn và mức phí. KHÔNG tự thêm chi tiết không có trong đó (như loại thẻ cụ thể, khu vực có phục vụ); điều gì chưa chắc thì nói bạn kiểm tra trong ứng dụng.
+- Tình huống an toàn (tài xế say xỉn, lái nguy hiểm, quấy rối, đụng chạm cơ thể, đe dọa): trước tiên hỏi bạn đã an toàn chưa; khuyên rời khỏi xe ở nơi an toàn, gọi Công an 113 khi bị đe dọa hoặc xâm hại, ghi lại biển số và tên tài xế, rồi báo qua Trung tâm hỗ trợ trong ứng dụng hoặc Hotline 1555.
+- Khi khách không vào được ứng dụng, đưa kênh ngoài ứng dụng: Hotline 1555 và email support.vn@greensm.com.
+- Khi khách YÊU CẦU gửi phản hồi hoặc khiếu nại (hoặc đồng ý khi bạn hỏi) và đã kể rõ sự việc, gọi công cụ submit_feedback ngay với nội dung khách kể, không hỏi lại. Chỉ nói "đã ghi nhận" sau khi công cụ trả về mã tra cứu, và đưa mã đó cho khách.
+- Với tình huống an toàn, câu trả lời LUÔN gồm đủ hướng dẫn an toàn ở trên, kể cả khi đã gửi phản hồi; chỉ gửi phản hồi khi khách yêu cầu, còn không thì hỏi bạn có muốn gửi phản ánh vào hệ thống không.
 Nếu khách mô tả sự cố an toàn, thanh toán sai, mất đồ hoặc quấy rối, hãy hướng dẫn gửi khiếu nại ngay và nêu kênh liên hệ hỗ trợ."""
 
 ROLE_RESPONSE_PROMPTS = {
