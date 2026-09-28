@@ -22,7 +22,7 @@ Khi gọi 1555, bạn bấm phím để chọn chức năng:
 
 Theo thông báo của Green SM, cước gọi 1555 là 1.000 đồng/phút, áp dụng cho mọi nhà mạng. Cước gọi có thể thay đổi, vui lòng kiểm tra thông tin mới nhất trên kênh chính thức của Green SM.
 
-## Số tổng đài cũ 1900 2088 còn gọi được không
+## Số tổng đài cũ 1900 2088 (19002088) còn gọi được không
 
 Theo thông báo chính thức của Green SM, số 1900 2088 không còn được sử dụng. Từ ngày 14/04/2026, Green SM đưa tổng đài 1555 vào hoạt động để thay thế dần đầu số 1900 2088. Lộ trình chuyển đổi đã được công bố như sau:
 - Từ 20/04 đến 15/05/2026: hai số hoạt động song song, gọi 1900 2088 sẽ nghe thông báo về số mới.

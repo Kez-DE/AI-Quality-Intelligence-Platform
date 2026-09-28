@@ -42,7 +42,9 @@ trong ứng dụng trước khi đặt.
 Để trả bằng thẻ, khách cần đăng ký một thẻ hợp lệ theo hướng dẫn trong ứng
 dụng. Green SM có quyền xác minh thông tin thẻ khi đăng ký lần đầu và khi sử
 dụng dịch vụ. Theo Điều khoản sử dụng, mọi chi phí liên quan đến việc thanh
-toán bằng thẻ do khách chịu.
+toán bằng thẻ do khách chịu. Các trang chính thức không liệt kê loại thẻ cụ thể
+(như Visa, Mastercard, JCB); bạn sẽ biết thẻ có dùng được hay không khi liên
+kết thẻ trong mục Thanh toán của ứng dụng.
 
 Green SM có thể từ chối thanh toán bằng thẻ nếu giao dịch lỗi khiến ngân hàng
 phát hành từ chối, hoặc khi có dấu hiệu thẻ bị dùng cho giao dịch lừa đảo, bất

@@ -61,6 +61,8 @@ def _strip_accents(text: str) -> str:
 
 def _tokenize(text: str) -> List[str]:
     norm = _strip_accents(text.lower())
+    # "7 chỗ" -> "7cho": the digit alone is dropped and "cho" is a stopword.
+    norm = re.sub(r"\b(\d+)\s*cho\b", r"\1cho", norm)
     tokens = re.findall(r"[a-z0-9]+", norm)
     return [t for t in tokens if len(t) > 1 and t not in _STOPWORDS]
 

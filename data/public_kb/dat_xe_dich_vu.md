@@ -11,7 +11,7 @@ source_checked_at: 2026-09-28
 
 # Đặt xe & dịch vụ
 
-## Green SM có những dịch vụ nào
+## Green SM có những dịch vụ, loại xe nào
 
 Green SM (Xanh SM) là ứng dụng đặt xe và giao hàng dùng 100% phương tiện thuần điện do VinFast sản xuất. Theo website chính thức và Trung tâm hỗ trợ, các dịch vụ gồm:
 
@@ -71,9 +71,9 @@ Green SM Premium là dịch vụ di chuyển cao cấp của Green SM. Theo tran
 
 Cách đặt: mở ứng dụng Green SM, chọn biểu tượng Ô tô, nhập điểm đi và điểm đến, chọn Green SM Premium, chọn phương thức thanh toán, áp dụng ưu đãi nếu có rồi xác nhận đặt xe. Bạn cũng có thể hẹn giờ đón trước cho chuyến Premium. Cước Premium hiển thị trong ứng dụng trước khi bạn đặt.
 
-## Đặt xe cho nhóm đông, gia đình với Green SM Limo
+## Xe cho nhóm đông, gia đình (hỏi xe 7 chỗ, 6 chỗ): Green SM Limo
 
-Green SM Limo là dịch vụ taxi điện cao cấp dùng xe VinFast Limo Green rộng rãi, êm ái, được thiết kế cho nhóm 6 người hoặc khách cần di chuyển tiện nghi như gia đình, doanh nhân, du khách.
+Green SM không có dịch vụ mang tên xe 7 chỗ. Với nhóm đông người, hãy chọn Green SM Limo: taxi điện cao cấp dùng xe VinFast Limo Green 6 chỗ, rộng rãi, êm ái, được thiết kế cho nhóm 6 người hoặc khách cần di chuyển tiện nghi như gia đình, doanh nhân, du khách.
 
 Cách đặt: mở ứng dụng Green SM, chọn biểu tượng Ô tô, nhập điểm đi và điểm đến, chọn Green SM Limo, chọn phương thức thanh toán, áp dụng ưu đãi nếu có rồi xác nhận đặt xe.
 
@@ -171,7 +171,7 @@ Bạn có thể đặt chuyến cho người thân bằng tài khoản Green SM 
 - Kiểm tra cước, chọn thanh toán và nhập mã khuyến mãi nếu có.
 - Bấm "Đặt xe" và chờ tài xế liên hệ tới đón.
 
-Chỉ nên đặt hộ cho người bạn biết và tin tưởng, vì bạn là người chịu trách nhiệm cho chuyến xe đó. Bạn cũng có thể hướng dẫn người thân tự tải ứng dụng Green SM, đăng ký tài khoản và đặt xe trên tài khoản của họ.
+Dịch vụ chỉ có ở khu vực Green SM đang hoạt động: nhập điểm đón của người thân để ứng dụng cho biết có xe hay không. Chỉ nên đặt hộ cho người bạn biết và tin tưởng, vì bạn là người chịu trách nhiệm cho chuyến xe đó. Bạn cũng có thể hướng dẫn người thân tự tải ứng dụng Green SM, đăng ký tài khoản và đặt xe trên tài khoản của họ.
 
 ## Thêm điểm dừng cho chuyến xe
 

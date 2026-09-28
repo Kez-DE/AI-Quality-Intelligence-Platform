@@ -70,8 +70,9 @@ trong hai trường hợp:
 - Tài xế hủy chuyến vì khách không có mặt tại điểm đón vào thời điểm đã xác
   định qua ứng dụng.
 
-Hợp đồng dịch vụ không nêu mức phí hủy cụ thể; vui lòng kiểm tra trong ứng dụng
-trước khi hủy. Nếu tài xế không đến đón với
+Hợp đồng dịch vụ không nêu mức phí hủy cụ thể, và Green SM cũng chưa công bố
+việc ứng dụng có báo trước mức phí khi bạn hủy hay không; vui lòng kiểm tra
+trong ứng dụng trước khi hủy. Nếu tài xế không đến đón với
 lý do không hợp lý khiến khách phải hủy, hoặc tài xế yêu cầu khách tự hủy, hãy
 phản ánh tại "Trung tâm hỗ trợ" kèm mã chuyến để được kiểm tra.
 
@@ -163,6 +164,7 @@ Theo Trung tâm hỗ trợ Green SM:
 - Cung cấp thông tin chuyến (thời gian đi, tên tài xế, biển số xe) và mô tả đồ
   bỏ quên.
 - Nếu tài xế tìm thấy, trao đổi với tài xế cách nhận lại thuận tiện nhất.
+- Nếu đồ bỏ quên chính là điện thoại, hãy mượn một máy khác để gọi Hotline 1555.
 
 Green SM luôn cố gắng hỗ trợ nhưng không cam kết đồ vật sẽ được tìm thấy trong
 mọi trường hợp hoặc được hoàn trả ngay khi tìm thấy. Green SM và tài xế không
