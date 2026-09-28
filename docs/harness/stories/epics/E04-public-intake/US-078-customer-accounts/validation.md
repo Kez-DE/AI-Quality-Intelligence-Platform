@@ -4,8 +4,7 @@ Proof status: **implemented** (2026-09-28), with open items. Three E2E cases
 are blocked by the environment: chat with a real model (and filing through
 chat), delivery of a real reset email, and Google/Facebook OAuth. The local
 migration layer did not run, so the first-profile-admin branch and a behavioural
-CHECK rejection are unproven. The Logs/Audit claim is open for
-`prompt_preview`. See Known Gaps and Acceptance Evidence.
+CHECK rejection are unproven. See Known Gaps and Acceptance Evidence.
 
 ## Proof Strategy
 
@@ -82,21 +81,21 @@ copy; the orchestrator applies remote changes after the owner approves.
   `guest → pending → staff` is closed too. `POST /api/users/bulk-approve` only
   touches `pending` rows. A Customer account can only be deleted (decision 0018
   §7). The Staff web shows `guest` rows read-only.
-- `chat_completion` writes `prompt_preview` (the first user message, PII-masked,
-  up to 160 characters) to `pipeline/logs/agent.log` on every call, mock
-  provider included. Ops staff read that file through `GET /api/agent/logs`.
-  Two US-078 paths reach it: the customer chat tier (the Customer's chat text),
-  and the ml-worker scoring prompt, which carries the text of every negative row
-  with `overall_risk` NULL, `customer` rows included. On Railway the ml-worker
-  is its own service, so its log may not be the file the API serves. This is
-  older than US-078 and breaks the Logs/Audit claim for both. The owner decides
-  whether to drop the preview for these calls.
+- Closed 2026-09-28 (owner's choice): `chat_completion` wrote `prompt_preview`
+  (the first user message, PII-masked, up to 160 characters) to
+  `pipeline/logs/agent.log`, which ops staff read through
+  `GET /api/agent/logs`. It carried the Customer's chat text and, through the
+  ml-worker scoring prompt, submitted Feedback text. `chat_completion` now takes
+  `log_preview`; the public/customer chat tier and `call_llm` (scoring, analyst
+  and task batch prompts) pass `False`. Staff web chat keeps its preview. The
+  spike prompt in `llm_agent.py` keeps it: its first 160 characters are the
+  fixed instruction text.
 
 ## Acceptance Evidence
 
 2026-09-28, branch `feat/customer-accounts`.
 
-- **Backend:** pytest with the neutralised env: 528 passed, 3 skipped, 2
+- **Backend:** pytest with the neutralised env: 531 passed, 3 skipped, 2
   xfailed. Adds `test_customer_account_role_never_changes` (admin, manager,
   staff, pending: 400, role stays `guest`, no audit row) and
   `test_bulk_approve_skips_customer_accounts`. The customer route sweep covers
@@ -187,8 +186,12 @@ copy; the orchestrator applies remote changes after the owner approves.
     `authenticated` holds no such grant (see Migration).
   - Logs: the uvicorn log holds no submitted text, chat text or password. The
     honeypot was not filled during E2E; its branches log nothing
-    (`customer_api.py`, `public_intake.py`). The `prompt_preview` gap under
-    Known Gaps still applies to chat text and submitted text.
+    (`customer_api.py`, `public_intake.py`). During this E2E, before the fix,
+    `agent.log` did record the test chat question as `prompt_preview`. After
+    the fix, `test_customer_chat_text_never_reaches_the_agent_log` runs the
+    real route down to `chat_completion` (mock provider) and finds no preview
+    and no chat text; `test_batch_agents_call_the_router_without_a_preview`
+    covers `call_llm`.
   - Cleanup: all three test accounts deleted (the cascade removed the customer
     row), the anonymous row and the probe chat row deleted. Production counts
     are back to the baseline above. No `audit_logs` row referenced the test

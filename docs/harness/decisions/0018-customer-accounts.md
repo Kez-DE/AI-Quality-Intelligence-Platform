@@ -190,5 +190,7 @@ Tradeoffs:
   promote a Customer account in two steps. `POST /api/users/bulk-approve` only
   touches `pending` rows. A Customer account can only be deleted; a Staff
   account comes from `POST /api/admin/users` (§7).
-- Whether `prompt_preview` in `pipeline/logs/agent.log` may carry Customer chat
-  text and submitted Feedback text (US-078 Known Gaps).
+- Decided 2026-09-28: `pipeline/logs/agent.log` carries no preview of Customer
+  words. The public/customer chat tier and the Feedback batch prompts
+  (`call_llm`) call `chat_completion(log_preview=False)`; Staff web chat keeps
+  its preview.
