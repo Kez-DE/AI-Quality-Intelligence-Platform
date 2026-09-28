@@ -18,10 +18,11 @@ from fastapi import Depends, Header, HTTPException
 
 from ingest import get_supabase
 
-# pending = Pending account (CONTEXT.md): created by an admin or by the sign-up
-# trigger, no access until an admin grants a Staff role. Decision 0017 retired
-# 'guest'; every fail-closed fallback lands on 'pending'.
-VALID_ROLES = {"admin", "manager", "staff", "pending"}
+# pending = Pending account (CONTEXT.md): no access until an admin grants a
+# Staff role; every fail-closed fallback lands on 'pending'.
+# guest = Customer account (decision 0018): a self sign-up, reaches only
+# /api/customer/* (require_customer) and /api/me.
+VALID_ROLES = {"admin", "manager", "staff", "pending", "guest"}
 OPS_ROLES = {"admin", "manager", "staff"}
 
 
@@ -98,6 +99,13 @@ def require_admin(user: AuthUser = Depends(get_current_user)) -> AuthUser:
 def require_manager(user: AuthUser = Depends(get_current_user)) -> AuthUser:
     if user.role not in {"manager", "admin"}:
         raise HTTPException(status_code=403, detail="Yêu cầu quyền manager hoặc admin")
+    _require_password_changed(user)
+    return user
+
+
+def require_customer(user: AuthUser = Depends(get_current_user)) -> AuthUser:
+    if user.role != "guest":
+        raise HTTPException(status_code=403, detail="Chỉ dành cho tài khoản khách hàng")
     _require_password_changed(user)
     return user
 

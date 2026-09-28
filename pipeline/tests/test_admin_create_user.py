@@ -33,7 +33,7 @@ BODY = {
 
 class _FakeAdmin:
     """auth.admin double. create_user fires the handle_new_user trigger's effect:
-    a profile row with role 'pending'."""
+    a profile row with role 'guest' (decision 0018: every sign-up after the first)."""
 
     def __init__(self, db: FakeDB, existing_emails=()):
         self._db = db
@@ -50,7 +50,7 @@ class _FakeAdmin:
         uid = f"new-{len(self.created)}"
         self.existing.add(attributes["email"])
         self._db.tables.setdefault("profiles", []).append(
-            {"id": uid, "email": attributes["email"], "role": "pending", "department": None}
+            {"id": uid, "email": attributes["email"], "role": "guest", "department": None}
         )
         return SimpleNamespace(user=SimpleNamespace(id=uid, email=attributes["email"]))
 
@@ -181,7 +181,7 @@ async def test_invalid_fields_are_400(db, as_admin, patch):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("role", ["manager", "staff", "pending"])
+@pytest.mark.parametrize("role", ["manager", "staff", "pending", "guest"])
 async def test_non_admin_is_403(db, role):
     restore = _as(AuthUser(id="u", email=None, role=role, department="CSKH"))
     try:
@@ -252,3 +252,32 @@ async def test_password_never_appears_in_any_response_or_log(db, as_admin, caplo
         assert TEMP_PASSWORD not in res.text, f"password echoed with {res.status_code}"
 
     assert TEMP_PASSWORD not in caplog.text
+
+
+async def patch_role(user_id, role):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        return await c.patch(f"/api/users/{user_id}/role", json={"role": role})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role", ["admin", "manager", "staff"])
+async def test_customer_account_is_never_promoted_to_staff(db, as_admin, role):
+    """Decision 0018: a Staff account only comes from the create-user form."""
+    db.tables["profiles"].append({"id": "cust-1", "email": "khach@local.test", "role": "guest"})
+
+    res = await patch_role("cust-1", role)
+
+    assert res.status_code == 400
+    assert "form Tạo tài khoản" in res.text
+    assert db.tables["profiles"][-1]["role"] == "guest"
+    assert db.tables["audit_logs"] == []
+
+
+@pytest.mark.asyncio
+async def test_customer_account_can_still_be_set_pending(db, as_admin):
+    db.tables["profiles"].append({"id": "cust-1", "email": "khach@local.test", "role": "guest"})
+
+    res = await patch_role("cust-1", "pending")
+
+    assert res.status_code == 200
+    assert db.tables["profiles"][-1]["role"] == "pending"

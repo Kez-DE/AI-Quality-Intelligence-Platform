@@ -350,7 +350,7 @@ def test_derive_status_mapping():
 # ---------------------------------------------------------------------------
 
 
-GUARDS = {"get_current_user", "require_admin", "require_manager", "require_ops_staff"}
+GUARDS = {"get_current_user", "require_admin", "require_manager", "require_ops_staff", "require_customer"}
 
 
 def iter_api_routes(node):
@@ -413,3 +413,19 @@ def test_only_api_me_accepts_any_authenticated_role():
             identity_only.add(route.path)
 
     assert identity_only == {"/api/me", "/api/me/password"}
+
+
+def test_customer_routes_sit_behind_require_customer_only():
+    """US-078: /api/customer/* is the Customer account's surface, and no staff
+    role guard is mixed in (a guest must pass, a staff role must not)."""
+    customer = {}
+    for route in iter_api_routes(app):
+        if route.path.startswith("/api/customer"):
+            names = {d.call.__name__ for d in route.dependant.dependencies if getattr(d, "call", None)}
+            for method in route.methods:
+                customer[(method, route.path)] = names & ROLE_GUARDS
+    assert customer == {
+        ("POST", "/api/customer/feedback"): {"require_customer"},
+        ("GET", "/api/customer/feedback"): {"require_customer"},
+        ("POST", "/api/customer/chat"): {"require_customer"},
+    }

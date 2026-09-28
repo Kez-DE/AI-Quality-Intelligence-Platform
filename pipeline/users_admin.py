@@ -2,8 +2,9 @@
 
 Backend dùng SERVICE_ROLE_KEY nên truy cập được admin API của Supabase
 (db.auth.admin.*) để tạo/liệt kê/xoá tài khoản auth. Mọi route ở đây đều
-đứng sau require_admin. Từ decision 0017, admin là người DUY NHẤT tạo tài khoản
-(POST /api/admin/users); không còn tự đăng ký.
+đứng sau require_admin. Admin là người DUY NHẤT tạo Staff account
+(POST /api/admin/users); tự đăng ký chỉ tạo Customer account (role guest,
+decision 0018).
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
-from auth_guard import AuthUser, VALID_ROLES, get_current_user, require_admin
+from auth_guard import OPS_ROLES, AuthUser, VALID_ROLES, get_current_user, require_admin
 from departments import DEPARTMENTS
 from ingest import get_supabase
 
@@ -74,6 +75,10 @@ def update_user_role(user_id: str, payload: dict, user: AuthUser = Depends(requi
         raise HTTPException(status_code=404, detail="User not found")
     old_role = old_profile[0].get("role", "pending")
     target_email = old_profile[0].get("email")
+    # A self-signed-up Customer account never becomes Staff: Staff accounts come
+    # from POST /api/admin/users, with a temp password the owner must change.
+    if old_role == "guest" and new_role in OPS_ROLES:
+        raise HTTPException(status_code=400, detail="Tạo tài khoản nhân viên qua form Tạo tài khoản")
 
     try:
         data = db.table("profiles") \
@@ -242,8 +247,8 @@ def password_problems(password: str) -> list[str]:
 class CreateUserReq(BaseModel):
     email: str = Field(..., max_length=254)
     full_name: str = Field(..., max_length=120)
-    # A created account gets a real Staff role; 'pending' is what the sign-up
-    # trigger assigns, never something an admin picks.
+    # A created account gets a real Staff role; 'guest' is what the sign-up
+    # trigger assigns (decision 0018). An admin never picks guest or pending here.
     role: Literal["admin", "manager", "staff"]
     department: Optional[str] = None
     temp_password: str = Field(..., max_length=72)  # bcrypt ignores bytes past 72
@@ -317,7 +322,7 @@ def create_user(payload: dict, user: AuthUser = Depends(require_admin)):
         raise HTTPException(status_code=503, detail=f"Không tạo được tài khoản ({code})") from None
 
     new_id = created.user.id
-    # handle_new_user already inserted the profile as 'pending'; grant the role.
+    # handle_new_user already inserted the profile as 'guest' (decision 0018); grant the role.
     try:
         updated = db.table("profiles").update(
             {"role": req.role, "department": req.department}
@@ -332,12 +337,13 @@ def create_user(payload: dict, user: AuthUser = Depends(require_admin)):
             db.auth.admin.delete_user(new_id)
         except Exception as exc:
             logger.error("admin create_user: rollback delete failed for %s: %s", new_id, type(exc).__name__)
-            # The account survives as pending (no access). Say so, or the admin
-            # retries and gets a confusing 409.
+            # The account survives as guest, still flagged must_change_password,
+            # so every role guard refuses it. Say so, or the admin retries and
+            # gets a confusing 409.
             raise HTTPException(
                 status_code=503,
                 detail=f"Không gán được quyền và không huỷ được tài khoản {req.email}: tài khoản vẫn tồn tại "
-                "ở trạng thái Chờ cấp quyền. Cấp quyền hoặc xoá nó trong danh sách người dùng.",
+                "ở dạng tài khoản khách hàng, chưa có quyền nhân viên. Cấp quyền hoặc xoá nó trong danh sách người dùng.",
             ) from None
         raise HTTPException(status_code=503, detail="Không gán được quyền cho tài khoản mới, đã huỷ tạo")
 

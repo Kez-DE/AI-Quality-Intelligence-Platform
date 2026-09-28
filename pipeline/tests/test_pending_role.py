@@ -1,4 +1,5 @@
-"""US-077 / decision 0017: the `guest` role is retired; a Pending account has no access.
+"""US-077 / decision 0017: a Pending account has no access. US-078 / decision 0018:
+`guest` is back as the Customer account, which reaches only /api/customer/*.
 
 A Pending account holds a valid Supabase JWT, so `get_current_user` accepts it.
 What must stop it is the role guard on every route. These tests sweep the whole
@@ -16,11 +17,12 @@ from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 
 import auth_guard
-from auth_guard import AuthUser, get_current_user, require_admin, require_manager, require_ops_staff
+from auth_guard import AuthUser, get_current_user, require_admin, require_customer, require_manager, require_ops_staff
 from main import app
 from tests.test_public_intake import iter_api_routes
 
 PENDING = AuthUser(id="00000000-0000-0000-0000-0000000000p1", email="p@local.test", role="pending", department=None)
+GUEST = AuthUser(id="00000000-0000-0000-0000-0000000000g1", email="g@local.test", role="guest", department=None)
 
 # The only routes a Pending account (or nobody at all) may reach.
 OPEN_TO_PENDING = {
@@ -31,6 +33,10 @@ OPEN_TO_PENDING = {
     "/api/public/feedback",
     "/api/public/feedback/{public_ref}",
 }
+
+# A Customer account (guest) also reaches its own three routes, and nothing else.
+CUSTOMER_ROUTES = {"/api/customer/feedback", "/api/customer/chat"}
+OPEN_TO_GUEST = OPEN_TO_PENDING | CUSTOMER_ROUTES
 
 
 @pytest.fixture
@@ -44,16 +50,28 @@ def as_pending():
         app.dependency_overrides[get_current_user] = prev
 
 
-def _protected_calls():
+@pytest.fixture
+def as_guest():
+    prev = app.dependency_overrides.get(get_current_user)
+    app.dependency_overrides[get_current_user] = lambda: GUEST
+    yield
+    if prev is None:
+        app.dependency_overrides.pop(get_current_user, None)
+    else:
+        app.dependency_overrides[get_current_user] = prev
+
+
+def _protected_calls(open_paths):
     for route in iter_api_routes(app):
-        if route.path in OPEN_TO_PENDING:
+        if route.path in open_paths:
             continue
         path = re.sub(r"\{[^}]+\}", "x", route.path)
         for method in sorted(route.methods - {"HEAD", "OPTIONS"}):
             yield method, path
 
 
-PROTECTED = sorted(set(_protected_calls()))
+PROTECTED = sorted(set(_protected_calls(OPEN_TO_PENDING)))
+STAFF_ONLY = sorted(set(_protected_calls(OPEN_TO_GUEST)))
 
 
 def test_sweep_covers_the_endpoints_named_in_the_spec():
@@ -66,6 +84,10 @@ def test_sweep_covers_the_endpoints_named_in_the_spec():
         ("GET", "/api/users"),
     }
     assert named <= set(PROTECTED)
+    assert named <= set(STAFF_ONLY)
+    # Pending gets nothing a Customer account gets.
+    assert {("POST", "/api/customer/feedback"), ("GET", "/api/customer/feedback"),
+            ("POST", "/api/customer/chat")} <= set(PROTECTED)
 
 
 @pytest.mark.asyncio
@@ -75,6 +97,33 @@ async def test_pending_gets_403_everywhere_else(as_pending, method, path):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         res = await c.request(method, path, json={})
     assert res.status_code == 403, f"{method} {path} -> {res.status_code} {res.text[:200]}"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method,path", STAFF_ONLY)
+async def test_guest_gets_403_on_every_staff_route(as_guest, method, path):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        res = await c.request(method, path, json={})
+    assert res.status_code == 403, f"{method} {path} -> {res.status_code} {res.text[:200]}"
+
+
+@pytest.mark.asyncio
+async def test_public_only_chat_does_not_open_a_door_for_guest(as_guest):
+    """The Customer assistant is /api/customer/chat; the staff chat stays closed."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        res = await c.post(
+            "/api/agent/chat",
+            json={"messages": [{"role": "user", "content": "xin chào"}], "public_only": True},
+        )
+    assert res.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_guest_can_ask_who_am_i(as_guest):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        res = await c.get("/api/me")
+    assert res.status_code == 200
+    assert res.json()["data"]["role"] == "guest"
 
 
 @pytest.mark.asyncio
@@ -96,16 +145,23 @@ async def test_pending_can_still_ask_who_am_i(as_pending):
     assert res.json()["data"]["role"] == "pending"
 
 
-@pytest.mark.parametrize("guard", [require_ops_staff, require_admin, require_manager])
+@pytest.mark.parametrize("guard", [require_ops_staff, require_admin, require_manager, require_customer])
 def test_every_role_guard_rejects_pending(guard):
     with pytest.raises(HTTPException) as exc:
         guard(PENDING)
     assert exc.value.status_code == 403
 
 
-def test_valid_roles_have_pending_not_guest():
-    assert auth_guard.VALID_ROLES == {"admin", "manager", "staff", "pending"}
-    assert "pending" not in auth_guard.OPS_ROLES
+@pytest.mark.parametrize("guard", [require_ops_staff, require_admin, require_manager])
+def test_every_staff_guard_rejects_guest(guard):
+    with pytest.raises(HTTPException) as exc:
+        guard(GUEST)
+    assert exc.value.status_code == 403
+
+
+def test_valid_roles_have_pending_and_guest():
+    assert auth_guard.VALID_ROLES == {"admin", "manager", "staff", "pending", "guest"}
+    assert not {"pending", "guest"} & auth_guard.OPS_ROLES
 
 
 class _Profiles:
@@ -139,7 +195,6 @@ class _AuthDB:
     [
         [],                                        # JWT valid, no profile row
         [{"role": None, "department": None}],      # empty role
-        [{"role": "guest", "department": None}],   # a stale value from before the migration
         [{"role": "superuser", "department": None}],
     ],
 )
@@ -147,3 +202,8 @@ def test_missing_or_unknown_role_fails_closed_to_pending(monkeypatch, profile_ro
     monkeypatch.setattr(auth_guard, "get_supabase", lambda: _AuthDB(profile_rows))
     user = auth_guard.get_current_user(authorization="Bearer t")
     assert user.role == "pending"
+
+
+def test_guest_role_is_read_as_guest(monkeypatch):
+    monkeypatch.setattr(auth_guard, "get_supabase", lambda: _AuthDB([{"role": "guest", "department": None}]))
+    assert auth_guard.get_current_user(authorization="Bearer t").role == "guest"

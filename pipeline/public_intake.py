@@ -122,6 +122,38 @@ def derive_status(row: dict) -> str:
     return "received"
 
 
+def classified_fields(raw_text: str) -> dict:
+    """Masked text plus server-side labels: the one classify path for every
+    Customer-facing write (public intake, Customer account, customer chat).
+
+    Raises 400 when nothing is left after cleaning.
+    """
+    from classifier import predict_feedback
+
+    # clean_text masks phone, email and plate before anything else touches the
+    # string — the classifier, the database and any future LLM all see the masked
+    # form. The raw body is never stored and never logged.
+    cleaned = clean_text(raw_text)
+    if not cleaned.strip():
+        raise HTTPException(status_code=400, detail="Thiếu nội dung phản hồi")
+
+    prediction = predict_feedback(cleaned)
+    severity = prediction["severity"]
+    return {
+        "text": cleaned,
+        "topic": prediction["topic"],
+        "sentiment": prediction["sentiment"],
+        "severity": (
+            severity
+            if isinstance(severity, str) and severity.upper().startswith("P")
+            else f"P{int(severity)}"
+        ),
+        "confidence": prediction["confidence"],
+        "needs_review": prediction.get("needs_review", False),
+        "review_reason": prediction.get("review_reason"),
+    }
+
+
 @router.post("/feedback")
 def submit_public_feedback(payload: PublicFeedbackReq, request: Request):
     """Accept a report from someone with no account.
@@ -136,23 +168,9 @@ def submit_public_feedback(payload: PublicFeedbackReq, request: Request):
     if (payload.website or "").strip():
         raise HTTPException(status_code=400, detail="Invalid submission")
 
-    from classifier import predict_feedback
     from regions import region_code
 
-    # clean_text masks phone, email and plate before anything else touches the
-    # string — the classifier, the database and any future LLM all see the masked
-    # form. The raw body is never stored and never logged.
-    cleaned = clean_text(payload.text)
-    if not cleaned.strip():
-        raise HTTPException(status_code=400, detail="Thiếu nội dung phản hồi")
-
-    prediction = predict_feedback(cleaned)
-    severity = prediction["severity"]
-    severity_value = (
-        severity
-        if isinstance(severity, str) and severity.upper().startswith("P")
-        else f"P{int(severity)}"
-    )
+    labels = classified_fields(payload.text)
 
     public_ref = secrets.token_urlsafe(PUBLIC_REF_BYTES)
     row = {
@@ -166,14 +184,8 @@ def submit_public_feedback(payload: PublicFeedbackReq, request: Request):
         ).isoformat(),
         "source": "public",
         "channel": (payload.channel or "web").strip() or "web",
-        "text": cleaned,
-        "topic": prediction["topic"],
-        "sentiment": prediction["sentiment"],
-        "severity": severity_value,
-        "confidence": prediction["confidence"],
         "area": region_code((payload.area or "").strip()),
-        "needs_review": prediction.get("needs_review", False),
-        "review_reason": prediction.get("review_reason"),
+        **labels,
     }
 
     try:
@@ -212,12 +224,8 @@ def get_public_feedback_status(public_ref: str, request: Request):
         rows = (
             get_supabase()
             .table("feedback")
-            .select("public_ref,created_at,needs_review,reviewed")
+            .select("public_ref,created_at,needs_review,reviewed,retention_until")
             .eq("public_ref", public_ref)
-            # Expired or redacted rows are filtered here, so they fall into the
-            # same 404 as unknown codes. Checked at read time, not left to the
-            # 03:00 job, so a row is gone the moment its deadline passes.
-            .gt("retention_until", datetime.now(timezone.utc).isoformat())
             .is_("redacted_at", "null")
             .limit(1)
             .execute()
@@ -230,6 +238,14 @@ def get_public_feedback_status(public_ref: str, request: Request):
             status_code=503, detail="Không tra cứu được, vui lòng thử lại"
         ) from exc
 
+    # Expired or redacted rows fall into the same 404 as unknown codes. Checked at
+    # read time, not left to the 03:00 job, so a row is gone the moment its
+    # deadline passes. A Customer account's row has no deadline (decision 0018).
+    now = datetime.now(timezone.utc)
+    rows = [
+        r for r in rows
+        if not r.get("retention_until") or datetime.fromisoformat(r["retention_until"]) > now
+    ]
     if not rows:
         # Same response for "never existed", "expired" and "redacted", so this is
         # not an oracle telling an enumerator which references are real.

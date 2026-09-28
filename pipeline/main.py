@@ -21,6 +21,7 @@ from dispatch_utils import parse_deadline
 from db_utils import fetch_paginated
 from users_admin import router as users_router, audit_router, admin_router, me_router
 from public_intake import router as public_intake_router
+from customer_api import router as customer_router
 from rate_limiter import RateLimiter, check_rate_limit
 from clean import mask_pii
 from env_config import get_settings
@@ -279,6 +280,9 @@ app.include_router(me_router)
 # Anonymous intake (decision 0016) — the only routes here with no auth dependency.
 # Kept in their own module so the unauthenticated contract stays one small file.
 app.include_router(public_intake_router)
+
+# Customer account (guest, decision 0018): own feedback + customer assistant only.
+app.include_router(customer_router)
 
 
 @app.get("/api/me")
@@ -1473,6 +1477,51 @@ def _append_safe_client_history(normalized: list[dict], messages: list[ChatMessa
         normalized.append({"role": role, "content": safe_content[:8000]})
 
 
+def run_public_chat(messages: list[ChatMessageReq], execute_fn, log_team: str = "public") -> dict:
+    """TẦNG CÔNG KHAI: Public KB + PUBLIC_SYSTEM_PROMPT + chỉ PUBLIC_TOOLS (submit_feedback).
+
+    Dùng chung cho public_only của staff và trợ lý của Customer account
+    (/api/customer/chat). execute_fn quyết định submit_feedback ghi vào đâu."""
+    if not messages:
+        raise HTTPException(status_code=400, detail="messages must be a non-empty list")
+
+    from agent.chat_tools import PUBLIC_TOOLS_DEFINITIONS
+
+    # RAG công khai: lấy câu hỏi cuối của khách -> tra public KB (chính sách/FAQ).
+    last_user_q = next(
+        (m.content for m in reversed(messages) if m.role == "user" and m.content.strip()),
+        "",
+    )
+    normalized = [{"role": "system", "content": PUBLIC_SYSTEM_PROMPT}]
+    if last_user_q:
+        try:
+            from agent.public_kb import search_public_knowledge, format_public_for_prompt
+            kb = format_public_for_prompt(search_public_knowledge(mask_pii(last_user_q), top_k=3))
+            normalized.append({"role": "system", "content": kb})
+        except Exception as exc:
+            print(f"[agent_chat] public KB lookup failed: {exc}", flush=True)
+    _append_safe_client_history(normalized, messages)
+    _t0 = time.time()
+    try:
+        # Chạy ReAct agent nhưng CHỈ với PUBLIC_TOOLS (submit_feedback).
+        # Truyền tools_override và execute_fn để agent không có quyền gọi OPS tools.
+        result = run_chat_agent(
+            normalized,
+            temperature=0.4,
+            tools_override=PUBLIC_TOOLS_DEFINITIONS,
+            execute_fn=execute_fn,
+        )
+    except Exception as exc:
+        _log_chat_event(log_team, "error", int((time.time() - _t0) * 1000), error=str(exc)[:200])
+        # Customer-facing tier: provider error text stays in ai-log, never in the response.
+        raise HTTPException(status_code=502, detail="Trợ lý tạm thời không phản hồi, vui lòng thử lại") from exc
+    if isinstance(result.get("content"), str):
+        result["content"] = mask_pii(result["content"])
+    _log_chat_event(log_team, "success", int((time.time() - _t0) * 1000),
+                    provider=result.get("provider", ""), model=result.get("model", ""))
+    return {"status": "success", "data": result}
+
+
 @app.post("/api/agent/chat")
 def agent_chat(payload: ChatReq, user: AuthUser = Depends(require_ops_staff)):
     # Chỉ Staff account (decision 0017): Pending account nhận 403 kể cả với public_only.
@@ -1481,43 +1530,11 @@ def agent_chat(payload: ChatReq, user: AuthUser = Depends(require_ops_staff)):
     # tool/dữ liệu nội bộ. Không thể dùng để nâng quyền.
     if payload.public_only:
         check_rate_limit(chat_rate_limit, user.id)
-        if not payload.messages:
-            raise HTTPException(status_code=400, detail="messages must be a non-empty list")
+        from agent.chat_tools import execute_public_tool
 
-        from agent.chat_tools import PUBLIC_TOOLS_DEFINITIONS, execute_public_tool
-
-        # RAG công khai: lấy câu hỏi cuối của khách -> tra public KB (chính sách/FAQ).
-        last_user_q = next(
-            (m.content for m in reversed(payload.messages) if m.role == "user" and m.content.strip()),
-            "",
+        return run_public_chat(
+            payload.messages, lambda name, args: execute_public_tool(name, args, user_id=user.id)
         )
-        normalized = [{"role": "system", "content": PUBLIC_SYSTEM_PROMPT}]
-        if last_user_q:
-            try:
-                from agent.public_kb import search_public_knowledge, format_public_for_prompt
-                kb = format_public_for_prompt(search_public_knowledge(mask_pii(last_user_q), top_k=3))
-                normalized.append({"role": "system", "content": kb})
-            except Exception as exc:
-                print(f"[agent_chat] public KB lookup failed: {exc}", flush=True)
-        _append_safe_client_history(normalized, payload.messages)
-        _t0 = time.time()
-        try:
-            # Chạy ReAct agent nhưng CHỈ với PUBLIC_TOOLS (submit_feedback).
-            # Truyền tools_override và execute_fn để agent không có quyền gọi OPS tools.
-            result = run_chat_agent(
-                normalized,
-                temperature=0.4,
-                tools_override=PUBLIC_TOOLS_DEFINITIONS,
-                execute_fn=lambda name, args: execute_public_tool(name, args, user_id=user.id),
-            )
-        except Exception as exc:
-            _log_chat_event("public", "error", int((time.time() - _t0) * 1000), error=str(exc)[:200])
-            raise HTTPException(status_code=502, detail=f"Agent model error: {str(exc)[:300]}") from exc
-        if isinstance(result.get("content"), str):
-            result["content"] = mask_pii(result["content"])
-        _log_chat_event("public", "success", int((time.time() - _t0) * 1000),
-                        provider=result.get("provider", ""), model=result.get("model", ""))
-        return {"status": "success", "data": result}
 
     # Staff / manager / admin — apply a higher rate limit to prevent LLM API key abuse
     check_rate_limit(chat_rate_limit_staff, user.id)
