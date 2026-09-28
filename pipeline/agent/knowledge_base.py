@@ -45,8 +45,9 @@ _KB_DIR = _resolve_kb_dir()
 _STOPWORDS = {
     "la", "va", "co", "cua", "cho", "khi", "the", "nao", "gi", "thi", "mot", "cac",
     "nhung", "duoc", "voi", "trong", "tai", "ve", "den", "tu", "hay", "lam", "bi",
-    "se", "da", "dang", "nay", "do", "ra", "len", "xuong", "phai", "can", "neu",
-    "the", "a", "an", "the", "to", "of", "in", "on", "for", "and", "or", "is", "how",
+    # No "do" or "an": accent-stripped they are đồ/đỏ and ăn/"an toàn".
+    "se", "da", "dang", "nay", "ra", "len", "xuong", "phai", "can", "neu",
+    "the", "a", "the", "to", "of", "in", "on", "for", "and", "or", "is", "how",
     "what", "khong", "co", "bao", "nhieu", "may",
 }
 
