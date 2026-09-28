@@ -1510,6 +1510,7 @@ def run_public_chat(messages: list[ChatMessageReq], execute_fn, log_team: str = 
             temperature=0.4,
             tools_override=PUBLIC_TOOLS_DEFINITIONS,
             execute_fn=execute_fn,
+            log_preview=False,  # Customer words stay out of agent.log
         )
     except Exception as exc:
         _log_chat_event(log_team, "error", int((time.time() - _t0) * 1000), error=str(exc)[:200])

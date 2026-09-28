@@ -320,8 +320,13 @@ def chat_completion(
     temperature: float = 0.3,
     tools: list[dict] | None = None,
     tool_choice: str | dict | None = None,
+    log_preview: bool = True,
 ) -> dict:
     """Gọi LLM với failover: thử lần lượt các provider có key trong .env.
+
+    log_preview=False: agent.log không ghi prompt_preview. Dùng cho prompt chứa
+    lời của Customer (chat tầng public/customer, lô Feedback): ops staff đọc
+    agent.log qua /api/agent/logs.
 
     Provider nào lỗi (key chết, hết credit, mạng) thì log lại và thử provider kế tiếp,
     thay vì raise ngay. Chỉ raise khi TẤT CẢ provider thật đều fail (mock luôn ở cuối
@@ -332,6 +337,7 @@ def chat_completion(
     safe_messages = sanitize_pii_payload(messages)
     chain = resolve_provider_chain()
     first_user = next((m.get("content", "") for m in safe_messages if m.get("role") == "user"), "")
+    preview = {"prompt_preview": first_user[:160]} if log_preview else {}
     last_exc: Exception | None = None
 
     for provider in chain:
@@ -355,7 +361,7 @@ def chat_completion(
                 "model": model_name,
                 "ok": True,
                 "latency_ms": latency_ms,
-                "prompt_preview": first_user[:160],
+                **preview,
                 "usage": usage,
             })
             return {
@@ -377,7 +383,7 @@ def chat_completion(
                 "latency_ms": latency_ms,
                 "error": str(exc)[:500],
                 "failover": True,
-                "prompt_preview": first_user[:160],
+                **preview,
             })
             print(f"[model_router] provider={provider} lỗi, thử provider kế tiếp: {str(exc)[:160]}")
             continue

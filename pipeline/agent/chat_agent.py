@@ -30,6 +30,7 @@ def run_chat_agent(
     scope_team: str | None = None,
     tools_override: list | None = None,
     execute_fn=None,
+    log_preview: bool = True,
 ) -> dict:
     """Chạy vòng lặp ReAct agent để LLM tự gọi công cụ (nếu cần) trước khi trả lời.
 
@@ -68,7 +69,8 @@ def run_chat_agent(
             result = chat_completion(
                 current_messages,
                 temperature=temperature,
-                tools=active_tools
+                tools=active_tools,
+                log_preview=log_preview,
             )
         except ValueError as e:
             # Fallback nếu provider (vd: Gemini) không hỗ trợ tools
@@ -76,7 +78,8 @@ def run_chat_agent(
                 # Bỏ tools đi và thử lại
                 result = chat_completion(
                     current_messages,
-                    temperature=temperature
+                    temperature=temperature,
+                    log_preview=log_preview,
                 )
             else:
                 raise e

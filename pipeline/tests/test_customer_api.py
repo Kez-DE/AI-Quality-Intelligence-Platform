@@ -379,3 +379,26 @@ async def test_chat_rejects_empty_messages(db, as_user, fake_agent):
     async with client() as c:
         res = await c.post("/api/customer/chat", json={"messages": []})
     assert res.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_customer_chat_text_never_reaches_the_agent_log(db, as_user, monkeypatch):
+    """US-078 Logs/Audit: ops staff read agent.log through /api/agent/logs, so the
+    real path down to chat_completion must log no preview of the Customer's text."""
+    from agent import model_router
+
+    logged = []
+    monkeypatch.setattr(model_router, "resolve_provider_chain", lambda: ["mock"])
+    monkeypatch.setattr(model_router, "write_agent_log", logged.append)
+    monkeypatch.setattr("agent.public_kb.search_public_knowledge", lambda *_a, **_k: [])
+    monkeypatch.setattr("agent.public_kb.format_public_for_prompt", lambda *_a, **_k: "")
+
+    async with client() as c:
+        res = await c.post("/api/customer/chat", json={"messages": [
+            {"role": "user", "content": "xe tôi hỏng điều hoà ở Cầu Giấy"},
+        ]})
+
+    assert res.status_code == 200, res.text
+    assert logged, "chat_completion should have run and logged its call"
+    assert all("prompt_preview" not in event for event in logged)
+    assert "Cầu Giấy" not in str(logged)

@@ -38,3 +38,27 @@ def test_chat_completion_redacts_pii_before_provider_and_log(tmp_path):
 
     # Hàm không được sửa lịch sử chat mà API đang giữ trong request hiện tại.
     assert "0912345678" in messages[0]["content"]
+
+
+def test_log_preview_false_logs_no_prompt_text():
+    messages = [{"role": "user", "content": "Tài xế đến trễ ở Cầu Giấy"}]
+    with (
+        patch.object(model_router, "resolve_provider_chain", return_value=["mock"]),
+        patch.object(model_router, "write_agent_log") as write_log,
+    ):
+        model_router.chat_completion(messages, log_preview=False)
+
+    event = write_log.call_args.args[0]
+    assert "prompt_preview" not in event
+    assert "Cầu Giấy" not in str(event)
+
+
+def test_batch_agents_call_the_router_without_a_preview():
+    """scoring/analyst/task prompts carry Feedback text, customer rows included."""
+    from agents import common
+
+    common._LLM_CACHE.clear()
+    with patch.object(common, "chat_completion", return_value={"content": "{}", "provider": "x"}) as cc:
+        common.call_llm("sys", "ID 0: Tài xế đến trễ", "json_object")
+
+    assert cc.call_args.kwargs.get("log_preview") is False

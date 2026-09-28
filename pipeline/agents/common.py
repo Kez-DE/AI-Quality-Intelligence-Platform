@@ -56,7 +56,8 @@ def call_llm(
     ]
     want_json = response_format == "json_object"
     try:
-        result = chat_completion(messages, response_json=want_json, temperature=0.1)
+        # Batch prompts carry Feedback text (customer rows too): no preview in agent.log.
+        result = chat_completion(messages, response_json=want_json, temperature=0.1, log_preview=False)
         if want_json and result.get("provider") == "mock":
             return ""
 
