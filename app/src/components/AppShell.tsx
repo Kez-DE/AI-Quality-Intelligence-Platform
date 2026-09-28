@@ -170,10 +170,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex text-foreground">
-      {/* Badge phòng ban — góc trên bên phải (desktop). Chưa rõ role/chưa gán phòng: ẩn. */}
-      <div className="hidden md:block fixed top-4 right-6 z-50">
-        <DepartmentBadge me={me} className="shadow-sm backdrop-blur bg-card/80" />
-      </div>
       {/* Sidebar */}
       <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border bg-card/90 text-card-foreground backdrop-blur sticky top-0 h-screen">
         <div className="p-5 border-b border-border">
@@ -316,6 +312,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <main className="flex-1 md:py-6 md:px-8 pt-28 pb-10 px-4 max-w-7xl text-foreground">
+        {/* Badge phòng ban (desktop): its own row in the page flow, so it never covers the
+            page's own header buttons the way a fixed corner badge did. Hidden when no role or
+            no department, as before. */}
+        <div className="hidden md:flex justify-end mb-3">
+          <DepartmentBadge me={me} className="shadow-sm" />
+        </div>
         {children}
       </main>
 
