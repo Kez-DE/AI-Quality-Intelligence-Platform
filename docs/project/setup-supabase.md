@@ -7,6 +7,8 @@
 
 > **Cập nhật 2026-09-27 (US-077 / decision 0017):** thêm bước tay tắt tự đăng ký và OAuth (8.1); admin đầu tiên tạo trong Dashboard vì Staff web không còn form đăng ký (8.4); role `guest` đổi thành `pending`.
 
+> **Cập nhật 2026-09-28 (US-078 / decision 0018):** Customer web có đăng nhập tuỳ chọn cho khách hàng, nên **giữ bật** tự đăng ký và các provider Email, Google, Facebook (8.1 thay cho bước tắt cũ); thêm redirect URL của Customer web (8.3). Tự đăng ký vào với role `guest` (tài khoản khách hàng), không còn `pending`.
+
 ---
 
 ## 1. Tạo project trên Supabase Cloud
@@ -117,31 +119,21 @@ Hoặc migration đã tự bật (file `enable_feedback_realtime.sql`).
 
 ## 8. Cấu hình Authentication
 
-### 8.1 Tắt tự đăng ký và đăng nhập Google/Facebook (thao tác tay, bắt buộc)
+### 8.1 Đăng ký và provider: giữ bật (thao tác tay)
 
-Từ US-077 (decision 0017), chỉ admin tạo tài khoản và Staff web đã bỏ form đăng ký cùng nút Google/Facebook. Nhưng Supabase Auth vẫn nhận đăng ký trực tiếp qua API và qua OAuth cho tới khi chủ dự án tắt trong Dashboard. Không có code nào trong repo làm hoặc kiểm tra được việc này, nên đây là bước tay, làm trên **đúng project production**.
+Decision 0017 từng yêu cầu tắt tự đăng ký và Google/Facebook. Từ US-078 (decision 0018) **không tắt nữa**: Customer web cho khách hàng tự đăng ký và đăng nhập bằng email/mật khẩu, Google hoặc Facebook. Staff web vẫn không có form đăng ký; tài khoản Staff vẫn chỉ do admin tạo (8.4).
 
 Nhãn có thể khác nhau giữa các phiên bản Dashboard:
 
 1. Vào **Authentication → Sign In / Providers** (bản cũ: **Authentication → Providers**).
-2. Ở mục **User Signups**, tắt **Allow new users to sign up**. Theo tài liệu Supabase, khi tắt thì chỉ user đã tồn tại mới đăng nhập được.
-3. Trong danh sách provider, tắt **Google** và **Facebook**.
-4. **Giữ provider Email bật.** Đây là đường đăng nhập bằng mật khẩu duy nhất còn lại; tắt provider Email sẽ chặn luôn cả đăng nhập.
-5. Kiểm tra ngay sau khi tắt:
-   - Admin tạo một tài khoản thử bằng form "Tạo tài khoản" trên Staff web (`POST /api/admin/users`), đăng nhập được và bị bắt đổi mật khẩu, rồi xoá tài khoản thử. Tài liệu Supabase không nói rõ việc tạo user bằng admin API (service role) có còn chạy khi tắt đăng ký hay không, nên phải kiểm tra thực tế.
-   - Đăng ký trực tiếp bằng publishable key phải bị từ chối và không tạo user mới:
+2. Ở mục **User Signups**, **giữ bật** **Allow new users to sign up**.
+3. **Giữ bật** các provider **Email**, **Google** và **Facebook**. Callback của Google/Facebook vẫn là URL callback của Supabase; trang quay về sau khi đăng nhập là Customer web, nên URL đó phải nằm trong danh sách Redirect URLs (8.3).
+4. Nếu đã lỡ tắt theo hướng dẫn cũ của US-077, bật lại cả ba mục trên.
+5. Xác nhận email: tuỳ chủ dự án quyết định (8.2).
 
-     ```bash
-     curl -s -X POST "$SUPABASE_URL/auth/v1/signup" \
-       -H "apikey: $SUPABASE_PUBLISHABLE_KEY" -H "Content-Type: application/json" \
-       -d '{"email":"signup-check@example.com","password":"Chk#12345678"}'
-     ```
+Mọi tài khoản tự đăng ký (qua Customer web hay gọi thẳng `/auth/v1/signup`) vào với role `guest`: tài khoản khách hàng, chỉ dùng được Customer web. Backend trả 403 ở mọi route Staff, RLS không cho quyền ops. Phanh duy nhất với việc tạo tài khoản hàng loạt là rate limit theo user id ở `/api/customer/*`; captcha là việc tiếp theo (decision 0018).
 
-     Nếu lệnh này tạo được user thì bước 2 chưa có hiệu lực. Tài khoản đó vào hệ thống với role `pending` (không có quyền), nhưng vẫn nên xoá trong **Authentication → Users**.
-
-Chưa tắt thì rủi ro còn lại là tài khoản rác: mọi tài khoản tự đăng ký đều vào với role `pending`, backend trả 403 ở mọi endpoint trừ `GET /api/me`, `POST /api/me/password` và `/health`.
-
-Stack local: tương đương là `enable_signup = false` trong mục `[auth]` của `supabase/config.toml` (hiện file chưa đặt giá trị này).
+Stack local: `supabase/config.toml`, mục `[auth]`, không đặt `enable_signup = false`; `additional_redirect_urls` có `http://localhost:5175/**` cho Customer web.
 
 ### 8.2 Email Auth
 
@@ -150,13 +142,17 @@ Vào **Authentication → Providers → Email**:
 - ✅ Enable Email (giữ bật, xem 8.1)
 - ✅ Enable Email Confirmations: **TẮT** (cho dev/demo nhanh)
 - Hoặc bật nếu muốn verify email thật. Tài khoản admin tạo qua `POST /api/admin/users` đã được xác nhận email sẵn.
+- Khi bật, khách hàng đăng ký trên Customer web phải mở email xác nhận trước khi đăng nhập được. Chủ dự án tự chọn bật hay tắt (decision 0018).
 
 ### 8.3 Site URL & Redirect
 
 Vào **Authentication → URL Configuration**:
 
 - **Site URL:** `http://localhost:5174` (dev) hoặc URL deploy
-- **Redirect URLs:** thêm `http://localhost:5174/`**
+- **Redirect URLs:**
+  - Staff web: `http://localhost:5174/**`
+  - Customer web (US-078): `http://localhost:5175/**`. Cần cho OAuth Google/Facebook (quay về `${origin}/`) và cho link đặt lại mật khẩu (`${origin}/dat-lai-mat-khau`).
+  - Khi deploy: thêm domain production của Staff web và Customer web theo cùng mẫu `https://<domain>/**`. Domain Customer web production chưa chốt (backlog), phải thêm trước khi deploy, nếu không OAuth và link đặt lại mật khẩu sẽ quay về Site URL.
 
 ### 8.4 Tạo tài khoản admin đầu tiên
 
@@ -171,8 +167,10 @@ Cách 1 — Database mới (chưa có profile nào):
 Cách 2 — Database đã có profile:
 
 1. **Authentication → Users → Add user**
-2. Nhập email + password (tài khoản vào với role `pending`)
+2. Nhập email + password (tài khoản vào với role `guest`, tức tài khoản khách hàng)
 3. Vào **Table Editor → profiles** → sửa cột `role` = `admin`
+
+Chỉ làm với tài khoản vừa tạo cho đúng người cần quyền admin. Không nâng tài khoản khách hàng tự đăng ký trên Customer web lên Staff; tài khoản Staff do admin tạo bằng form "Tạo tài khoản" (decision 0018).
 
 ## 9. Row Level Security (RLS)
 
@@ -180,8 +178,7 @@ Project dùng `SERVICE_ROLE_KEY` ở backend (bypass RLS), nên gate quyền ở
 
 Frontend đọc trực tiếp qua anon key + RLS:
 
-- Tài khoản không thuộc ops (kể cả `pending`) chỉ đọc được dòng feedback/alert của chính mình; phản hồi ẩn danh (`user_id` NULL) chỉ ops đọc được
-- Staff/admin đọc được feedback, alerts
+- `feedback` và `alerts`: chỉ ops staff (admin/manager/staff, đã đổi mật khẩu tạm) đọc được; `pending` và `guest` không đọc được dòng nào, kể cả dòng của mình (migration `20260928000000` mục 3). Tài khoản khách hàng xem lịch sử qua `GET /api/customer/feedback`
 - Chỉ ops staff được insert vào `feedback`, và phải đúng `user_id` của mình
 - Knowledge base nội bộ (`graph_nodes`, `graph_edges`) chỉ ops staff đọc được
 - `is_ops_staff()` và `is_admin()` đòi `password_is_current()`: tài khoản còn mật khẩu tạm (`app_metadata.must_change_password`) không có quyền ops/admin qua PostgREST và realtime cho tới khi đổi mật khẩu và refresh session
@@ -202,7 +199,7 @@ SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public';
 | ----------------- | ---------------------------------------------------------------------------------- |
 | `feedback`        | Phản hồi đã phân loại (topic, sentiment, severity, confidence, area, needs_review) |
 | `alerts`          | Ticket/Alert do spike detector + LLM sinh ra                                       |
-| `profiles`        | User profile kèm role (admin/manager/staff/pending)                                |
+| `profiles`        | User profile kèm role (admin/manager/staff/pending/guest)                          |
 | `correction_logs` | Audit trail khi staff sửa nhãn AI                                                  |
 | `chat_messages`   | Lịch sử chat AI                                                                    |
 

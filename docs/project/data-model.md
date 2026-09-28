@@ -4,6 +4,11 @@
 >
 > **Cập nhật 2026-09-27:** cột phản hồi ẩn danh của US-076 (`public_ref`, `submitter_hash`,
 > `retention_until`) và của US-077 (`redacted_at`); role `guest` đổi thành `pending`.
+>
+> **Cập nhật 2026-09-28 (US-078 / decision 0018):** role `guest` quay lại làm tài khoản khách
+> hàng; tự đăng ký vào với `guest`; `feedback.source` có thêm giá trị `customer` (không có
+> `retention_until`). SELECT trên `feedback` và `alerts` chỉ còn cho ops staff: bỏ nửa
+> "dòng của mình" của policy.
 
 Tài liệu này mô tả toàn bộ bảng, cột, kiểu dữ liệu và ý nghĩa nghiệp vụ của cơ sở dữ liệu
 Postgres trên Supabase. Đây là tài liệu tra cứu chính cho ai cần hiểu dữ liệu chảy qua hệ
@@ -58,14 +63,15 @@ thao tác đọc), và đóng vai trò lớp phòng thủ.
 ### `profiles`
 Hồ sơ người dùng, mở rộng từ `auth.users`. Mỗi user Supabase có đúng một dòng ở đây, tạo tự
 động bằng trigger `handle_new_user` khi tài khoản được tạo (admin tạo qua `POST /api/admin/users`,
-hoặc tạo trong Supabase Dashboard). Staff web không còn form tự đăng ký.
+khách hàng tự đăng ký trên Customer web, hoặc tạo trong Supabase Dashboard). Staff web không có
+form tự đăng ký.
 
 | Cột | Kiểu | Ý nghĩa |
 |---|---|---|
 | `id` | UUID, PK | Trỏ tới `auth.users(id)`. Xoá user là xoá profile (CASCADE). |
 | `email` | TEXT | Email, sao chép từ auth lúc tạo tài khoản. |
 | `full_name` | TEXT | Tên hiển thị. Mặc định lấy phần trước `@` của email nếu không khai báo. |
-| `role` | TEXT | Vai trò RBAC: `admin`, `manager`, `staff`, `pending`. Mặc định `pending` (cả DEFAULT của cột lẫn trigger; xem mục 10). `pending` là tài khoản chờ cấp quyền, không có quyền gì. |
+| `role` | TEXT | Vai trò RBAC: `admin`, `manager`, `staff`, `pending`, `guest`. DEFAULT của cột là `pending`; trigger gán `guest` cho tài khoản mới (xem mục 10). `pending` là tài khoản chờ cấp quyền, không có quyền gì. `guest` là tài khoản khách hàng (US-078): chỉ dùng Customer web, không có quyền nội bộ. |
 | `department` | TEXT | Phòng ban: `IT`, `CSKH`, `Vận hành`, `Tài chính & Thanh toán`, `Sản phẩm`, `Quản lý Rủi ro & Gian lận`. `NULL` nghĩa là chưa được gán phòng, khi đó ops user chưa xem được dữ liệu phòng nào. |
 | `created_at` / `updated_at` | TIMESTAMPTZ | Thời điểm tạo và cập nhật. |
 
@@ -105,8 +111,8 @@ loại (ML + rule) gán.
 | Cột | Kiểu | Ý nghĩa |
 |---|---|---|
 | `id` | UUID, PK | |
-| `user_id` | UUID, nullable | Người gửi (hoặc tài khoản nhập liệu). `NULL` với phản hồi ẩn danh từ Customer web. |
-| `source` | TEXT | Nguồn dữ liệu: `manual` (gửi trong Staff web), `chat` (tool chat), `public` (khách hàng gửi từ Customer web, không tài khoản), hoặc tên dataset khi nạp hàng loạt. Mặc định `manual`. |
+| `user_id` | UUID, nullable | Người gửi (hoặc tài khoản nhập liệu). `NULL` với phản hồi ẩn danh từ Customer web; là tài khoản khách hàng với `source = 'customer'`. |
+| `source` | TEXT | Nguồn dữ liệu: `manual` (gửi trong Staff web), `chat` (tool chat), `public` (khách hàng gửi từ Customer web, không tài khoản), `customer` (tài khoản khách hàng gửi qua `/api/customer`, có `user_id` và `public_ref`), hoặc tên dataset khi nạp hàng loạt. Mặc định `manual`. |
 | `channel` | TEXT | Kênh: `app`, `ch_play`, `app_store`... Mặc định `app`. |
 | `text` | TEXT | Nội dung phản hồi (đã làm sạch PII trước khi lưu). |
 | `topic` | TEXT | Chủ đề do phân loại gán: `Safety`, `Driver Behavior`, `App Issue`, `Payment`, `Pricing`, `Delay`, `Other`. |
@@ -123,9 +129,9 @@ loại (ML + rule) gán.
 | `risk_vehicle` | INTEGER | Điểm 0..10: xe hỏng, mất vệ sinh. |
 | `risk_compliance` | INTEGER | Điểm 0..10: sai đường, trễ giờ, không tuân thủ quy trình. |
 | `overall_risk` | INTEGER | Điểm rủi ro tổng hợp 1..5 từ thuật toán Max-Pooling Waterfall. `NULL` nghĩa là chưa chấm. |
-| `public_ref` | TEXT | Mã tra cứu của phản hồi ẩn danh (72 bit ngẫu nhiên). Unique khi khác `NULL`. Là credential duy nhất để khách xem trạng thái. |
+| `public_ref` | TEXT | Mã tra cứu của phản hồi từ Customer web (`public` và `customer`; 72 bit ngẫu nhiên). Unique khi khác `NULL`. Là credential duy nhất để khách xem trạng thái. |
 | `submitter_hash` | TEXT | Hash SHA-256 có salt của IP người gửi, chỉ để rate limit và điều tra lạm dụng. Bị xoá (`NULL`) khi hết hạn lưu trữ. |
-| `retention_until` | TIMESTAMPTZ | Hạn lưu trữ nội dung của phản hồi ẩn danh: ngày gửi + 180 ngày. |
+| `retention_until` | TIMESTAMPTZ | Hạn lưu trữ nội dung của phản hồi ẩn danh: ngày gửi + 180 ngày. `NULL` với dòng `customer` và dòng nội bộ: không có hạn. |
 | `redacted_at` | TIMESTAMPTZ | Thời điểm job retention đã xoá nội dung. `NULL` nghĩa là chưa xoá. |
 | `created_at` | TIMESTAMPTZ | |
 
@@ -143,6 +149,13 @@ Phản hồi ẩn danh (`source = 'public'`): khách tra cứu bằng `public_re
 đặt `submitter_hash = NULL`, ghi `redacted_at`, và xoá `correction_logs.note` của dòng đó. Các nhãn, `area`, `channel`, `created_at` và
 `overall_risk` được giữ nguyên nên dashboard và xu hướng không đổi. Mã tra cứu đã hết hạn hoặc đã
 xoá trả 404 như mã không tồn tại.
+
+Phản hồi của tài khoản khách hàng (`source = 'customer'`, US-078): cùng đường làm sạch và phân
+loại như `public`, có `user_id` và `public_ref`. Tài khoản đó xem lại qua
+`GET /api/customer/feedback`, chỉ nhận `public_ref`, trạng thái, `created_at` và `text`; RLS
+không cho nó đọc thẳng dòng nào. Dòng `customer` có `retention_until = NULL` (decision 0018 §9):
+job retention chỉ xoá nội dung dòng `public`, mã tra cứu của dòng `customer` không hết hạn, và
+nội dung còn cho tới khi tài khoản bị xoá (cascade).
 
 ### `correction_logs`
 Nhật ký người duyệt sửa nhãn AI (human-in-the-loop). Mỗi lần ai đó sửa `topic`, `sentiment`
@@ -351,8 +364,8 @@ Các giá trị này lặp lại ở nhiều bảng; gom về một chỗ để 
 
 | Khái niệm | Giá trị hợp lệ | Xuất hiện ở |
 |---|---|---|
-| Vai trò (role) | `admin`, `manager`, `staff`, `pending` | `profiles.role` |
-| Nguồn phản hồi | `manual`, `chat`, `public`, tên dataset | `feedback.source` |
+| Vai trò (role) | `admin`, `manager`, `staff`, `pending`, `guest` | `profiles.role`, `mcp_tokens.role` |
+| Nguồn phản hồi | `manual`, `chat`, `public`, `customer`, tên dataset | `feedback.source` |
 | Trạng thái phản hồi (suy ra, không lưu) | `received`, `under_review`, `reviewed` | `GET /api/public/feedback/{public_ref}` |
 | Phòng ban | `IT`, `CSKH`, `Vận hành`, `Tài chính & Thanh toán`, `Sản phẩm`, `Quản lý Rủi ro & Gian lận` | `profiles.department`, `alerts.assigned_team`, `tasks.assigned_team`, `department_reports.team`, `task_completion_reports.team` |
 | Chủ đề (topic) | `Safety`, `Driver Behavior`, `App Issue`, `Payment`, `Pricing`, `Delay`, `Other` | `feedback.topic`, `tasks.topic` |
@@ -374,11 +387,11 @@ tuyến, nhưng không gán user vào đó nữa.
 
 | Tên | Loại | Tác dụng |
 |---|---|---|
-| `handle_new_user()` | Trigger trên `auth.users` | Tạo profile khi có user mới. Profile đầu tiên thành `admin`, còn lại mặc định `pending`. `POST /api/admin/users` gán role thật ngay sau đó. |
+| `handle_new_user()` | Trigger trên `auth.users` | Tạo profile khi có user mới. Profile đầu tiên thành `admin`, còn lại thành `guest` (tài khoản khách hàng, từ migration `20260928000000`). `POST /api/admin/users` gán role Staff ngay sau đó. |
 | `current_user_role()` | SQL, SECURITY DEFINER | Đọc role của user hiện tại mà không gây đệ quy RLS. |
 | `password_is_current()` | SQL | `true` trừ khi JWT hiện tại có `app_metadata.must_change_password = true` (tài khoản còn mật khẩu tạm). Đọc từ `auth.jwt()`, nên sau khi đổi mật khẩu client phải refresh session để có JWT mới. |
 | `is_admin()` | SQL | `true` nếu user hiện tại là admin **và** `password_is_current()`. Dùng trong policy. |
-| `is_ops_staff()` | SQL | `true` nếu role thuộc `admin/manager/staff` (không gồm `pending`) **và** `password_is_current()`. Dùng trong policy. |
+| `is_ops_staff()` | SQL | `true` nếu role thuộc `admin/manager/staff` (không gồm `pending`, `guest`) **và** `password_is_current()`. Dùng trong policy. |
 | `match_graph_nodes(query_embedding, match_count, department_filter)` | plpgsql | Tìm các `SOPSection` gần nhất theo cosine similarity, lọc theo phòng. Trả về id, tiêu đề, nội dung, phòng, độ tương đồng. |
 | `approve_report_and_dispatch(p_report_id, p_tasks, p_approver)` | plpgsql | Duyệt báo cáo và sinh task trong một thao tác nguyên tử: cập nhật `department_reports` rồi INSERT từng phần tử `suggested_tasks` thành `tasks` (`source=report`). Báo lỗi nếu báo cáo đã duyệt. |
 
@@ -394,8 +407,8 @@ PostgREST và realtime cho tới khi đổi mật khẩu và refresh session.
 | Bảng | Đọc | Ghi |
 |---|---|---|
 | `profiles` | Chính chủ hoặc admin | Không ai tự insert/delete (đã thu hồi `INSERT`, `DELETE`, `TRUNCATE`); UPDATE chỉ cột `full_name`. Role và phòng đổi qua backend |
-| `feedback` | Ops staff xem hết; tài khoản khác chỉ dòng của mình; dòng ẩn danh chỉ ops | Chỉ ops staff insert, đúng `user_id` của mình; update/delete chỉ qua backend (service role) |
-| `alerts` | Ops staff xem hết; tài khoản khác chỉ dòng của mình | Chỉ qua backend (service role) |
+| `feedback` | Chỉ ops staff (từ migration `20260928000000`; `pending`, `guest` không đọc được dòng nào, kể cả dòng của mình) | Chỉ ops staff insert, đúng `user_id` của mình; update/delete chỉ qua backend (service role) |
+| `alerts` | Chỉ ops staff (từ migration `20260928000000`) | Chỉ qua backend (service role) |
 | `tasks` | Ops staff | INSERT chỉ service role; UPDATE ops; DELETE admin |
 | `department_reports` | Admin và manager | Chỉ service role |
 | `task_completion_reports` | Authenticated (gate phòng ở API) | Service role; cho phép authenticated insert dự phòng |
@@ -404,7 +417,7 @@ PostgREST và realtime cho tới khi đổi mật khẩu và refresh session.
 | `agent_run_logs` | Admin và manager | Chỉ service role |
 | `audit_logs` | Chỉ admin | Chỉ service role |
 | `graph_nodes`, `graph_edges` | Chỉ ops staff ("Graph nodes select ops" / "Graph edges select ops") | Chỉ service role |
-| `chat_messages` | Chính chủ | Chính chủ |
+| `chat_messages` | Chính chủ, chỉ ops staff (từ migration `20260928000000` mục 4; `pending`, `guest` không đọc được) | Chính chủ, chỉ ops staff. Chat của Customer web không lưu vào bảng này |
 
 ## 12. Bảng nào bật Realtime
 

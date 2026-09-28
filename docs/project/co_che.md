@@ -3,6 +3,8 @@
 > **Cập nhật 2026-06-27:** đồng bộ 6 phòng ban, RAG hybrid, roster agent với code hoàn thiện.
 >
 > **Cập nhật 2026-09-27 (US-077 / decision 0017):** tách Customer web khỏi Staff web, bỏ role `guest` thay bằng `pending`, thêm job xoá nội dung phản hồi ẩn danh quá hạn.
+>
+> **Cập nhật 2026-09-28 (US-078 / decision 0018):** `guest` quay lại làm tài khoản khách hàng (tuỳ chọn, chỉ dùng Customer web); tự đăng ký và tài khoản tạo trong Supabase Dashboard vào với `guest`.
 
 Tài liệu này có hai mục đích trong một file:
 
@@ -276,7 +278,7 @@ Bốn role:
 
 `OPS_ROLES = {admin, manager, staff}` là nhóm nhân sự vận hành. Role thiếu hoặc không hợp lệ rơi về `pending` (fail-closed).
 
-Khách hàng (người ngoài công ty) **không có tài khoản**. Họ gửi phản hồi trên Customer web qua `POST /api/public/feedback` và tra cứu bằng mã tra cứu qua `GET /api/public/feedback/{public_ref}`, chỉ thấy trạng thái (Đã tiếp nhận / Đang xem xét / Đã xem xét) và ngày gửi, không bao giờ thấy nhãn AI. Chi tiết: [guest-account.md](guest-account.md).
+Khách hàng (người ngoài công ty) **không cần tài khoản**. Họ gửi phản hồi trên Customer web qua `POST /api/public/feedback` và tra cứu bằng mã tra cứu qua `GET /api/public/feedback/{public_ref}`, chỉ thấy trạng thái (Đã tiếp nhận / Đang xem xét / Đã xem xét) và ngày gửi, không bao giờ thấy nhãn AI. Nếu muốn, họ tự đăng ký **tài khoản khách hàng** (role `guest`, US-078) trên Customer web để xem lịch sử phản hồi và dùng trợ lý chat qua `/api/customer/*`; tài khoản này không vào được Staff web và bị 403 ở mọi route Staff. Chi tiết: [guest-account.md](guest-account.md).
 
 ### Cách hệ thống chặn xem chéo phòng
 
@@ -348,7 +350,7 @@ Frontend (`AppShell.tsx`) lọc nav theo role, layout `_authenticated` chặn `p
 
 ### Quản lý user và bootstrap
 
-`PATCH /api/users/{id}/role` đổi role, chặn admin tự đổi quyền chính mình, ghi `audit_logs` action `role_change`. `PATCH /api/users/{id}/department` gán phòng, `valid_departments = [null, IT, CSKH, Vận hành, Tài chính & Thanh toán, Sản phẩm, Quản lý Rủi ro & Gian lận]`, ghi audit. `POST /api/admin/users` là đường tạo tài khoản duy nhất trên Staff web (không còn tự đăng ký): admin nhập email, họ tên, role, phòng ban và mật khẩu tạm (5 tiêu chí), backend tạo qua `auth.admin.create_user` với `app_metadata.must_change_password = true` (chỉ service role ghi được), ghi audit; lần đăng nhập đầu phải đổi mật khẩu qua `POST /api/me/password`, endpoint duy nhất xoá cờ. Cờ được chặn ở server: role guard trả 403, MCP HTTP trả 401, và `is_ops_staff()` / `is_admin()` đòi `password_is_current()` nên RLS cũng đóng. Bootstrap: profile đầu tiên của hệ thống thành admin; tài khoản tạo ngoài form của admin (ví dụ Supabase Dashboard) và mọi tài khoản `guest` cũ đều là `pending`, chờ admin duyệt lên staff hoặc manager.
+`PATCH /api/users/{id}/role` đổi role, chặn admin tự đổi quyền chính mình, ghi `audit_logs` action `role_change`. `PATCH /api/users/{id}/department` gán phòng, `valid_departments = [null, IT, CSKH, Vận hành, Tài chính & Thanh toán, Sản phẩm, Quản lý Rủi ro & Gian lận]`, ghi audit. `POST /api/admin/users` là đường tạo tài khoản duy nhất trên Staff web (không còn tự đăng ký): admin nhập email, họ tên, role, phòng ban và mật khẩu tạm (5 tiêu chí), backend tạo qua `auth.admin.create_user` với `app_metadata.must_change_password = true` (chỉ service role ghi được), ghi audit; lần đăng nhập đầu phải đổi mật khẩu qua `POST /api/me/password`, endpoint duy nhất xoá cờ. Cờ được chặn ở server: role guard trả 403, MCP HTTP trả 401, và `is_ops_staff()` / `is_admin()` đòi `password_is_current()` nên RLS cũng đóng. Bootstrap: profile đầu tiên của hệ thống thành admin. Từ US-078, tài khoản tự đăng ký và tài khoản tạo ngoài form của admin (ví dụ Supabase Dashboard) vào với `guest` (tài khoản khách hàng), không vào hàng đợi duyệt và không được nâng lên Staff. Hai tài khoản `guest` cũ trước US-077 vẫn là `pending`, chờ admin duyệt lên staff hoặc manager.
 
 ## 8. Cơ chế sinh báo cáo
 

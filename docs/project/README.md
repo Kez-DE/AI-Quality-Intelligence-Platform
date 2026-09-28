@@ -29,8 +29,8 @@ Thư mục `docs/project` chứa tài liệu mô tả kiến trúc, cơ chế, d
 | Tệp | Mô tả |
 | --- | --- |
 | [data-model.md](data-model.md) | Data dictionary: 10+ bảng Supabase, enums, indexes, triggers, ghi chú lịch sử |
-| [rbac-departments.md](rbac-departments.md) | RBAC 4 roles (admin/manager/staff/pending), phân quyền theo 6 phòng ban |
-| [guest-account.md](guest-account.md) | Khách hàng (Customer web), tài khoản chờ cấp quyền, cách tạo tài khoản |
+| [rbac-departments.md](rbac-departments.md) | RBAC 5 roles (admin/manager/staff/pending/guest), phân quyền theo 6 phòng ban |
+| [guest-account.md](guest-account.md) | Khách hàng (Customer web), tài khoản khách hàng (tuỳ chọn), tài khoản chờ cấp quyền, cách tạo tài khoản |
 
 ## Setup & Deploy
 

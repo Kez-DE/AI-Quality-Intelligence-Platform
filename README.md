@@ -12,7 +12,7 @@
 
 Mục tiêu: giúp đội ngũ vận hành nắm bắt nhanh vấn đề chất lượng dịch vụ, giảm thời gian xử lý, và đưa ra quyết định dựa trên dữ liệu.
 
-> **Phạm vi**: chạy được cả local lẫn deploy. Production chạy trên Railway (6 service Docker; service `customer-web` mới chưa tạo) + Supabase cloud. Stack: FastAPI + Vite + Supabase. Hai web: **Staff web** (`app/`, cho nhân viên) và **Customer web** (`customer-web/`, khách gửi phản hồi không cần tài khoản).
+> **Phạm vi**: chạy được cả local lẫn deploy. Production chạy trên Railway (6 service Docker; service `customer-web` mới chưa tạo) + Supabase cloud. Stack: FastAPI + Vite + Supabase. Hai web: **Staff web** (`app/`, cho nhân viên) và **Customer web** (`customer-web/`, khách gửi phản hồi không cần tài khoản, hoặc đăng ký tài khoản khách hàng để xem lịch sử và chat).
 
 ---
 
@@ -29,10 +29,10 @@ Mục tiêu: giúp đội ngũ vận hành nắm bắt nhanh vấn đề chất 
 | 7 | Human-in-the-Loop | Hàng đợi duyệt nhãn — nhân viên sửa nhãn AI, ghi correction log |
 | 8 | AI Chat & RAG (Tiered) | Hỏi đáp tích hợp Hybrid Search KB, tự động phân quyền truy cập (widget trang chủ `public_only`: Public FAQ / Staff: Internal Ops Tools) |
 | 9 | Streaming Realtime | Ingest phản hồi theo luồng thời gian thực |
-| 10 | RBAC 4 vai trò | Phân quyền admin, manager, staff, pending (chờ cấp quyền); chỉ admin tạo tài khoản |
+| 10 | RBAC 5 vai trò | Phân quyền admin, manager, staff, pending (chờ cấp quyền), guest (tài khoản khách hàng, chỉ dùng Customer web); chỉ admin tạo tài khoản Staff |
 | 11 | Khép kín Báo cáo → Task | HI-Loop Approval: Manager biên tập hành động AI đề xuất trong báo cáo rồi duyệt một nút để tự tạo task chính thức, có liên kết ngược về báo cáo gốc |
 | 12 | MCP Server | Expose tool nghiệp vụ qua MCP (stdio) cho agent ngoài (Claude Desktop...), identity + phân quyền cố định phía server — xem [`docs/project/mcp-server.md`](docs/project/mcp-server.md) |
-| 13 | Customer web | Khách gửi phản hồi và tra cứu trạng thái bằng mã tra cứu, không cần tài khoản; nội dung tự xoá sau 180 ngày — xem [`docs/project/guest-account.md`](docs/project/guest-account.md) |
+| 13 | Customer web | Khách gửi phản hồi và tra cứu trạng thái bằng mã tra cứu, không cần tài khoản (nội dung ẩn danh tự xoá sau 180 ngày); tài khoản khách hàng tuỳ chọn có lịch sử phản hồi và trợ lý chat — xem [`docs/project/guest-account.md`](docs/project/guest-account.md) |
 
 ---
 
@@ -135,13 +135,13 @@ npm install
 VITE_BACKEND_API_URL=http://127.0.0.1:8000 npm run dev
 ```
 
-Customer web không cần biến Supabase nào. Dev server chạy ở cổng 5175 (Staff web ở 5174), nên chạy song song được. Chi tiết: [`customer-web/README.md`](customer-web/README.md).
+Gửi và tra cứu ẩn danh không cần biến Supabase. Đăng nhập tài khoản khách hàng cần thêm `VITE_SUPABASE_URL` và `VITE_SUPABASE_PUBLISHABLE_KEY` (publishable key, không phải service role). Dev server chạy ở cổng 5175 (Staff web ở 5174), nên chạy song song được. Chi tiết: [`customer-web/README.md`](customer-web/README.md).
 
 ### Tài khoản Admin
 
 - Email: `manhnguyn1912@gmail.com` / Password: `12345678`
-- Tài khoản khác: admin tạo bằng form "Tạo tài khoản" trong trang Admin (mật khẩu tạm, bắt đổi ở lần đăng nhập đầu). Staff web không còn form tự đăng ký. Tài khoản tạo trong Supabase Dashboard vào với role `pending` và chờ admin cấp quyền.
-- Chủ dự án cần tắt tự đăng ký và Google/Facebook trong Supabase Dashboard: xem [`docs/project/setup-supabase.md`](docs/project/setup-supabase.md) mục 8.1.
+- Tài khoản khác: admin tạo bằng form "Tạo tài khoản" trong trang Admin (mật khẩu tạm, bắt đổi ở lần đăng nhập đầu). Staff web không có form tự đăng ký. Tài khoản tự đăng ký (trên Customer web) hoặc tạo trong Supabase Dashboard vào với role `guest` (tài khoản khách hàng) và không được nâng lên Staff. Chỉ khi chưa vào được Staff web, chủ dự án mới tạo admin trong Dashboard rồi sửa `role` trong **Table Editor → profiles** (setup-supabase mục 8.4).
+- Giữ bật tự đăng ký và Google/Facebook trong Supabase Dashboard (Customer web cần), và thêm redirect URL của Customer web: xem [`docs/project/setup-supabase.md`](docs/project/setup-supabase.md) mục 8.1 và 8.3.
 
 ---
 
@@ -198,7 +198,8 @@ AI-Quality-Intelligence-Platform/
 - **Manager**: giám sát phòng mình — alerts, feedback, insights, reports, chat
 - **Staff**: công việc hàng ngày phòng mình — feedback, tasks, chat
 - **Pending**: tài khoản chờ cấp quyền, chỉ thấy màn "Tài khoản đang chờ admin cấp quyền"; backend trả 403 trừ `GET /api/me`, `POST /api/me/password` và `/health`
-- **Khách hàng**: không có tài khoản, dùng Customer web
+- **Tài khoản khách hàng** (`guest`): khách tự đăng ký trên Customer web, xem lịch sử phản hồi và dùng trợ lý chat; Staff web chỉ hiện màn "Đây là tài khoản khách hàng", backend trả 403 ở mọi route Staff
+- **Khách hàng không tài khoản**: dùng Customer web bằng mã tra cứu
 
 Ngoài role, mỗi ops user gắn một **phòng ban** (IT/CSKH/Vận hành/Tài chính & Thanh toán/Sản phẩm/Quản lý Rủi ro & Gian lận) quyết định họ thấy dữ liệu của ai. Manager/staff chỉ xem và thao tác trong phòng mình; admin xem tất cả. Chi tiết cơ chế scope: [`docs/project/rbac-departments.md`](docs/project/rbac-departments.md).
 
@@ -260,7 +261,7 @@ Kịch bản chi tiết: [`docs/project/demo-script.md`](docs/project/demo-scrip
 |------|----------|
 | [`docs/project/deploy-railway.md`](docs/project/deploy-railway.md) | Deploy 6 service (+ `customer-web`) lên Railway qua GitHub Actions |
 | [`docs/project/demo-script.md`](docs/project/demo-script.md) | Kịch bản demo 5-7 phút |
-| [`docs/project/guest-account.md`](docs/project/guest-account.md) | Khách hàng (Customer web), tài khoản chờ cấp quyền, cách tạo tài khoản |
+| [`docs/project/guest-account.md`](docs/project/guest-account.md) | Khách hàng (Customer web), tài khoản khách hàng, tài khoản chờ cấp quyền, cách tạo tài khoản |
 | [`docs/project/eval-evidence.md`](docs/project/eval-evidence.md) | Bằng chứng đánh giá model (Gate G2) |
 
 ---

@@ -8,7 +8,7 @@ inspector, ...) truy vấn dữ liệu chất lượng dịch vụ. Nó là adap
 
 Server đọc danh tính từ env lúc khởi động, client KHÔNG truyền được:
 
-- `MCP_ROLE` — `admin` | `manager` | `staff`. Không set hoặc giá trị khác thì rơi về `pending`: không có tool nào (US-077 / decision 0017 đã bỏ role `guest`).
+- `MCP_ROLE` — `admin` | `manager` | `staff`. Không set hoặc giá trị khác thì rơi về `pending`: không có tool nào. Role `guest` (tài khoản khách hàng, US-078 / decision 0018) cũng rơi về `pending`, không có tool.
 - `MCP_SCOPE_TEAM` — tên phòng ban (vd `Tài chính & Thanh toán`); rỗng = toàn hệ thống,
   chỉ hợp lệ khi role `admin`. Bắt buộc khi role `staff`/`manager`.
 

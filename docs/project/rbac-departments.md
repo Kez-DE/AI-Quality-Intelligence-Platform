@@ -3,10 +3,12 @@
 > **Cập nhật 2026-06-27:** đồng bộ 6 phòng ban & phân tầng quyền chat.
 >
 > **Cập nhật 2026-09-27 (US-077 / decision 0017):** bỏ role `guest`, thay bằng `pending` (tài khoản chờ cấp quyền); chỉ admin tạo tài khoản.
+>
+> **Cập nhật 2026-09-28 (US-078 / decision 0018):** `guest` quay lại làm tài khoản khách hàng (tuỳ chọn, chỉ dùng Customer web); tự đăng ký và tài khoản tạo trong Supabase Dashboard vào với `guest`.
 
 Hệ thống có hai trục phân quyền: **role** (cấp độ quyền) và **department** (phòng ban, quyết định thấy dữ liệu của ai). Backend chạy bằng `SUPABASE_SERVICE_ROLE_KEY` nên bypass RLS của Postgres, vì vậy mọi kiểm tra quyền phải làm ở tầng API trong `pipeline/auth_guard.py`.
 
-## 4 role
+## 5 role
 
 | Role | Nhãn UI | Quyền |
 |------|---------|-------|
@@ -14,10 +16,11 @@ Hệ thống có hai trục phân quyền: **role** (cấp độ quyền) và **
 | `manager` | Quản lý | Giám sát phòng mình: alerts, tasks, insights, reports, chat |
 | `staff` | Nhân viên | Công việc hàng ngày phòng mình: feedback, tasks, chat |
 | `pending` | Chờ cấp quyền | Không có quyền gì cho tới khi admin cấp role. Backend trả 403 ở mọi endpoint trừ `GET /api/me`, `POST /api/me/password` và `/health` |
+| `guest` | Khách hàng | Tài khoản khách hàng: chỉ dùng Customer web qua `/api/customer/*` (`require_customer`). Mọi route Staff trả 403; Staff web chỉ hiện màn "Đây là tài khoản khách hàng" |
 
-`VALID_ROLES = {admin, manager, staff, pending}`. `OPS_ROLES = {admin, manager, staff}` là nhóm nhân sự vận hành. Profile thiếu hoặc role không hợp lệ đều rơi về `pending` (fail-closed).
+`VALID_ROLES = {admin, manager, staff, pending, guest}`. `OPS_ROLES = {admin, manager, staff}` là nhóm nhân sự vận hành. Profile thiếu hoặc role không hợp lệ đều rơi về `pending` (fail-closed).
 
-Khách hàng (người ngoài công ty) **không có tài khoản** và không có role: họ gửi phản hồi qua Customer web (`/api/public/*`, không token). Xem [guest-account.md](guest-account.md).
+Khách hàng (người ngoài công ty) **không cần tài khoản**: họ gửi phản hồi qua Customer web (`/api/public/*`, không token). Tài khoản khách hàng (`guest`) là tuỳ chọn. Xem [guest-account.md](guest-account.md).
 
 ## 6 phòng ban
 
@@ -95,7 +98,7 @@ Endpoint admin-only (qua `require_admin`): `GET /api/agent/stats`, `POST /api/in
 - `POST /api/me/password` — chính chủ đổi mật khẩu `{new_password}` (cùng 5 tiêu chí). Backend gọi `auth.admin.update_user_by_id` với mật khẩu mới và `app_metadata {must_change_password: false}`; lỗi 400/503 không bao giờ lặp lại mật khẩu. Không cần role, nên tài khoản còn mật khẩu tạm hoặc `pending` đều gọi được.
 - `POST /api/users/bulk-approve` — duyệt hàng loạt tài khoản `pending` thành staff/manager.
 
-Bootstrap: profile **đầu tiên** của hệ thống thành admin; mọi tài khoản tạo ngoài form của admin (ví dụ qua Supabase Dashboard) mặc định `pending`. Staff web không còn form tự đăng ký.
+Bootstrap: profile **đầu tiên** của hệ thống thành admin; mọi tài khoản tự đăng ký hoặc tạo ngoài form của admin (ví dụ qua Supabase Dashboard) vào với `guest` (tài khoản khách hàng). Staff web không có form tự đăng ký, và không nâng tài khoản khách hàng lên Staff.
 
 ---
 

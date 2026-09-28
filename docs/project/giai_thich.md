@@ -3,6 +3,8 @@
 > **Cập nhật 2026-06-27:** đồng bộ 6 phòng ban, RAG hybrid, roster agent với code hoàn thiện.
 >
 > **Cập nhật 2026-09-27 (US-077 / decision 0017):** tách Customer web khỏi Staff web, bỏ role `guest` thay bằng `pending`, chỉ admin tạo tài khoản.
+>
+> **Cập nhật 2026-09-28 (US-078 / decision 0018):** `guest` quay lại làm tài khoản khách hàng (tuỳ chọn, chỉ dùng Customer web); tự đăng ký và tài khoản tạo trong Supabase Dashboard vào với `guest`.
 
 Tài liệu này mô tả toàn bộ cách hệ thống vận hành: một phản hồi của khách đi vào, được phân loại, định tuyến về phòng ban, rồi xử lý ra sao. Phần sau giải thích các loại tài khoản, các bộ máy chạy nền, các lớp AI, và đi qua từng màn hình của ứng dụng kèm các nút bấm chính.
 
@@ -91,9 +93,9 @@ Cách hệ thống chặn xem chéo phòng: backend chạy bằng service role k
 - `scoped_team` dùng cho endpoint danh sách: admin thấy tất cả, ops bị ép lọc về đúng phòng mình, ops chưa gán phòng bị chặn 403.
 - `can_view_team` dùng cho thao tác trên một record: chặn ghi/đọc chéo phòng.
 
-Khách hàng (người ngoài công ty) không có tài khoản và không có role. Họ gửi phản hồi trên Customer web và tra cứu bằng mã tra cứu (xem mục Customer web ở phần 5).
+Khách hàng (người ngoài công ty) không cần tài khoản. Họ gửi phản hồi trên Customer web và tra cứu bằng mã tra cứu (xem mục Customer web ở phần 5). Nếu muốn, họ tự đăng ký tài khoản khách hàng (role `guest`) để xem lịch sử phản hồi và dùng trợ lý chat; tài khoản này không vào được Staff web.
 
-Tạo tài khoản: chỉ admin tạo, bằng form "Tạo tài khoản" trong trang Quản lý người dùng; Staff web không còn form tự đăng ký. Bootstrap: profile đầu tiên của hệ thống thành admin. Tài khoản tạo ngoài form của admin (ví dụ trong Supabase Dashboard) và các tài khoản `guest` cũ đều là `pending`, chờ admin duyệt lên staff hoặc manager.
+Tạo tài khoản: chỉ admin tạo, bằng form "Tạo tài khoản" trong trang Quản lý người dùng; Staff web không còn form tự đăng ký. Bootstrap: profile đầu tiên của hệ thống thành admin. Tài khoản tự đăng ký và tài khoản tạo ngoài form của admin (ví dụ trong Supabase Dashboard) vào với `guest` (tài khoản khách hàng), không được nâng lên Staff. Hai tài khoản `guest` cũ trước US-077 vẫn là `pending`, chờ admin duyệt lên staff hoặc manager.
 
 Chat cũng phân quyền theo phòng và chỉ dành cho ops (tài khoản `pending` bị chặn 403). Khi widget trang chủ gửi cờ `public_only`, trợ lý chạy tầng công khai với prompt riêng, chỉ trả lời về cách dùng app, đặt xe, thanh toán, khuyến mãi, khiếu nại, và không bao giờ chạm dữ liệu nội bộ. Ops dùng prompt nội bộ kèm RAG, và mọi truy vấn bị ép lọc về phòng của họ (admin xem toàn hệ thống). Cả hai luồng đều che PII ở cả đầu vào lẫn đầu ra.
 
