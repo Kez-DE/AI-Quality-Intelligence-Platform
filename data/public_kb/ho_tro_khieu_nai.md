@@ -4,6 +4,7 @@ category: faq
 audience: public
 topic_group: CSKH
 source_url: https://www.greensm.com/vn-vi/terms-policies/consumer-protection-policy
+sources: [https://www.greensm.com/vn-vi/terms-policies/consumer-protection-policy, https://www.greensm.com/vn-vi/terms-policies/privacy-notice]
 source: greensm_public_policy
 source_checked_at: 2026-06-19
 ---
@@ -14,12 +15,12 @@ source_checked_at: 2026-06-19
 
 Khách có thể gửi yêu cầu hỗ trợ hoặc khiếu nại qua các kênh sau:
 
-- Mục **Hỗ trợ/Trung tâm hỗ trợ** trong ứng dụng Green SM.
-- Hotline đặt xe/hỗ trợ: **1555**.
-- Email chăm sóc khách hàng: **support.vn@greensm.com**.
+- Mục Hỗ trợ/Trung tâm hỗ trợ trong ứng dụng Green SM.
+- Hotline đặt xe/hỗ trợ: 1555.
+- Email chăm sóc khách hàng: support.vn@greensm.com.
 
-Với vấn đề liên quan đến bảo vệ dữ liệu cá nhân, chính sách công khai của Green SM
-liệt kê kênh liên hệ DPO qua **DPOoffice@greensm.com** và số **1900 2097**.
+Với vấn đề liên quan đến bảo vệ dữ liệu cá nhân, Thông báo bảo vệ dữ liệu cá nhân
+của Green SM liệt kê kênh liên hệ DPO qua email DPOoffice@greensm.com.
 
 ## Thông tin nên cung cấp khi khiếu nại
 
