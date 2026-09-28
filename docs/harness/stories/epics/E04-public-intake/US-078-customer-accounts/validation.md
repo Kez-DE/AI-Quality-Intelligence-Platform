@@ -1,8 +1,8 @@
 # Validation
 
-Proof status: **implemented** (2026-09-28), with open items. Three E2E cases
-are blocked by the environment: chat with a real model (and filing through
-chat), delivery of a real reset email, and Google/Facebook OAuth. The local
+Proof status: **implemented** (2026-09-28), with open items. Two E2E cases
+are blocked by the environment: delivery of a real reset email, and
+Google/Facebook OAuth. The local
 migration layer did not run, so the first-profile-admin branch and a behavioural
 CHECK rejection are unproven. See Known Gaps and Acceptance Evidence.
 
@@ -149,13 +149,24 @@ copy; the orchestrator applies remote changes after the owner approves.
   - Logged out, the chat panel only asks the visitor to log in, and the
     anonymous form posts to `/api/public/feedback` (`source = 'public'`,
     `user_id` NULL, retention set).
-  - Chat: `POST /api/customer/chat` 200 and the reply renders. Found and fixed:
+  - Chat: `POST /api/customer/chat` 200 and the repl  - Chat: `POST /api/customer/chat` 200 and the reply renders. Found and fixed:
     in Chrome 153 the first reply blanked the page ("destroy is not a
-    function"). The reply came from the mock provider: the OpenRouter key
-    returns 401 "User not found", the OpenAI key is rejected, and there is no
-    Gemini or Groq key. **Not verified:** a real model answer, and filing
-    Feedback through chat. Only pytest with a stub model covers that path.
-  - Forgot password: `POST /auth/v1/recover` goes out with `redirect_to`
+    function"). The first run answered from the mock provider (the OpenRouter
+    and OpenAI keys were rejected); the owner replaced the OpenRouter key and
+    the run was repeated with a new test account:
+    - A policy question ("để quên đồ trên xe") got a real answer from
+      `openrouter` / `google/gemini-2.5-flash-lite`. Markdown such as `**…**`
+      shows as plain text, since replies never render as HTML.
+    - Asking the assistant to record a complaint made it call
+      `submit_feedback`. The reply carried the stored Lookup code. The row has
+      `source = 'customer'`, `channel = 'chat'`, the account's `user_id`, the
+      classifier's labels (Safety, negative, P5, `needs_review`) and
+      `retention_until` NULL. `/cua-toi` lists it as "Đang xem xét" with no AI
+      label. The stored text is the model's rewording of the Customer's
+      message, not the typed words.
+    - The three new `agent.log` events (openrouter, ok) carry no
+      `prompt_preview`; no line holds the chat text.
+t with `redirect_to`
     `http://localhost:5175/dat-lai-mat-khau`. Supabase refused the test address
     (`email_address_invalid`), so no mail was sent. Found and fixed: the form
     said "try again in a few minutes"; it now explains `email_address_invalid`
