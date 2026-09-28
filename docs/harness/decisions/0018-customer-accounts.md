@@ -185,7 +185,10 @@ Tradeoffs:
 - Captcha or Turnstile on `/dang-ky`, if sign-up abuse appears.
 - Fix the Customer web production domain and add it to the Supabase redirect
   allow list before the deploy.
-- Whether an admin may ever change a `guest` to a Staff role through
-  `PATCH /api/users/{id}/role`. Until that is decided, the Staff web does not
-  offer it (§7) and a Staff account is created with `POST /api/admin/users`.
-  The backend rule for that route lives in `pipeline/users_admin.py`.
+- Decided 2026-09-28: `PATCH /api/users/{id}/role` refuses every change away
+  from `guest` (400), `pending` included, so `guest → pending → staff` cannot
+  promote a Customer account in two steps. `POST /api/users/bulk-approve` only
+  touches `pending` rows. A Customer account can only be deleted; a Staff
+  account comes from `POST /api/admin/users` (§7).
+- Whether `prompt_preview` in `pipeline/logs/agent.log` may carry Customer chat
+  text and submitted Feedback text (US-078 Known Gaps).
