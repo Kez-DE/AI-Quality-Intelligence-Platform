@@ -57,7 +57,6 @@ function FeedbackPage() {
   const initializedRef = useRef(false);
 
   const { data: me } = useMe();
-  const isGuest = me?.role === "guest";
 
   const search = Route.useSearch();
   const [activeFilter, setActiveFilter] = useState<FilterType>(
@@ -142,14 +141,10 @@ function FeedbackPage() {
       }
       initializedRef.current = true;
       setList(rows);
-      if (isGuest) {
-        setQueue([]);
-      } else {
-        const queueJson = await apiFetch<{ data?: Feedback[] }>(
-          "/api/feedback/recent?limit=200&needs_review=true&reviewed=false",
-        );
-        setQueue(queueJson.data ?? []);
-      }
+      const queueJson = await apiFetch<{ data?: Feedback[] }>(
+        "/api/feedback/recent?limit=200&needs_review=true&reviewed=false",
+      );
+      setQueue(queueJson.data ?? []);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Không đọc được live feedback");
     }
@@ -273,8 +268,7 @@ function FeedbackPage() {
       </section>
 
       {/* 2. Stat cards */}
-      {!isGuest && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <StatCard 
             label="Tổng phản hồi" 
             value={stats.total} 
@@ -307,12 +301,10 @@ function FeedbackPage() {
             onClick={() => setActiveFilter("low_conf")}
             isActive={activeFilter === "low_conf"}
           />
-        </div>
-      )}
+      </div>
 
       {/* 3. Hai cột: Luồng phản hồi (trái) | Cần duyệt (phải) */}
-      {!isGuest && (
-        <div className="grid lg:grid-cols-2 gap-4 items-start">
+      <div className="grid lg:grid-cols-2 gap-4 items-start">
           {/* Cột trái: Luồng phản hồi */}
         <section className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
           <div className="p-5 border-b border-border flex items-center justify-between">
@@ -407,7 +399,6 @@ function FeedbackPage() {
           )}
         </section>
       </div>
-      )}
     </div>
   );
 }
@@ -452,6 +443,10 @@ function FeedbackRow({
         )}
       </div>
       <div className="col-span-12 sm:col-span-5 flex flex-wrap justify-start sm:justify-end gap-1.5 items-center">
+        {/* Sent through the Customer web: 'public' = no account, 'customer' = Customer account. */}
+        {(f.source === "public" || f.source === "customer") && (
+          <Pill tone="green">Khách hàng</Pill>
+        )}
         {f.topic && <Pill icon={Tag}>{topicLabel(f.topic)}</Pill>}
         {f.sentiment && (
           <Pill tone={f.sentiment === "negative" ? "coral" : f.sentiment === "positive" ? "green" : "mint"}>

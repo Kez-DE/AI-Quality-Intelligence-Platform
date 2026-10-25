@@ -142,7 +142,10 @@ def ingest_dataset(
     with open(json_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
         
-    profiles_res = db.table("profiles").select("id").limit(1).execute()
+    # Dataset owner = oldest admin, as for alerts (spike_detector, ticket_agent): any
+    # other profile may be a self-signed-up Customer account (decision 0018), and
+    # feedback.user_id is ON DELETE CASCADE.
+    profiles_res = db.table("profiles").select("id").eq("role", "admin").order("created_at").limit(1).execute()
     mock_user_id = None
     if profiles_res.data:
         mock_user_id = profiles_res.data[0]["id"]

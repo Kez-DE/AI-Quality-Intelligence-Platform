@@ -145,6 +145,40 @@ async def test_whitespace_only_text_rejected(db):
     assert db.tables["feedback"] == []
 
 
+@pytest.mark.asyncio
+async def test_honeypot_filled_is_rejected_and_nothing_stored(db):
+    """The `website` field is hidden from humans; only a bot fills it (decision 0017)."""
+    async with client() as c:
+        res = await submit(c, website="http://spam.example")
+
+    assert res.status_code == 400
+    assert res.json()["error"]["message"] == "Invalid submission"
+    assert db.tables["feedback"] == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("website", ["", "   ", None])
+async def test_honeypot_left_empty_is_accepted(db, website):
+    async with client() as c:
+        res = await submit(c, website=website)
+    assert res.status_code == 200
+    assert len(db.tables["feedback"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_honeypot_hit_still_counts_against_the_rate_limit(db, monkeypatch):
+    """A bot that trips the honeypot must not get free retries."""
+    monkeypatch.setattr(public_intake.public_intake_limit, "max_requests", 2)
+
+    async with client() as c:
+        for _ in range(2):
+            assert (await submit(c, website="x")).status_code == 400
+        blocked = await submit(c)
+
+    assert blocked.status_code == 429
+    assert db.tables["feedback"] == []
+
+
 # ---------------------------------------------------------------------------
 # Abuse control without an account to key on
 # ---------------------------------------------------------------------------
@@ -223,9 +257,13 @@ async def test_status_lookup_returns_only_allowlisted_fields(db):
 
     assert res.status_code == 200
     data = res.json()["data"]
-    assert set(data) == {"public_ref", "status", "created_at", "topic", "severity"}
-    # A leaked reference must not hand over the body or the internal scoring.
-    for leaked in ("user_id", "submitter_hash", "retention_until", "text", "confidence"):
+    # Decision 0017: a Customer never sees the AI labels, so topic and severity
+    # left the allowlist along with everything else internal.
+    assert set(data) == {"public_ref", "status", "created_at"}
+    for leaked in (
+        "user_id", "submitter_hash", "retention_until", "text", "confidence",
+        "topic", "severity", "sentiment", "redacted_at",
+    ):
         assert leaked not in data
 
 
@@ -244,7 +282,7 @@ async def test_status_reflects_review_progress(db):
 
         row["reviewed"] = True
         got = await c.get(f"/api/public/feedback/{ref}")
-        assert got.json()["data"]["status"] == "resolved"
+        assert got.json()["data"]["status"] == "reviewed"
 
 
 @pytest.mark.asyncio
@@ -252,6 +290,26 @@ async def test_unknown_reference_is_404(db):
     async with client() as c:
         res = await c.get("/api/public/feedback/does-not-exist", headers={"x-forwarded-for": IP_A})
     assert res.status_code == 404
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "gone",
+    [
+        {"retention_until": "2000-01-01T00:00:00+00:00"},  # past its retention deadline
+        {"redacted_at": "2026-09-27T03:00:00+00:00"},       # text already wiped
+    ],
+)
+async def test_expired_or_redacted_reference_is_404_like_unknown(db, gone):
+    """Same answer as a code that never existed, so the endpoint is not an oracle."""
+    async with client() as c:
+        ref = (await submit(c)).json()["data"]["public_ref"]
+        db.tables["feedback"][0].update(gone)
+        res = await c.get(f"/api/public/feedback/{ref}")
+        unknown = await c.get("/api/public/feedback/never-issued")
+
+    assert res.status_code == 404
+    assert res.json() == unknown.json()
 
 
 @pytest.mark.asyncio
@@ -280,7 +338,9 @@ async def test_status_lookup_is_rate_limited(db, monkeypatch):
 
 
 def test_derive_status_mapping():
-    assert public_intake.derive_status({"reviewed": True, "needs_review": True}) == "resolved"
+    # "reviewed" means staff checked the AI label, not that the problem is fixed
+    # (CONTEXT.md: Feedback status). The old "resolved" over-promised.
+    assert public_intake.derive_status({"reviewed": True, "needs_review": True}) == "reviewed"
     assert public_intake.derive_status({"needs_review": True}) == "under_review"
     assert public_intake.derive_status({}) == "received"
 
@@ -290,7 +350,7 @@ def test_derive_status_mapping():
 # ---------------------------------------------------------------------------
 
 
-GUARDS = {"get_current_user", "require_admin", "require_manager", "require_ops_staff"}
+GUARDS = {"get_current_user", "require_admin", "require_manager", "require_ops_staff", "require_customer"}
 
 
 def iter_api_routes(node):
@@ -329,4 +389,43 @@ def test_public_routes_are_the_only_new_unguarded_ones():
         "/health",
         "/api/public/feedback",
         "/api/public/feedback/{public_ref}",
+    }
+
+
+ROLE_GUARDS = GUARDS - {"get_current_user"}
+
+
+def test_only_api_me_accepts_any_authenticated_role():
+    """Decision 0017: a Pending account reaches nothing but `/api/me` and changing
+    its own password (`/api/me/password`, also the only way out of a temporary one).
+
+    `get_current_user` alone only proves a valid JWT; a Pending account passes
+    it. Every other authenticated route must sit behind a role guard, so a new
+    route written with bare `get_current_user` fails here instead of quietly
+    serving Pending accounts.
+    """
+    identity_only = set()
+    for route in iter_api_routes(app):
+        names = {
+            d.call.__name__ for d in route.dependant.dependencies if getattr(d, "call", None)
+        }
+        if "get_current_user" in names and not names & ROLE_GUARDS:
+            identity_only.add(route.path)
+
+    assert identity_only == {"/api/me", "/api/me/password"}
+
+
+def test_customer_routes_sit_behind_require_customer_only():
+    """US-078: /api/customer/* is the Customer account's surface, and no staff
+    role guard is mixed in (a guest must pass, a staff role must not)."""
+    customer = {}
+    for route in iter_api_routes(app):
+        if route.path.startswith("/api/customer"):
+            names = {d.call.__name__ for d in route.dependant.dependencies if getattr(d, "call", None)}
+            for method in route.methods:
+                customer[(method, route.path)] = names & ROLE_GUARDS
+    assert customer == {
+        ("POST", "/api/customer/feedback"): {"require_customer"},
+        ("GET", "/api/customer/feedback"): {"require_customer"},
+        ("POST", "/api/customer/chat"): {"require_customer"},
     }

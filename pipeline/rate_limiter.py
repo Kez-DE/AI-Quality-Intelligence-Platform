@@ -1,24 +1,22 @@
 """In-memory sliding window rate limiter for FastAPI.
 
-Dùng làm dependency để giới hạn số request của guest user theo scope.
-Staff/admin/manager được bypass hoàn toàn.
+Dùng làm dependency để giới hạn số request theo scope; staff/admin/manager được
+bypass hoàn toàn. Route không có tài khoản (public intake) và các tầng chat gọi
+thẳng check_rate_limit(limiter, key) với key tự chọn.
 
 Cách dùng:
     from rate_limiter import RateLimiter
 
-    guest_feedback_limit = RateLimiter(max_requests=10, window_seconds=3600, scope="feedback")
+    report_limit = RateLimiter(max_requests=10, window_seconds=3600, scope="report")
 
-    @app.post("/api/feedback/submit")
-    def submit_feedback(
-        payload: dict,
+    @app.post("/api/example")
+    def example(
         user: AuthUser = Depends(get_current_user),
-        _: None = Depends(guest_feedback_limit),
+        _: None = Depends(report_limit),
     ):
         ...
 
 Preset instances:
-    - guest_feedback_limit: 10 req / hour
-    - guest_chat_limit:     20 req / hour
     - general_api_limit:   100 req / minute
 """
 
@@ -136,12 +134,6 @@ class RateLimiter:
 # ------------------------------------------------------------------
 # Pre-configured instances for common use cases
 # ------------------------------------------------------------------
-
-# Guest feedback submission: 10 per hour
-guest_feedback_limit = RateLimiter(max_requests=10, window_seconds=3600, scope="feedback")
-
-# Guest chat messages: 20 per hour
-guest_chat_limit = RateLimiter(max_requests=20, window_seconds=3600, scope="chat")
 
 # General API calls: 100 per minute (applies to any user scope)
 general_api_limit = RateLimiter(max_requests=100, window_seconds=60, scope="general")

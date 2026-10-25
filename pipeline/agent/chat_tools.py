@@ -5,7 +5,6 @@ from agents.common import get_db
 from agents.router_agent import route_ticket
 from departments import alert_department
 from ingest import get_supabase
-from clean import mask_pii
 from .knowledge_base import search_knowledge, format_for_prompt
 from .rag_engine import _vector_search, _hybrid_merge, embedder
 
@@ -98,34 +97,34 @@ def get_team_priority_tasks(team_name: str) -> str:
         return f"Lỗi truy xuất dữ liệu: {str(e)}"
 
 
-def submit_feedback(content: str, topic: str = "Other", sentiment: str = "negative", user_id: str | None = None) -> str:
-    """Gửi phản hồi/khiếu nại của khách hàng vào hệ thống Supabase.
+def submit_feedback(content: str, user_id: str | None = None) -> str:
+    """Gửi phản hồi từ trợ lý công khai (public_only của staff) vào `feedback`.
 
-    Cột phải khớp lược đồ `feedback`: nội dung nằm ở `text`, và `user_id` là
-    NOT NULL — thiếu nó thì bản ghi không vào được, nên phải từ chối rõ ràng
-    thay vì để tầng dưới ném lỗi rồi bị nuốt.
+    Nhãn (topic/sentiment/severity) do classifier gán qua cùng đường với public
+    intake — không để model tự chọn nhãn hay mặc định P3 (decision 0018).
+    `user_id` bắt buộc: bản ghi không có public_ref thì phải có chủ
+    (feedback_identity_chk), nên từ chối rõ ràng thay vì để tầng dưới ném lỗi.
     """
     if not user_id:
         return "Không gửi được phản hồi: phiên đăng nhập chưa xác định người gửi."
     try:
+        from public_intake import MAX_PUBLIC_TEXT, classified_fields
+
         db = get_supabase()
-        safe_content = mask_pii(content[:2000])
         row = {
             "id": str(uuid.uuid4()),
             "user_id": user_id,
-            "text": safe_content,
-            "topic": topic,
-            "sentiment": sentiment,
-            "severity": "P3",  # default severity cho feedback từ chat
             "source": "chat",
-            "needs_review": True,
             "reviewed": False,
+            **classified_fields(content[:MAX_PUBLIC_TEXT]),
+            # Unchanged staff flow: every landing-assistant report goes to the Review Queue.
+            "needs_review": True,
         }
         db.table("feedback").insert(row).execute()
         return f"✅ Phản hồi của bạn đã được ghi nhận thành công! Chúng tôi sẽ xem xét và phản hồi sớm nhất có thể."
     except Exception as e:
-        print(f"[chat_tools] submit_feedback failed: {e}")
-        return f"Lỗi khi gửi phản hồi: {str(e)[:200]}"
+        print(f"[chat_tools] submit_feedback failed: {type(e).__name__}")
+        return "Không gửi được phản hồi, vui lòng thử lại."
 
 
 def search_knowledge_base(query: str, scope_team: str | None = None, sources_out: list | None = None) -> str:
@@ -318,8 +317,8 @@ TOOLS_DEFINITIONS = [
     }
 ]
 
-# ── Tool definitions cho GUEST (giới hạn, chỉ 1 tool) ─────────────────────────
-GUEST_TOOLS_DEFINITIONS = [
+# ── Tool definitions cho TẦNG CÔNG KHAI (public_only, chỉ 1 tool) ──────────────
+PUBLIC_TOOLS_DEFINITIONS = [
     {
         "type": "function",
         "function": {
@@ -331,15 +330,6 @@ GUEST_TOOLS_DEFINITIONS = [
                     "content": {
                         "type": "string",
                         "description": "Nội dung phản hồi/khiếu nại của khách hàng"
-                    },
-                    "topic": {
-                        "type": "string",
-                        "description": "Chủ đề vấn đề. Chọn một trong: Driver Behavior, Safety, Payment, App Issue, Other"
-                    },
-                    "sentiment": {
-                        "type": "string",
-                        "enum": ["negative", "neutral", "positive"],
-                        "description": "Cảm xúc của phản hồi"
                     }
                 },
                 "required": ["content"]
@@ -366,16 +356,12 @@ def execute_tool(name: str, args: dict, scope_team: str | None = None, sources_o
     return f"Error: Tool '{name}' not found"
 
 
-def execute_guest_tool(name: str, args: dict, user_id: str | None = None) -> str:
-    """Thực thi tool dành riêng cho GUEST (submit_feedback)."""
+def execute_public_tool(name: str, args: dict, user_id: str | None = None) -> str:
+    """Thực thi tool của tầng công khai (submit_feedback)."""
     if name == "submit_feedback":
-        return submit_feedback(
-            content=args.get("content", ""),
-            topic=args.get("topic", "Other"),
-            sentiment=args.get("sentiment", "negative"),
-            user_id=user_id,
-        )
-    return f"Error: Guest tool '{name}' not found"
+        # Labels come from the classifier; any topic/sentiment the model sends is ignored.
+        return submit_feedback(content=str(args.get("content", "")), user_id=user_id)
+    return f"Error: Public tool '{name}' not found"
 
 
 # ── Phân tầng tool theo VAI TRÒ (role) ────────────────────────────────────────

@@ -202,7 +202,6 @@ function SankeyCanvas({ flows }: { flows: SankeyLink[] }) {
 export function SankeyFlow() {
   const { data: ov, isLoading } = useCockpitOverview();
   const flows = ov?.sankey_flows ?? [];
-  const isGuest = ov?.scope?.restricted;
 
   return (
     <Card>
@@ -214,10 +213,10 @@ export function SankeyFlow() {
       <div className="px-4 pb-4 pt-2">
         {isLoading ? (
           <div className="h-72 animate-pulse bg-muted/40 rounded-xl" />
-        ) : isGuest || flows.length === 0 ? (
+        ) : flows.length === 0 ? (
           <div className="h-72 flex flex-col items-center justify-center text-xs text-muted-foreground gap-2">
             <GitBranch className="h-7 w-7 opacity-30" />
-            <span>{isGuest ? "Không khả dụng cho tài khoản Khách" : "Chưa có dữ liệu luồng"}</span>
+            <span>Chưa có dữ liệu luồng</span>
           </div>
         ) : (
           <SankeyCanvas flows={flows} />

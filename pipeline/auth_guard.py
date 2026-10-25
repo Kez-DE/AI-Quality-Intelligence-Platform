@@ -18,7 +18,11 @@ from fastapi import Depends, Header, HTTPException
 
 from ingest import get_supabase
 
-VALID_ROLES = {"admin", "manager", "staff", "guest"}
+# pending = Pending account (CONTEXT.md): no access until an admin grants a
+# Staff role; every fail-closed fallback lands on 'pending'.
+# guest = Customer account (decision 0018): a self sign-up, reaches only
+# /api/customer/* (require_customer) and /api/me.
+VALID_ROLES = {"admin", "manager", "staff", "pending", "guest"}
 OPS_ROLES = {"admin", "manager", "staff"}
 
 
@@ -28,6 +32,9 @@ class AuthUser:
     email: str | None
     role: str
     department: str | None
+    # Admin-created account still on its temporary password (decision 0017).
+    # Read from app_metadata, which only the service role can write.
+    must_change_password: bool = False
 
 
 def _extract_token(authorization: str | None) -> str:
@@ -54,29 +61,52 @@ def get_current_user(authorization: str | None = Header(default=None)) -> AuthUs
         raise HTTPException(status_code=401, detail="Không xác thực được người dùng")
 
     profile = db.table("profiles").select("role,email,department").eq("id", user.id).limit(1).execute().data or []
-    role = (profile[0].get("role") if profile else None) or "guest"
+    role = (profile[0].get("role") if profile else None) or "pending"
     department = profile[0].get("department") if profile else None
     if role not in VALID_ROLES:
-        role = "guest"
+        role = "pending"
 
-    return AuthUser(id=user.id, email=getattr(user, "email", None), role=role, department=department)
+    app_meta = getattr(user, "app_metadata", None) or {}
+    return AuthUser(
+        id=user.id,
+        email=getattr(user, "email", None),
+        role=role,
+        department=department,
+        must_change_password=app_meta.get("must_change_password") is True,
+    )
+
+
+def _require_password_changed(user: AuthUser) -> None:
+    # Only /api/me and POST /api/me/password skip this: every role guard calls it.
+    if user.must_change_password:
+        raise HTTPException(status_code=403, detail="Bạn cần đổi mật khẩu tạm trước khi tiếp tục")
 
 
 def require_ops_staff(user: AuthUser = Depends(get_current_user)) -> AuthUser:
     if user.role not in OPS_ROLES:
         raise HTTPException(status_code=403, detail="Yêu cầu quyền staff/manager/admin")
+    _require_password_changed(user)
     return user
 
 
 def require_admin(user: AuthUser = Depends(get_current_user)) -> AuthUser:
     if user.role != "admin":
         raise HTTPException(status_code=403, detail="Yêu cầu quyền admin")
+    _require_password_changed(user)
     return user
 
 
 def require_manager(user: AuthUser = Depends(get_current_user)) -> AuthUser:
     if user.role not in {"manager", "admin"}:
         raise HTTPException(status_code=403, detail="Yêu cầu quyền manager hoặc admin")
+    _require_password_changed(user)
+    return user
+
+
+def require_customer(user: AuthUser = Depends(get_current_user)) -> AuthUser:
+    if user.role != "guest":
+        raise HTTPException(status_code=403, detail="Chỉ dành cho tài khoản khách hàng")
+    _require_password_changed(user)
     return user
 
 

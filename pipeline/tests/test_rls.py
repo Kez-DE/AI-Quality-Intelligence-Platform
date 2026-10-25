@@ -15,24 +15,24 @@ class TestSupabaseRLS(unittest.TestCase):
     def setUp(self):
         self.anon_client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-    def test_guest_cannot_read_alerts(self):
-        # Guest (anon) không được phép đọc bảng alerts (yêu cầu auth)
+    def test_anon_cannot_read_alerts(self):
+        # Anon (chưa đăng nhập) không được phép đọc bảng alerts (yêu cầu auth)
         # Sẽ trả về mảng rỗng (RLS block) hoặc lỗi quyền
         response = self.anon_client.table("alerts").select("*").limit(1).execute()
         # RLS có thể trả về mảng rỗng thay vì lỗi
-        self.assertEqual(len(response.data), 0, "Guest/Anon không được phép nhìn thấy alerts")
+        self.assertEqual(len(response.data), 0, "Anon không được phép nhìn thấy alerts")
 
-    def test_guest_can_insert_feedback(self):
-        # Guest được phép insert feedback (nếu policy cho phép insert on public)
-        # Tuy nhiên tuỳ thuộc vào policy hiện tại, test này kiểm tra xem insert có hoạt động hay bị chặn.
-        # Ở đây ta mong muốn nó insert được nếu đúng policy
+    def test_anon_insert_feedback_is_not_attempted(self):
+        # Anon không có quyền nào trên feedback (REVOKE ALL, 20260923000000); chỉ
+        # ops staff được INSERT trực tiếp (20260927000000). Không thử ghi ở đây vì
+        # test này chạy trên Supabase thật — kiểm chứng bằng local stack (US-077).
         pass
 
-    def test_guest_cannot_update_feedback(self):
+    def test_anon_cannot_update_feedback(self):
         # Không được phép update feedback nếu là anon
         try:
             response = self.anon_client.table("feedback").update({"topic": "Hacked"}).eq("id", "invalid-id").execute()
-            self.assertEqual(len(response.data), 0, "Guest không được update feedback")
+            self.assertEqual(len(response.data), 0, "Anon không được update feedback")
         except Exception as e:
             # Nếu throw error do permission denied cũng là hợp lệ
             self.assertTrue("permission denied" in str(e).lower() or "rls" in str(e).lower() or "401" in str(e) or "403" in str(e))

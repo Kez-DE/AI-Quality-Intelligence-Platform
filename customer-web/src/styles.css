@@ -1,0 +1,632 @@
+@import "tailwindcss";
+
+/* Brand tokens copied from app/src/styles.css (US-UI-01) so the Customer web
+   and the Staff web read as one brand. Dark values follow the OS setting here,
+   not a .dark class: the Customer web has no settings to toggle. Tokens the
+   Customer web adds are marked "customer web". */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-strong: var(--primary-strong);
+  --color-secondary: var(--secondary);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-on-band: var(--on-band);
+  --color-on-band-muted: var(--on-band-muted);
+  --color-band-deep: var(--band-deep);
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+:root {
+  color-scheme: light dark;
+  --radius: 1rem;
+
+  --xanh-green: oklch(0.72 0.17 175);
+  --xanh-mint: oklch(0.93 0.08 196);
+  --xanh-cyan: oklch(0.78 0.13 200);
+
+  --background: oklch(0.985 0.016 200);
+  --foreground: oklch(0.24 0.05 215);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.24 0.05 215);
+  --primary: oklch(0.78 0.13 200);
+  --primary-foreground: oklch(0.22 0.05 220);
+  --primary-glow: oklch(0.86 0.11 200);
+  --secondary: oklch(0.95 0.04 198);
+  --muted: oklch(0.96 0.025 198);
+  --muted-foreground: oklch(0.47 0.04 210);
+  --destructive: oklch(0.55 0.21 25);
+  --border: oklch(0.88 0.035 198);
+  --input: oklch(0.8 0.04 205);
+  --ring: oklch(0.78 0.13 200);
+  --success: oklch(0.72 0.15 175);
+  --warning: oklch(0.8 0.15 75);
+  --info: oklch(0.7 0.13 220);
+
+  /* customer web: cyan dark enough for icons and text on white (the brand cyan is 1.9:1). */
+  --primary-strong: oklch(0.5 0.1 205);
+  /* customer web: the header strip and confirmation panel. Stops come from
+     --gradient-hero, stopped before its light end so white text holds 7:1. */
+  --band-deep: oklch(0.3 0.07 208);
+  --band: radial-gradient(120% 140% at 100% 0%, oklch(0.62 0.13 198 / 0.55) 0%, transparent 55%),
+    linear-gradient(135deg, var(--band-deep) 0%, oklch(0.4 0.095 202) 100%);
+  --on-band: oklch(0.985 0.012 200);
+  --on-band-muted: oklch(0.88 0.04 198);
+  /* customer web: tag ink per Feedback status, dark enough for 4.5:1 on its tint. */
+  --tag-received: oklch(0.44 0.1 225);
+  --tag-review: oklch(0.45 0.1 62);
+  --tag-reviewed: oklch(0.43 0.09 170);
+
+  --gradient-mesh: radial-gradient(at 10% 0%, oklch(0.78 0.13 200 / 0.25) 0px, transparent 50%),
+    radial-gradient(at 90% 10%, oklch(0.7 0.13 185 / 0.22) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, oklch(0.92 0.09 196 / 0.4) 0px, transparent 50%);
+  --shadow-green: 0 20px 50px -20px color-mix(in oklab, oklch(0.72 0.13 198) 45%, transparent);
+  --shadow-card: 0 4px 24px -8px color-mix(in oklab, oklch(0.32 0.08 205) 20%, transparent);
+  --shadow-elevated: 0 18px 44px -18px color-mix(in oklab, oklch(0.32 0.08 205) 32%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --xanh-green: oklch(0.78 0.14 178);
+    --xanh-mint: oklch(0.28 0.06 200);
+    --xanh-cyan: oklch(0.8 0.12 205);
+
+    --background: oklch(0.15 0.025 185);
+    --foreground: oklch(0.95 0.012 170);
+    --card: oklch(0.205 0.03 184);
+    --card-foreground: oklch(0.95 0.012 170);
+    --primary: oklch(0.8 0.13 200);
+    --primary-foreground: oklch(0.15 0.03 215);
+    --primary-glow: oklch(0.84 0.11 200);
+    --secondary: oklch(0.25 0.035 195);
+    --muted: oklch(0.24 0.025 195);
+    --muted-foreground: oklch(0.74 0.03 195);
+    --destructive: oklch(0.72 0.18 25);
+    --border: oklch(0.92 0.015 200 / 14%);
+    --input: oklch(0.4 0.03 195);
+    --ring: oklch(0.8 0.13 200);
+    --success: oklch(0.76 0.14 175);
+    --warning: oklch(0.82 0.14 78);
+    --info: oklch(0.74 0.12 220);
+
+    --primary-strong: oklch(0.8 0.13 200);
+    --tag-received: oklch(0.86 0.08 220);
+    --tag-review: oklch(0.88 0.1 80);
+    --tag-reviewed: oklch(0.86 0.1 172);
+
+    --gradient-mesh: radial-gradient(at 10% 0%, oklch(0.78 0.13 200 / 0.12) 0px, transparent 50%),
+      radial-gradient(at 90% 10%, oklch(0.7 0.13 185 / 0.1) 0px, transparent 50%),
+      radial-gradient(at 50% 100%, oklch(0.32 0.08 205 / 0.18) 0px, transparent 50%);
+    --shadow-card: 0 4px 28px -10px color-mix(in oklab, black 55%, transparent);
+    --shadow-elevated: 0 20px 50px -18px color-mix(in oklab, black 60%, transparent);
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    scrollbar-color: color-mix(in oklab, var(--muted-foreground) 35%, transparent) transparent;
+  }
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--background);
+    background-image: var(--gradient-mesh);
+    color: var(--foreground);
+    letter-spacing: -0.006em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.018em;
+    text-wrap: balance;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 38%, transparent);
+    color: var(--foreground);
+  }
+  input,
+  textarea {
+    caret-color: var(--primary-strong);
+  }
+  :focus-visible {
+    outline: 2px solid var(--primary-strong);
+    outline-offset: 2px;
+  }
+  a {
+    text-underline-offset: 0.2em;
+  }
+}
+
+@layer components {
+  /* Header strip: the one deep-teal field on the page. A thin cyan→green rule
+     closes it, the way a service header closes with its colour bar. */
+  .band {
+    background: var(--band);
+    color: var(--on-band);
+    border-bottom: 4px solid transparent;
+    border-image: linear-gradient(90deg, var(--xanh-cyan), var(--xanh-green)) 1;
+  }
+  .wordmark {
+    font-family: var(--font-display);
+    font-size: 1.375rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--on-band);
+    text-decoration: none;
+  }
+  .wordmark span {
+    color: var(--xanh-cyan);
+  }
+  .wordmark:focus-visible {
+    outline-color: var(--on-band);
+    border-radius: 6px;
+  }
+
+  .page-title {
+    font-size: 1.75rem;
+    line-height: 1.15;
+    font-weight: 700;
+  }
+  /* Focused by script after a route change (App.tsx) as a reading position, not
+     a control, so no focus ring. */
+  .page-title:focus {
+    outline: none;
+  }
+  .section-title {
+    font-size: 1.25rem;
+    line-height: 1.25;
+    font-weight: 600;
+  }
+  @media (min-width: 48rem) {
+    .page-title {
+      font-size: 2.25rem;
+    }
+  }
+
+  .surface {
+    background: var(--card);
+    color: var(--card-foreground);
+    border-radius: var(--radius-2xl);
+  }
+
+  /* Aurora border from US-UI-01, without the hover lift: these cards hold a
+     form, and a form that moves under the pointer is harder to use. */
+  .aurora-card {
+    position: relative;
+    isolation: isolate;
+    box-shadow:
+      var(--shadow-elevated),
+      0 0 22px -10px color-mix(in oklab, var(--xanh-cyan) 40%, transparent);
+  }
+  .aurora-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: conic-gradient(
+      from var(--aurora-angle),
+      var(--xanh-cyan),
+      var(--xanh-green),
+      var(--primary-glow),
+      var(--xanh-mint),
+      var(--xanh-cyan)
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0.8;
+    pointer-events: none;
+    animation: aurora-spin 26s linear infinite;
+  }
+
+  .field-label {
+    display: block;
+    font-weight: 600;
+    font-size: 1.0625rem;
+    line-height: 1.35;
+  }
+  .field-hint {
+    margin-top: 0.25rem;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    color: var(--muted-foreground);
+  }
+  .field-error {
+    margin-top: 0.5rem;
+    font-weight: 600;
+    color: var(--destructive);
+  }
+  .field-input {
+    display: block;
+    width: 100%;
+    min-height: 3rem;
+    padding-inline: 1rem;
+    border: 1.5px solid var(--input);
+    border-radius: var(--radius-lg);
+    background: var(--card);
+    color: var(--foreground);
+    /* 16px keeps iOS Safari from zooming into the field on focus. */
+    font-size: 1rem;
+    transition:
+      border-color 150ms ease,
+      box-shadow 150ms ease;
+  }
+  .field-input:hover {
+    border-color: color-mix(in oklab, var(--primary-strong) 55%, var(--input));
+  }
+  .field-input:focus {
+    outline: none;
+    border-color: var(--primary-strong);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--primary) 30%, transparent);
+  }
+  .field-input[aria-invalid="true"] {
+    border-color: var(--destructive);
+  }
+  .field-input[aria-invalid="true"]:focus {
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--destructive) 22%, transparent);
+  }
+  /* Grows with the text where supported (field-sizing), scrolls past the cap.
+     No resize grip: it drew outside the rounded corner. */
+  textarea.field-input {
+    resize: none;
+    field-sizing: content;
+    min-height: 10rem;
+    max-height: 26rem;
+  }
+  .field-select {
+    appearance: none;
+    padding-right: 2.75rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23507680' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.9rem center;
+    background-size: 1.25rem;
+  }
+
+  /* Radio rows: the whole row is the target; the native radio keeps its semantics. */
+  .option {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-height: 3.25rem;
+    padding: 0.75rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--card);
+    font-weight: 500;
+    cursor: pointer;
+    transition:
+      border-color 150ms ease,
+      background-color 150ms ease,
+      box-shadow 150ms ease;
+  }
+  .option:hover {
+    border-color: color-mix(in oklab, var(--primary-strong) 45%, var(--border));
+  }
+  .option:has(:checked) {
+    border-color: var(--primary-strong);
+    background: color-mix(in oklab, var(--primary) 12%, var(--card));
+  }
+  .option:has(:focus-visible) {
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--primary) 32%, transparent);
+  }
+  .option-dot {
+    appearance: none;
+    flex-shrink: 0;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin: 0;
+    border: 2px solid color-mix(in oklab, var(--muted-foreground) 70%, transparent);
+    border-radius: 9999px;
+    background: var(--card);
+    transition: border 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .option-dot:checked {
+    border: 6px solid var(--primary-strong);
+  }
+  .option-dot:focus-visible {
+    outline: none;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 3rem;
+    padding-inline: 1.5rem;
+    border-radius: var(--radius-lg);
+    font-weight: 600;
+    font-size: 1rem;
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+      transform 120ms cubic-bezier(0.16, 1, 0.3, 1),
+      background-color 150ms ease,
+      border-color 150ms ease,
+      box-shadow 150ms ease;
+  }
+  .btn:not(:disabled):active {
+    transform: scale(0.98);
+  }
+  .btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+  .btn-primary {
+    min-height: 3.25rem;
+    background: var(--primary);
+    color: var(--primary-foreground);
+    box-shadow: var(--shadow-green);
+  }
+  .btn-primary:not(:disabled):hover {
+    background: color-mix(in oklab, var(--primary) 88%, var(--foreground));
+  }
+  .btn-secondary {
+    border: 1.5px solid var(--input);
+    background: var(--card);
+    color: var(--foreground);
+  }
+  .btn-secondary:not(:disabled):hover {
+    border-color: var(--primary-strong);
+    background: color-mix(in oklab, var(--primary) 10%, var(--card));
+  }
+  .btn-on-band {
+    min-height: 2.75rem;
+    padding-inline: 1.1rem;
+    border: 1.5px solid color-mix(in oklab, var(--on-band) 45%, transparent);
+    background: color-mix(in oklab, var(--on-band) 10%, transparent);
+    color: var(--on-band);
+  }
+  .btn-on-band:hover {
+    background: color-mix(in oklab, var(--on-band) 18%, transparent);
+  }
+  .btn-on-band:focus-visible {
+    outline-color: var(--on-band);
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-weight: 500;
+    color: var(--primary-strong);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+  }
+
+  .error-summary {
+    padding: 1rem 1.25rem;
+    border: 3px solid var(--destructive);
+    border-radius: var(--radius-lg);
+    background: var(--card);
+  }
+  .error-summary:focus {
+    outline: 3px solid color-mix(in oklab, var(--destructive) 40%, transparent);
+    outline-offset: 2px;
+  }
+
+  /* customer web: a neutral callout (the staff-account message). */
+  .notice {
+    padding: 1rem 1.25rem;
+    border: 1.5px solid var(--primary-strong);
+    border-radius: var(--radius-lg);
+    background: var(--card);
+  }
+
+  /* customer web: one row of "Phản hồi của tôi", the whole card is the link. */
+  .history-row {
+    display: block;
+    padding: 1rem 1.25rem;
+    border: 1.5px solid var(--border);
+    color: inherit;
+    text-decoration: none;
+    box-shadow: var(--shadow-card);
+    transition: border-color 150ms ease;
+  }
+  .history-row:hover {
+    border-color: var(--primary-strong);
+  }
+
+  /* customer web: the assistant. Floating button, panel above it. */
+  .chat-fab {
+    position: fixed;
+    right: max(1rem, env(safe-area-inset-right));
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    z-index: 40;
+    display: grid;
+    place-items: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 9999px;
+    background: var(--band);
+    color: var(--on-band);
+    box-shadow: var(--shadow-elevated);
+    cursor: pointer;
+  }
+  .chat-panel {
+    position: fixed;
+    inset-inline: max(0.75rem, env(safe-area-inset-right));
+    bottom: calc(max(1rem, env(safe-area-inset-bottom)) + 4.25rem);
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    max-height: min(34rem, calc(100dvh - 7rem));
+    border: 1.5px solid var(--border);
+    box-shadow: var(--shadow-elevated);
+    overflow: hidden;
+  }
+  @media (min-width: 40rem) {
+    .chat-panel {
+      left: auto;
+      width: 24rem;
+    }
+  }
+  textarea.chat-input {
+    min-height: 3rem;
+    max-height: 8rem;
+  }
+  .chat-bubble {
+    max-width: 85%;
+    padding: 0.6rem 0.9rem;
+    border-radius: var(--radius-lg);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .chat-bubble[data-role="user"] {
+    margin-left: auto;
+    background: color-mix(in oklab, var(--primary) 22%, var(--card));
+  }
+  .chat-bubble[data-role="assistant"] {
+    background: var(--muted);
+  }
+
+  /* The confirmation panel: the Lookup code handed over on the deep field. */
+  .confirm-panel {
+    border-radius: var(--radius-2xl);
+    background: var(--band);
+    color: var(--on-band);
+  }
+  .code-text {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    line-height: 1.2;
+    font-variant-ligatures: none;
+  }
+  .code-text [aria-hidden] {
+    display: inline-flex;
+    flex-wrap: wrap;
+    column-gap: 0.45em;
+  }
+
+  .summary-list > div {
+    display: grid;
+    gap: 0.25rem;
+    padding-block: 0.9rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .summary-list > div:first-child {
+    padding-top: 0;
+  }
+  .summary-list dt {
+    font-size: 0.9375rem;
+    color: var(--muted-foreground);
+  }
+  .summary-list dd {
+    font-weight: 500;
+  }
+  @media (min-width: 40rem) {
+    .summary-list > div {
+      grid-template-columns: 9rem 1fr;
+      align-items: center;
+      gap: 1rem;
+    }
+  }
+
+  .tag {
+    --tag-ink: var(--foreground);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.8rem 0.3rem 0.65rem;
+    border-radius: 9999px;
+    font-weight: 600;
+    color: var(--tag-ink);
+    background: color-mix(in oklab, var(--tag-ink) 12%, var(--card));
+  }
+  .tag::before {
+    content: "";
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: currentColor;
+  }
+  .tag[data-status="received"] {
+    --tag-ink: var(--tag-received);
+  }
+  .tag[data-status="under_review"] {
+    --tag-ink: var(--tag-review);
+  }
+  .tag[data-status="reviewed"] {
+    --tag-ink: var(--tag-reviewed);
+  }
+
+  /* Honeypot: in the DOM and the POST, invisible to people and screen readers. */
+  .hp {
+    position: absolute;
+    left: -10000px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+
+  /* The one authored moment: the answer arrives. Starts visible, sharpens in. */
+  .reveal {
+    animation: reveal 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+@property --aurora-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 120deg;
+}
+@keyframes aurora-spin {
+  to {
+    --aurora-angle: 480deg;
+  }
+}
+@keyframes reveal {
+  from {
+    opacity: 0.35;
+    filter: blur(6px);
+    transform: translateY(8px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora-card::before,
+  .reveal,
+  .animate-spin,
+  .animate-pulse {
+    animation: none !important;
+  }
+  .btn:active {
+    transform: none !important;
+  }
+}

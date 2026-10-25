@@ -10,7 +10,7 @@ from spike_detector import _select_candidates, detect_spikes
 
 def _query(data):
     query = MagicMock()
-    for method in ("select", "gte", "order", "limit", "range"):
+    for method in ("select", "eq", "gte", "order", "limit", "range"):
         getattr(query, method).return_value = query
     query.execute.return_value = MagicMock(data=data)
     return query
@@ -150,6 +150,9 @@ class TestSpikeDetector(unittest.TestCase):
         outbound_text = mock_analyze_spike.call_args.args[1][0]
         self.assertNotIn("0912345678", outbound_text)
         self.assertNotIn("30A-12345", outbound_text)
+        # Alert owner is an admin, never an arbitrary (possibly Customer) profile.
+        mock_get_supabase.return_value.table("profiles").eq.assert_called_with("role", "admin")
+        self.assertEqual(kwargs["user_id"], "user123")
 
     @patch("spike_detector.create_or_update_ticket")
     @patch("spike_detector.analyze_spike")
@@ -229,3 +232,32 @@ class TestSpikeDetector(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _ticket_with_profiles(profiles):
+    from agents import ticket_agent
+    from tests._fakedb import FakeDB
+
+    db = FakeDB(profiles=profiles, alerts=[])
+    with patch.object(ticket_agent, "get_db", return_value=db), \
+         patch.object(ticket_agent, "log_agent_run"):
+        out = ticket_agent.create_or_update_ticket(
+            area="HCM-Q1", title="t", description="d", severity="P4", team="CSKH", sla_hours=4
+        )
+    return out, db
+
+
+def test_ticket_owner_is_an_admin_not_the_first_profile():
+    """A Customer account listed first must never own an alert (decision 0018)."""
+    out, db = _ticket_with_profiles([
+        {"id": "cust", "role": "guest"},
+        {"id": "adm", "role": "admin"},
+    ])
+    assert out["action"] == "created"
+    assert [a["user_id"] for a in db.tables["alerts"]] == ["adm"]
+
+
+def test_ticket_is_skipped_when_there_is_no_admin():
+    out, db = _ticket_with_profiles([{"id": "cust", "role": "guest"}])
+    assert out["action"] == "skipped"
+    assert db.tables["alerts"] == []

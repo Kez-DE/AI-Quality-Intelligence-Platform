@@ -228,7 +228,9 @@ def detect_spikes(
             f"{dropped_summary}{' ...' if len(dropped) > 10 else ''}"
         )
 
-    profiles_res = db.table("profiles").select("id").limit(1).execute()
+    # Alert owner must be an admin: any other profile may be a self-signed-up
+    # Customer account (decision 0018), which must never own an ops alert.
+    profiles_res = db.table("profiles").select("id").eq("role", "admin").limit(1).execute()
     user_id = profiles_res.data[0]["id"] if profiles_res.data else None
     alerts_created = 0
 

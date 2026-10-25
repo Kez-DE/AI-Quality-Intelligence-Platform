@@ -30,6 +30,7 @@ def run_chat_agent(
     scope_team: str | None = None,
     tools_override: list | None = None,
     execute_fn=None,
+    log_preview: bool = True,
 ) -> dict:
     """Chạy vòng lặp ReAct agent để LLM tự gọi công cụ (nếu cần) trước khi trả lời.
 
@@ -37,7 +38,7 @@ def run_chat_agent(
     này (chống rò rỉ dữ liệu chéo phòng). None = admin/toàn hệ thống.
 
     tools_override: thay thế TOOLS_DEFINITIONS mặc định bằng danh sách tool tuỳ chỉnh
-    (dùng cho guest tier: chỉ truyền GUEST_TOOLS_DEFINITIONS).
+    (dùng cho tầng công khai public_only: chỉ truyền PUBLIC_TOOLS_DEFINITIONS).
 
     execute_fn: hàm thực thi tool (name, args) -> str tuỳ chỉnh. Nếu không truyền,
     dùng execute_tool mặc định (dành cho ops/admin).
@@ -68,7 +69,8 @@ def run_chat_agent(
             result = chat_completion(
                 current_messages,
                 temperature=temperature,
-                tools=active_tools
+                tools=active_tools,
+                log_preview=log_preview,
             )
         except ValueError as e:
             # Fallback nếu provider (vd: Gemini) không hỗ trợ tools
@@ -76,7 +78,8 @@ def run_chat_agent(
                 # Bỏ tools đi và thử lại
                 result = chat_completion(
                     current_messages,
-                    temperature=temperature
+                    temperature=temperature,
+                    log_preview=log_preview,
                 )
             else:
                 raise e
@@ -109,7 +112,7 @@ def run_chat_agent(
             except Exception:
                 args = {}
                 
-            # Thực thi tool (ops dùng execute_tool, guest dùng execute_fn)
+            # Thực thi tool (ops dùng execute_tool, tầng công khai dùng execute_fn)
             tool_result = _execute(name, args)
             
             # Lọc PII từ tool context

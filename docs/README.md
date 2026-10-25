@@ -69,7 +69,7 @@ AI-Quality-Intelligence-Platform/
 | File | Mục đích |
 | --- | --- |
 | `rbac-departments.md` | Phân quyền theo role và scope theo phòng ban |
-| `guest-account.md` | Cơ chế tài khoản khách và chatbot CSKH |
+| `guest-account.md` | Khách hàng (Customer web), tài khoản chờ cấp quyền, cách tạo tài khoản |
 
 ### Cài đặt và triển khai
 

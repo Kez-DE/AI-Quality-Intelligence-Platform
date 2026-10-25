@@ -29,7 +29,9 @@ def create_or_update_ticket(
     if not user_id:
         # Lấy một user_id mặc định để thỏa mãn RLS / Foreign Key
         try:
-            res = db.table("profiles").select("id").limit(1).execute()
+            # Alert owner must be an admin: any other profile may be a self-signed-up
+            # Customer account (decision 0018), which must never own an ops alert.
+            res = db.table("profiles").select("id").eq("role", "admin").limit(1).execute()
             if res.data:
                 user_id = res.data[0]["id"]
             else:

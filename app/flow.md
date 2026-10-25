@@ -41,7 +41,7 @@ AI-Quality-Intelligence-Platform/
 │   │   ├── chat_tools.py           # tool definitions cho chat
 │   │   ├── rag_engine.py           # RAG hybrid: Cohere embed + BM25 + RRF k=60
 │   │   ├── knowledge_base.py       # KB nội bộ (embed + retrieve)
-│   │   ├── public_kb.py            # KB công khai (khách guest)
+│   │   ├── public_kb.py            # KB công khai (tầng public_only)
 │   │   └── model_router.py         # chọn model theo context
 │   ├── agents/                     # Multi-agent nghiệp vụ (8 agent + Orchestrator + helper)
 │   │   ├── orchestrator.py         # Orchestrator: chia việc cho 8 agent nghiệp vụ

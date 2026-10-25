@@ -2,3 +2,10 @@ project_id = "gvtoqbowulwmpzfogjwp"
 
 [edge_runtime]
 enabled = false
+
+[auth]
+# Customer web (US-078): OAuth return and password-reset links. Supabase CLI
+# 2.117 pushes only the keys declared here (checked with `supabase config diff`
+# on 2026-09-28), so other hosted auth settings stay as they are. Always run
+# `supabase config diff` before `supabase config push`.
+additional_redirect_urls = ["http://localhost:5175/**"]

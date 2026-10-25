@@ -94,23 +94,18 @@ def test_ops_scoped_to_own_department():
     assert data["kpis"]["window_total"] == 1  # chỉ feedback của IT
 
 
-def test_guest_payload_is_restricted():
+def test_ops_payload_is_never_restricted():
+    """The guest-only restricted payload is gone (decision 0017); the route now
+    requires ops staff, so every caller gets the full ops payload for its scope."""
     feedback = [
         {"id": "1", "topic": "App Issue", "sentiment": "negative", "severity": "P3",
          "area": "HCM", "created_at": _now_iso(), "needs_review": False, "overall_risk": 3},
     ]
     with patch("main.get_supabase", return_value=_database(feedback)):
-        result = cockpit_overview(days=14, user=_user("guest"))
+        result = cockpit_overview(days=14, user=_user("admin"))
     data = result["data"]
-    assert data["scope"]["restricted"] is True
-    # Guest không có KPI vận hành (alerts/tickets/corrections) và không có heatmap.
-    assert "alerts_open" not in data["kpis"]
-    assert "tickets_open" not in data["kpis"]
-    assert data["heatmap"]["cells"] == []
-    # nhưng vẫn có kpis cơ bản + trend + categories
-    assert data["kpis"]["feedback_today"] == 1
-    assert len(data["trend"]) == 14
-    assert data["categories"][0]["topic"] == "App Issue"
+    assert data["scope"]["restricted"] is False
+    assert "alerts_open" in data["kpis"]
 
 
 def test_db_error_does_not_crash():
@@ -172,22 +167,6 @@ def test_chart_fields_present_for_admin():
     neg_p5 = next((f for f in sent_sev_links if f["from"] == "negative" and f["to"] == "P5"), None)
     assert neg_p5 is not None
     assert neg_p5["value"] == 1
-
-
-def test_guest_no_funnel_no_sankey():
-    """Guest không thấy funnel và sankey_flows."""
-    feedback = [
-        {"id": "1", "topic": "App Issue", "sentiment": "negative", "severity": "P3",
-         "area": "HCM", "created_at": _now_iso(), "needs_review": False, "overall_risk": 5},
-    ]
-    with patch("main.get_supabase", return_value=_database(feedback)):
-        result = cockpit_overview(days=14, user=_user("guest"))
-    data = result["data"]
-    assert data["funnel"] == {}
-    assert data["sankey_flows"] == []
-    # nhưng vẫn có risk_distribution và trend_sentiment
-    assert len(data["risk_distribution"]) == 10
-    assert len(data["trend_sentiment"]) == 14
 
 
 def test_risk_distribution_missing_scores_fill_zero():

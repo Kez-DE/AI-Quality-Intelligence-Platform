@@ -1,6 +1,10 @@
 # Cơ chế hoạt động hệ thống — AI Quality Intelligence Platform (xanhSM)
 
 > **Cập nhật 2026-06-27:** đồng bộ 6 phòng ban, RAG hybrid, roster agent với code hoàn thiện.
+>
+> **Cập nhật 2026-09-27 (US-077 / decision 0017):** tách Customer web khỏi Staff web, bỏ role `guest` thay bằng `pending`, thêm job xoá nội dung phản hồi ẩn danh quá hạn.
+>
+> **Cập nhật 2026-09-28 (US-078 / decision 0018):** `guest` quay lại làm tài khoản khách hàng (tuỳ chọn, chỉ dùng Customer web); tự đăng ký và tài khoản tạo trong Supabase Dashboard vào với `guest`.
 
 Tài liệu này có hai mục đích trong một file:
 
@@ -34,18 +38,22 @@ Một repo, ba tầng. Supabase là trục nối: pipeline Python ghi kết qu�
 
 ```
 AI-Quality-Intelligence-Platform/
-├── app/        Frontend TanStack Start + React 19 (Cockpit, auth, chat, admin)
+├── app/        Staff web: TanStack Start + React 19 (Cockpit, auth, chat, admin)
+├── customer-web/ Customer web: Vite + React SPA tĩnh, khách gửi phản hồi không cần tài khoản
 ├── pipeline/   Python FastAPI: clean → classify → ingest → spike → LLM → multi-agent
 ├── supabase/   PostgreSQL + RBAC + RLS (migration)
 └── data/       Dataset review + knowledge base + taxonomy + reference
 ```
 
-Production deploy thành sáu Railway service Docker. Web API và bốn worker dùng chung source `pipeline/`, tách tiến trình để mỗi việc chạy theo nhịp riêng và không giẫm chân nhau.
+Production deploy thành sáu Railway service Docker, cộng service `customer-web` mới (đã có Dockerfile, chưa tạo trên Railway; xem [deploy-railway.md](deploy-railway.md)). Web API và bốn worker dùng chung source `pipeline/`, tách tiến trình để mỗi việc chạy theo nhịp riêng và không giẫm chân nhau.
 
 ```mermaid
 flowchart TB
     subgraph FE[Frontend service]
-        UI[React 19 + TanStack Start<br/>Quality Cockpit]
+        UI[React 19 + TanStack Start<br/>Staff web - Quality Cockpit]
+    end
+    subgraph CW[customer-web service]
+        CWUI[Vite + React SPA tĩnh<br/>Customer web - không đăng nhập]
     end
     subgraph BE[Backend service - web API]
         API[FastAPI main.py<br/>request, chat, scheduler on-demand]
@@ -60,6 +68,7 @@ flowchart TB
     LLM[LLM providers<br/>OpenRouter/OpenAI/Gemini/Groq + mock]
 
     UI -->|REST| API
+    CWUI -->|REST /api/public/*, không token| API
     UI -->|Realtime subscribe| DB
     API --> DB
     W1 --> DB
@@ -79,7 +88,7 @@ Nhịp và chi phí từng service:
 | `ingest-worker` | Bơm dataset theo batch, tự spike detect | 10s/batch | gián tiếp |
 | `ml-worker` | Quét feedback tiêu cực chưa chấm rủi ro, chấm 5 chiều | 30-60s | có |
 | `agent-worker` | Chạy full multi-agent pipeline | 300s | có |
-| `backend-worker` | Đẩy vòng đời ticket open → in_progress → resolved | 5s | không (rule) |
+| `backend-worker` | Đẩy vòng đời ticket open → in_progress → resolved; 03:00 hằng ngày xoá nội dung phản hồi ẩn danh quá hạn lưu trữ | 5s + cron 03:00 | không (rule) |
 
 Chỉ `ml-worker` và `agent-worker` tốn tiền LLM. Cả hai có cờ tắt (`WORKER_AGENT_ENABLED=false`) hoặc fallback mock, nên có thể chạy demo không tốn quota.
 
@@ -241,7 +250,7 @@ flowchart LR
         admin[admin<br/>toàn quyền]
         manager[manager<br/>giám sát phòng]
         staff[staff<br/>việc hàng ngày]
-        guest[guest<br/>khách]
+        pending[pending<br/>chờ cấp quyền]
     end
     subgraph Depts[Trục DEPARTMENT]
         IT[IT]
@@ -255,7 +264,7 @@ flowchart LR
     admin -.->|xem mọi phòng| Depts
     manager --> IT & CSKH & VH & FIN & SP & RR
     staff --> IT & CSKH & VH & FIN & SP & RR
-    guest -.->|không gắn phòng| none
+    pending -.->|không có quyền| none
 ```
 
 Bốn role:
@@ -265,9 +274,11 @@ Bốn role:
 | `admin` | Quản trị viên | Toàn quyền: quản lý user, bật/tắt streaming, trigger pipeline, xem mọi phòng |
 | `manager` | Quản lý | Giám sát phòng mình: alerts, tasks, insights, reports, duyệt báo cáo, chat |
 | `staff` | Nhân viên | Việc hàng ngày phòng mình: feedback, tasks, gửi báo cáo hoàn thành, chat |
-| `guest` | Khách | Dashboard rút gọn, gửi feedback, chat hỗ trợ CSKH |
+| `pending` | Chờ cấp quyền | Không có quyền: chỉ thấy màn chờ, backend trả 403 trừ `GET /api/me`, `POST /api/me/password` và `/health` |
 
-`OPS_ROLES = {admin, manager, staff}` là nhóm nhân sự vận hành, phân biệt với guest.
+`OPS_ROLES = {admin, manager, staff}` là nhóm nhân sự vận hành. Role thiếu hoặc không hợp lệ rơi về `pending` (fail-closed).
+
+Khách hàng (người ngoài công ty) **không cần tài khoản**. Họ gửi phản hồi trên Customer web qua `POST /api/public/feedback` và tra cứu bằng mã tra cứu qua `GET /api/public/feedback/{public_ref}`, chỉ thấy trạng thái (Đã tiếp nhận / Đang xem xét / Đã xem xét) và ngày gửi, không bao giờ thấy nhãn AI. Nếu muốn, họ tự đăng ký **tài khoản khách hàng** (role `guest`, US-078) trên Customer web để xem lịch sử phản hồi và dùng trợ lý chat qua `/api/customer/*`; tài khoản này không vào được Staff web và bị 403 ở mọi route Staff. Chi tiết: [guest-account.md](guest-account.md).
 
 ### Cách hệ thống chặn xem chéo phòng
 
@@ -275,9 +286,11 @@ Backend chạy bằng `SUPABASE_SERVICE_ROLE_KEY` nên bypass RLS của Postgres
 
 `get_current_user` lấy Bearer token, gọi `db.auth.get_user(token)` để Supabase verify JWT, rồi đọc `role` và `department` từ bảng `profiles`. Ba dependency gate:
 
-- `get_current_user`: mọi user đã đăng nhập (gồm guest).
-- `require_ops_staff`: chỉ OPS_ROLES, chặn guest (403).
+- `get_current_user`: xác thực user đã đăng nhập. Tài khoản `pending` chỉ dùng được `GET /api/me` và `POST /api/me/password`, còn lại 403.
+- `require_ops_staff`: chỉ OPS_ROLES, chặn `pending` (403).
 - `require_admin`: chỉ admin (403 nếu khác).
+
+Các role guard (`require_ops_staff`, `require_admin`, `require_manager`) còn trả 403 "Bạn cần đổi mật khẩu tạm trước khi tiếp tục" khi `app_metadata.must_change_password` của tài khoản còn bật.
 
 Hai helper scope phòng ban, đây là trái tim của RBAC:
 
@@ -307,15 +320,15 @@ Endpoint dùng `can_view_team` (chặn thao tác chéo phòng):
 | `POST /api/reports/{id}/approve-and-dispatch` | report (duyệt + tạo task, 409 nếu đã duyệt) |
 | `GET /api/insights/departments/{team}` | team trong path |
 
-Endpoint admin-only (qua `require_admin`): `GET /api/agent/stats`, `POST /api/ingest-real-dataset`, `POST /api/live-stream/start|stop`, `POST /api/run-real-pipeline`, `POST /api/trigger-spike-detect`, `POST /api/feedback/reclassify`, và toàn bộ quản lý user (`PATCH /api/users/{id}/role`, `PATCH /api/users/{id}/department`).
+Endpoint admin-only (qua `require_admin`): `GET /api/agent/stats`, `POST /api/ingest-real-dataset`, `POST /api/live-stream/start|stop`, `POST /api/run-real-pipeline`, `POST /api/trigger-spike-detect`, `POST /api/feedback/reclassify`, và toàn bộ quản lý user (`POST /api/admin/users`, `PATCH /api/users/{id}/role`, `PATCH /api/users/{id}/department`).
 
 ### Ai thấy màn hình nào
 
-| Màn hình (route) | guest | staff | manager | admin |
+| Màn hình (route) | pending | staff | manager | admin |
 |------------------|:-----:|:-----:|:-------:|:-----:|
-| Tổng quan (`/dashboard`) | có | có | có | có |
-| Phản hồi (`/feedback`) | gửi | có | có | có |
-| Trợ lý AI / chat (`/chat`) | có (public KB) | phòng mình | phòng mình | toàn hệ thống |
+| Tổng quan (`/dashboard`) | không | có | có | có |
+| Phản hồi (`/feedback`) | không | có | có | có |
+| Trợ lý AI / chat (`/chat`) | không | phòng mình | phòng mình | toàn hệ thống |
 | Phân loại Ticket (`/alerts`) | không | phòng mình | phòng mình | mọi phòng |
 | Quản lý công việc (`/tasks`) | không | phòng mình | phòng mình | mọi phòng |
 | Điều phối Hỗ trợ CSKH (`/support`) | không | phòng mình | phòng mình | mọi phòng |
@@ -325,17 +338,19 @@ Endpoint admin-only (qua `require_admin`): `GET /api/agent/stats`, `POST /api/in
 | Luồng trực tiếp (`/live-stream`) | không | không | không | có |
 | Quản lý người dùng (`/admin`) | không | không | không | có |
 
-Lưu ý có HAI màn hình hội thoại khác nhau, đừng gộp: `/support` ("Hỗ trợ CSKH") là bảng điều phối ticket cho ops (hàng đợi, canned reply), CHỈ admin/manager/staff và scope theo phòng — guest không vào được; còn `/chat` ("Trợ lý AI") mở cho cả guest (nhãn hỗ trợ CSKH, chỉ public KB) lẫn ops (RAG nội bộ scope theo phòng, admin toàn hệ thống).
+Cột `pending` toàn "không": tài khoản chờ cấp quyền chỉ thấy màn "Tài khoản đang chờ admin cấp quyền" và nút đăng xuất. Tài khoản mới do admin tạo còn phải đổi mật khẩu tạm ở lần đăng nhập đầu trước khi vào bất kỳ màn nào.
 
-Frontend (`AppShell.tsx`) lọc nav theo role, `route.tsx` redirect guest khỏi trang nghiệp vụ về `/dashboard`. Đây là lớp UX. Quyền thật vẫn kiểm ở backend. Đúng phải thế nào: không bao giờ tin frontend. Mọi endpoint phải tự gate, kể cả khi UI đã giấu nút.
+Lưu ý có HAI màn hình hội thoại khác nhau, đừng gộp: `/support` ("Hỗ trợ CSKH") là bảng điều phối ticket cho ops (hàng đợi, canned reply), scope theo phòng; còn `/chat` ("Trợ lý AI") là RAG nội bộ scope theo phòng, admin toàn hệ thống. Cả hai CHỈ dành cho admin/manager/staff.
+
+Frontend (`AppShell.tsx`) lọc nav theo role, layout `_authenticated` chặn `pending` ở màn chờ. Đây là lớp UX. Quyền thật vẫn kiểm ở backend. Đúng phải thế nào: không bao giờ tin frontend. Mọi endpoint phải tự gate, kể cả khi UI đã giấu nút.
 
 ### Chat phân quyền theo phòng
 
-`POST /api/agent/chat` rẽ hai luồng. Guest dùng `GUEST_SYSTEM_PROMPT`, RAG chỉ lấy từ `data/public_kb/` (file có `audience: public`), không chạm dữ liệu nội bộ, rate limit riêng. Ops dùng `AGENT_SYSTEM_PROMPT` + RAG nội bộ, `scope_team = user.department` (admin = None = toàn hệ thống) truyền xuống mọi tool để ép lọc về đúng phòng. Cả hai luồng mask PII ở input và output.
+`POST /api/agent/chat` chỉ cho ops staff (`pending` → 403) và rẽ hai luồng. Khi client gửi cờ `public_only` (widget trang chủ), trợ lý chạy tầng công khai: `PUBLIC_SYSTEM_PROMPT`, RAG chỉ lấy từ `data/public_kb/` (file có `audience: public`), không chạm dữ liệu nội bộ, rate limit riêng. Ops dùng `AGENT_SYSTEM_PROMPT` + RAG nội bộ, `scope_team = user.department` (admin = None = toàn hệ thống) truyền xuống mọi tool để ép lọc về đúng phòng. Cả hai luồng mask PII ở input và output.
 
 ### Quản lý user và bootstrap
 
-`PATCH /api/users/{id}/role` đổi role, chặn admin tự đổi quyền chính mình, ghi `audit_logs` action `role_change`. `PATCH /api/users/{id}/department` gán phòng, `valid_departments = [null, IT, CSKH, Vận hành, Tài chính & Thanh toán, Sản phẩm, Quản lý Rủi ro & Gian lận]`, ghi audit. Bootstrap: user đăng ký đầu tiên thành admin, các user sau mặc định guest, chờ admin duyệt lên staff hoặc manager.
+`PATCH /api/users/{id}/role` đổi role, chặn admin tự đổi quyền chính mình, ghi `audit_logs` action `role_change`. `PATCH /api/users/{id}/department` gán phòng, `valid_departments = [null, IT, CSKH, Vận hành, Tài chính & Thanh toán, Sản phẩm, Quản lý Rủi ro & Gian lận]`, ghi audit. `POST /api/admin/users` là đường tạo tài khoản duy nhất trên Staff web (không còn tự đăng ký): admin nhập email, họ tên, role, phòng ban và mật khẩu tạm (5 tiêu chí), backend tạo qua `auth.admin.create_user` với `app_metadata.must_change_password = true` (chỉ service role ghi được), ghi audit; lần đăng nhập đầu phải đổi mật khẩu qua `POST /api/me/password`, endpoint duy nhất xoá cờ. Cờ được chặn ở server: role guard trả 403, MCP HTTP trả 401, và `is_ops_staff()` / `is_admin()` đòi `password_is_current()` nên RLS cũng đóng. Bootstrap: profile đầu tiên của hệ thống thành admin. Từ US-078, tài khoản tự đăng ký và tài khoản tạo ngoài form của admin (ví dụ Supabase Dashboard) vào với `guest` (tài khoản khách hàng), không vào hàng đợi duyệt và không được nâng lên Staff. Hai tài khoản `guest` cũ trước US-077 vẫn là `pending`, chờ admin duyệt lên staff hoặc manager.
 
 ## 8. Cơ chế sinh báo cáo
 
@@ -504,8 +519,8 @@ Làm P0 trước tiên và trọn vẹn (đây là điều kiện để chạm d
 
 | Bảng | Ghi bởi | Đọc bởi | Vai trò |
 |------|---------|---------|---------|
-| `profiles` | trigger signup, users_admin | auth_guard, ticket_agent | role + department của user |
-| `feedback` | ingestion_agent, ingest.py | orchestrator, insight_agent, scoring_agent | review đã phân loại |
+| `profiles` | trigger `handle_new_user`, users_admin (tạo tài khoản, đổi role) | auth_guard, ticket_agent | role + department của user |
+| `feedback` | ingestion_agent, ingest.py, public_intake (Customer web), job retention (xoá nội dung quá hạn) | orchestrator, insight_agent, scoring_agent | review đã phân loại |
 | `alerts` | ticket_agent | alert_agent (dedup), task_agent | ticket sự cố, có routing fields |
 | `tasks` | task_agent, RPC approve_report_and_dispatch | task_agent, API tasks | đầu việc; `source` = agent (gom theo team/area) hoặc report (từ duyệt báo cáo), `report_id` trỏ về báo cáo gốc |
 | `department_reports` | orchestrator (insert), API draft-tasks/approve | API reports | báo cáo phân tích máy sinh; có `content`, `root_cause_summary`, `suggested_tasks` (JSONB), approval fields |

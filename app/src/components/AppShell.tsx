@@ -39,7 +39,6 @@ type NavItem = {
   group: NavGroup;
 };
 
-const ALL_ROLES: Role[] = ["admin", "manager", "staff", "guest"];
 const AUTHENTICATED_ROLES: Role[] = ["admin", "manager", "staff"];
 
 // Nhãn nhóm hiển thị trên sidebar — sắp theo luồng nghiệp vụ end-to-end.
@@ -57,7 +56,13 @@ const GROUP_ORDER: NavGroup[] = ["overview", "operations", "analytics", "assista
 // → (Phân tích → Báo cáo) → Trợ lý AI → Quản trị.
 const NAV: NavItem[] = [
   // 1. Tổng quan — đăng nhập vào là thấy ngay.
-  { to: "/dashboard", label: "Tổng quan", icon: Gauge, roles: ALL_ROLES, group: "overview" },
+  {
+    to: "/dashboard",
+    label: "Tổng quan",
+    icon: Gauge,
+    roles: AUTHENTICATED_ROLES,
+    group: "overview",
+  },
 
   // 2. Vận hành — theo đúng luồng dữ liệu đi qua hệ thống.
   {
@@ -132,7 +137,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [email, setEmail] = useState<string>("");
   const { data: me } = useMe();
 
-  const role = me?.role || "guest";
+  // Pending accounts never reach AppShell (the layout gate stops them); this
+  // fallback only covers /api/me still loading or failing: show no nav, fail closed.
+  const role: Role = me?.role || "pending";
   const { notifications, unreadCount, markAsRead, markAllRead } = useRealtimeNotifications(
     me?.id,
     me?.role,
@@ -140,12 +147,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   );
   const { theme, toggleTheme } = useTheme();
 
-  const navItems = NAV.filter((n) => n.roles.includes(role)).map((n) => {
-    if (n.to === "/chat" && role === "guest") {
-      return { ...n, label: "Hỗ trợ CSKH" };
-    }
-    return n;
-  });
+  const navItems = NAV.filter((n) => n.roles.includes(role));
 
   // Gom item theo nhóm, giữ đúng thứ tự nhóm và bỏ nhóm rỗng (tùy role).
   const navGroups = GROUP_ORDER.map((group) => ({
@@ -168,10 +170,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex text-foreground">
-      {/* Badge phòng ban — góc trên bên phải (desktop). Guest/chưa gán phòng: ẩn. */}
-      <div className="hidden md:block fixed top-4 right-6 z-50">
-        <DepartmentBadge me={me} className="shadow-sm backdrop-blur bg-card/80" />
-      </div>
       {/* Sidebar */}
       <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border bg-card/90 text-card-foreground backdrop-blur sticky top-0 h-screen">
         <div className="p-5 border-b border-border">
@@ -188,7 +186,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </Link>
         </div>
-        {role !== "guest" && (
+        {role !== "pending" && (
           <div className="px-3 pt-3">
             <NotificationPanel
               notifications={notifications}
@@ -275,7 +273,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex items-center gap-2">
             <DepartmentBadge me={me} />
-            {role !== "guest" && (
+            {role !== "pending" && (
               <NotificationPanel
                 notifications={notifications}
                 unreadCount={unreadCount}
@@ -314,6 +312,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <main className="flex-1 md:py-6 md:px-8 pt-28 pb-10 px-4 max-w-7xl text-foreground">
+        {/* Badge phòng ban (desktop): its own row in the page flow, so it never covers the
+            page's own header buttons the way a fixed corner badge did. Hidden when no role or
+            no department, as before. */}
+        <div className="hidden md:flex justify-end mb-3">
+          <DepartmentBadge me={me} className="shadow-sm" />
+        </div>
         {children}
       </main>
 

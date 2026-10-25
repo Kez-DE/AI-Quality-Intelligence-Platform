@@ -43,7 +43,7 @@ def log_agent_event(
 ) -> None:
     """Ghi 1 sự kiện vận hành agent ra file JSONL theo ngày.
 
-    team: phòng ban gắn với sự kiện (Safety/IT/.../admin/guest) để bóc log theo phòng.
+    team: phòng ban gắn với sự kiện (Safety/IT/.../admin/public) để bóc log theo phòng.
     source: 'pipeline' (6 agent nghiệp vụ) | 'chat' (chat agent theo account).
 
     Best-effort: mọi lỗi I/O đều nuốt để KHÔNG bao giờ làm vỡ pipeline agent.

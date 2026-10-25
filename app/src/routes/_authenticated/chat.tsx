@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { MarkdownContent } from "@/components/MarkdownContent";
+import { splitAssistantBlocks } from "@/lib/assistantBlocks";
 import {
   type ChatSource,
   linkifyCitations,
@@ -23,7 +24,7 @@ import {
   srcContent,
   srcTitle,
 } from "@/components/SourceCitation";
-import { apiFetch, useMe, type Role } from "@/lib/api";
+import { apiFetch, useMe, type StaffRole } from "@/lib/api";
 
 export const Route = createFileRoute("/_authenticated/chat")({
   component: ChatPage,
@@ -46,7 +47,6 @@ type AgentChatResponse = {
 
 const REQUEST_HISTORY_LIMIT = 24;
 const ASSISTANT_BLOCK_DELAY_MS = 380;
-const MAX_ASSISTANT_BLOCKS = 6;
 
 type ChatRoleConfig = {
   title: string;
@@ -56,19 +56,7 @@ type ChatRoleConfig = {
   suggestions: string[];
 };
 
-const CHAT_ROLE_CONFIG: Record<Role, ChatRoleConfig> = {
-  guest: {
-    title: "Hỗ trợ Trực tuyến",
-    subtitle: "Giải đáp hướng dẫn dùng dịch vụ và gửi khiếu nại.",
-    emptyTitle: "Xin chào! Tôi có thể giúp gì cho bạn?",
-    placeholder: "Nhập câu hỏi về đặt xe, thanh toán, tài khoản hoặc khiếu nại...",
-    suggestions: [
-      "Làm sao để gửi phản hồi về tài xế?",
-      "Làm sao để biết khiếu nại đã được xử lý chưa?",
-      "Tôi muốn báo cáo sự cố an toàn",
-      "Tôi cần hỗ trợ về thanh toán chuyến đi",
-    ],
-  },
+const CHAT_ROLE_CONFIG: Record<StaffRole, ChatRoleConfig> = {
   staff: {
     title: "AI Tác nghiệp",
     subtitle: "Trả lời theo checklist xử lý, ticket và việc cần làm của phòng bạn.",
@@ -107,10 +95,6 @@ const CHAT_ROLE_CONFIG: Record<Role, ChatRoleConfig> = {
   },
 };
 
-type AssistantBlock = {
-  title?: string;
-  body: string;
-};
 
 const markdownComponents = {
   p: ({ children }: any) => <p className="mb-2 last:mb-0">{children}</p>,
@@ -143,98 +127,6 @@ const markdownComponents = {
   ),
 };
 
-function matchBlockTitle(line: string): string | null {
-  const trimmed = line.trim();
-  const markdownHeading = trimmed.match(/^#{1,6}\s+(.{2,90})$/);
-  if (markdownHeading) return markdownHeading[1].trim();
-
-  const boldHeading = trimmed.match(/^\*\*([^*]{2,90})\*\*:?\s*$/);
-  if (boldHeading) return boldHeading[1].trim();
-
-  const numberedHeading = trimmed.match(/^\d+\.\s+(.{2,90})$/);
-  if (numberedHeading && !/[.!?]$/.test(numberedHeading[1].trim())) {
-    return numberedHeading[1].trim();
-  }
-
-  return null;
-}
-
-function splitAssistantBlocks(content: string): AssistantBlock[] {
-  const normalized = content.trim().replace(/\r\n/g, "\n");
-  if (!normalized) return [];
-
-  let blocks: AssistantBlock[] = [];
-  let currentTitle: string | undefined;
-  let currentLines: string[] = [];
-
-  const pushCurrent = () => {
-    const body = currentLines.join("\n").trim();
-    if (!body && !currentTitle) return;
-    blocks.push(body ? { title: currentTitle, body } : { body: currentTitle ?? "" });
-    currentTitle = undefined;
-    currentLines = [];
-  };
-
-  for (const rawLine of normalized.split("\n")) {
-    const title = matchBlockTitle(rawLine);
-    if (title) {
-      pushCurrent();
-      currentTitle = title;
-    } else {
-      currentLines.push(rawLine);
-    }
-  }
-  pushCurrent();
-
-  if (blocks.length <= 1) {
-    const paragraphs = normalized
-      .split(/\n{2,}/)
-      .map((part) => part.trim())
-      .filter(Boolean);
-    if (paragraphs.length > 1) {
-      blocks = paragraphs.map((body) => ({ body }));
-    }
-  }
-
-  if (blocks.length <= 1 && normalized.length > 420) {
-    const sentences =
-      normalized
-        .match(/[^.!?]+[.!?]+(?:\s|$)|[^.!?]+$/g)
-        ?.map((part) => part.trim())
-        .filter(Boolean) ?? [];
-    const chunks: string[] = [];
-    let chunk = "";
-    for (const sentence of sentences) {
-      const next = chunk ? `${chunk} ${sentence}` : sentence;
-      if (next.length > 360 && chunk) {
-        chunks.push(chunk);
-        chunk = sentence;
-      } else {
-        chunk = next;
-      }
-    }
-    if (chunk) chunks.push(chunk);
-    if (chunks.length > 1) {
-      blocks = chunks.map((body) => ({ body }));
-    }
-  }
-
-  if (blocks.length > MAX_ASSISTANT_BLOCKS) {
-    const visible = blocks.slice(0, MAX_ASSISTANT_BLOCKS - 1);
-    const rest = blocks.slice(MAX_ASSISTANT_BLOCKS - 1);
-    blocks = [
-      ...visible,
-      {
-        title: "Chi tiết bổ sung",
-        body: rest
-          .map((block) => [block.title, block.body].filter(Boolean).join("\n"))
-          .join("\n\n"),
-      },
-    ];
-  }
-
-  return blocks.length ? blocks : [{ body: normalized }];
-}
 
 function ChatPage() {
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -245,16 +137,17 @@ function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const { data: me } = useMe();
 
-  const role = me?.role ?? "guest";
+  // Only Staff roles pass the layout gate; while /api/me loads, show the
+  // least-privileged copy (the backend enforces the real scope).
+  const role: StaffRole =
+    me?.role && me.role !== "pending" && me.role !== "guest" ? me.role : "staff";
   const chatConfig = CHAT_ROLE_CONFIG[role];
   const scopeText =
     role === "admin"
       ? "Toàn hệ thống"
-      : role === "guest"
-        ? "Khách hàng"
-        : me?.department
-          ? `Phòng ${me.department}`
-          : "Chưa gán phòng ban";
+      : me?.department
+        ? `Phòng ${me.department}`
+        : "Chưa gán phòng ban";
 
   useEffect(() => {
     supabase
@@ -341,7 +234,7 @@ function ChatPage() {
     await supabase.from("chat_messages").insert({ user_id: u.user.id, role: "user", content });
 
     try {
-      const endpoint = "/api/agent/chat"; // backend tự phân tầng: guest→RAG công khai, ops/admin→ReAct Agent
+      const endpoint = "/api/agent/chat"; // backend tự phân tầng theo role + phòng ban (ReAct Agent)
       const reply = await apiFetch<AgentChatResponse>(
         endpoint,
         {
@@ -502,7 +395,7 @@ function ChatPage() {
           </button>
         </form>
         </div>
-        {(role !== "guest" && (messages.some(m => m.sources?.length) || loading)) && (
+        {(messages.some(m => m.sources?.length) || loading) && (
           <div className="flex-[4] rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] overflow-hidden flex flex-col">
             <div className="p-4 border-b border-border bg-muted/30">
               <h3 className="font-semibold text-sm flex items-center gap-2">

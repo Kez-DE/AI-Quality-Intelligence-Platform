@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ALL_TEAMS, apiFetch, useMe, ROLE_LABELS, type Role } from "@/lib/api";
+import { ALL_TEAMS, apiFetch, useMe, ROLE_LABELS, type Role, type StaffRole } from "@/lib/api";
+import { isStrongPassword } from "@/lib/password";
+import { PasswordStrengthHint } from "@/components/PasswordStrengthHint";
 import {
   Loader2,
   ShieldAlert,
@@ -13,6 +15,7 @@ import {
   UserCog,
   Clock,
   Search,
+  UserPlus,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -31,7 +34,9 @@ type ManagedUser = {
   created_at: string;
 };
 
-const ROLES: Role[] = ["admin", "manager", "staff", "guest"];
+const ROLES: Role[] = ["admin", "manager", "staff", "pending"];
+// An admin-created account starts with a Staff role; `pending` is only for demotion.
+const CREATE_ROLES: StaffRole[] = ["staff", "manager", "admin"];
 const DEPARTMENTS = ALL_TEAMS;
 
 function getRoleBadgeColor(role: Role) {
@@ -42,7 +47,7 @@ function getRoleBadgeColor(role: Role) {
       return "bg-blue-100 text-blue-800 border-blue-200";
     case "staff":
       return "bg-emerald-100 text-emerald-800 border-emerald-200";
-    case "guest":
+    case "pending":
       return "bg-yellow-100 text-yellow-800 border-yellow-200";
     default:
       return "bg-gray-100 text-gray-800 border-gray-200";
@@ -54,6 +59,7 @@ function AdminPage() {
   const qc = useQueryClient();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
 
   const usersQuery = useQuery({
     queryKey: ["admin-users"],
@@ -129,7 +135,7 @@ function AdminPage() {
   }
 
   const allUsers = usersQuery.data ?? [];
-  const pendingUsers = allUsers.filter((u) => u.role === "guest");
+  const pendingUsers = allUsers.filter((u) => u.role === "pending");
   const managerUsers = allUsers.filter((u) => u.role === "manager");
   const staffUsers = allUsers.filter((u) => u.role === "staff");
   const adminUsers = allUsers.filter((u) => u.role === "admin");
@@ -151,7 +157,7 @@ function AdminPage() {
         <div className="rounded-2xl border border-dashed border-border bg-muted/30 py-12 text-center">
           <CheckCircle className="h-10 w-10 mx-auto text-xanh-green/60 mb-3" />
           <p className="text-sm text-muted-foreground font-medium">
-            Không có tài khoản nào chờ duyệt
+            Không có tài khoản nào chờ cấp quyền
           </p>
           <p className="text-xs text-muted-foreground mt-1">Tất cả đã được xử lý.</p>
         </div>
@@ -173,7 +179,7 @@ function AdminPage() {
                   </div>
                   <div className="text-xs text-muted-foreground font-mono truncate">{u.email}</div>
                   <div className="text-[11px] text-muted-foreground mt-0.5">
-                    Đăng ký: {new Date(u.created_at).toLocaleDateString("vi-VN")}
+                    Tạo ngày: {new Date(u.created_at).toLocaleDateString("vi-VN")}
                   </div>
                 </div>
               </div>
@@ -185,14 +191,14 @@ function AdminPage() {
                     roleMutation.mutate({ id: u.id, role: "staff" });
                   }}
                   className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 disabled:opacity-40 transition-colors shadow-sm"
-                  title="Duyệt thành Nhân viên"
+                  title="Cấp quyền Nhân viên"
                 >
                   {busy ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
                     <UserCheck className="h-3.5 w-3.5" />
                   )}
-                  Duyệt Nhân viên
+                  Cấp quyền Nhân viên
                 </button>
                 <button
                   disabled={busy}
@@ -201,14 +207,14 @@ function AdminPage() {
                     roleMutation.mutate({ id: u.id, role: "manager" });
                   }}
                   className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-500 text-white text-xs font-semibold hover:bg-blue-600 disabled:opacity-40 transition-colors shadow-sm"
-                  title="Duyệt thành Quản lý"
+                  title="Cấp quyền Quản lý"
                 >
                   {busy ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
                     <Shield className="h-3.5 w-3.5" />
                   )}
-                  Duyệt Quản lý
+                  Cấp quyền Quản lý
                 </button>
                 <button
                   disabled={busy}
@@ -259,6 +265,9 @@ function AdminPage() {
         {users.map((u) => {
           const isSelf = u.id === me.data?.id;
           const busy = pendingId === u.id;
+          // Customer account (US-078): self sign-up, read-only here. A Staff account is
+          // created with the form, never promoted from a Customer account (decision 0018).
+          const isCustomer = u.role === "guest";
           return (
             <div
               key={u.id}
@@ -276,39 +285,51 @@ function AdminPage() {
                 <div className="text-xs font-mono text-muted-foreground truncate">{u.email}</div>
               </div>
               <div className="col-span-2">
-                <select
-                  value={u.role}
-                  disabled={busy || isSelf}
-                  onChange={(e) => {
-                    setPendingId(u.id);
-                    roleMutation.mutate({ id: u.id, role: e.target.value as Role });
-                  }}
-                  className="h-8 px-2 rounded-lg border border-border bg-card text-xs font-medium focus:outline-none focus:ring-2 focus:ring-xanh-green/40 disabled:opacity-60 w-full"
-                >
-                  {ROLES.map((r) => (
-                    <option key={r} value={r}>
-                      {ROLE_LABELS[r]}
-                    </option>
-                  ))}
-                </select>
+                {isCustomer ? (
+                  <span
+                    className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${getRoleBadgeColor(u.role)}`}
+                  >
+                    {ROLE_LABELS.guest}
+                  </span>
+                ) : (
+                  <select
+                    value={u.role}
+                    disabled={busy || isSelf}
+                    onChange={(e) => {
+                      setPendingId(u.id);
+                      roleMutation.mutate({ id: u.id, role: e.target.value as Role });
+                    }}
+                    className="h-8 px-2 rounded-lg border border-border bg-card text-xs font-medium focus:outline-none focus:ring-2 focus:ring-xanh-green/40 disabled:opacity-60 w-full"
+                  >
+                    {ROLES.map((r) => (
+                      <option key={r} value={r}>
+                        {ROLE_LABELS[r]}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div className="col-span-2">
-                <select
-                  value={u.department ?? ""}
-                  disabled={busy}
-                  onChange={(e) => {
-                    setPendingId(u.id);
-                    departmentMutation.mutate({ id: u.id, department: e.target.value || null });
-                  }}
-                  className="h-8 px-2 rounded-lg border border-border bg-card text-xs font-medium focus:outline-none focus:ring-2 focus:ring-xanh-green/40 disabled:opacity-60 w-full"
-                >
-                  <option value="">Chưa gán</option>
-                  {DEPARTMENTS.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
+                {isCustomer ? (
+                  <span className="text-xs text-muted-foreground">—</span>
+                ) : (
+                  <select
+                    value={u.department ?? ""}
+                    disabled={busy}
+                    onChange={(e) => {
+                      setPendingId(u.id);
+                      departmentMutation.mutate({ id: u.id, department: e.target.value || null });
+                    }}
+                    className="h-8 px-2 rounded-lg border border-border bg-card text-xs font-medium focus:outline-none focus:ring-2 focus:ring-xanh-green/40 disabled:opacity-60 w-full"
+                  >
+                    <option value="">Chưa gán</option>
+                    {DEPARTMENTS.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div className="col-span-2 text-xs text-muted-foreground">
                 {new Date(u.created_at).toLocaleDateString("vi-VN")}
@@ -343,23 +364,35 @@ function AdminPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="flex-shrink-0 w-11 h-11 rounded-xl bg-xanh-deep/10 flex items-center justify-center">
           <Users className="h-6 w-6 text-xanh-deep" />
         </div>
-        <div>
+        <div className="flex-1 min-w-0">
           <h1 className="font-display text-2xl font-bold">Quản lý người dùng</h1>
           <p className="text-sm text-muted-foreground">
-            Phân quyền, duyệt tài khoản và quản lý nhân sự trong hệ thống.
+            Tạo tài khoản, cấp quyền và quản lý nhân sự trong hệ thống.
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => setShowCreate((v) => !v)}
+          aria-expanded={showCreate}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-sm font-semibold shadow-[var(--shadow-green)]"
+          style={{ background: "var(--gradient-green)" }}
+        >
+          <UserPlus className="h-4 w-4" />
+          Tạo tài khoản
+        </button>
       </div>
+
+      {showCreate && <CreateUserForm onDone={() => setShowCreate(false)} />}
 
       {/* Stats cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-3.5">
           <div className="text-2xl font-bold text-yellow-700">{pendingUsers.length}</div>
-          <div className="text-xs text-yellow-600 font-medium mt-0.5">Chờ duyệt</div>
+          <div className="text-xs text-yellow-600 font-medium mt-0.5">Chờ cấp quyền</div>
         </div>
         <div className="rounded-xl border border-blue-200 bg-blue-50 p-3.5">
           <div className="text-2xl font-bold text-blue-700">{managerUsers.length}</div>
@@ -428,7 +461,7 @@ function AdminPage() {
               className="rounded-lg gap-1.5 data-[state=active]:bg-card data-[state=active]:shadow-sm"
             >
               <Clock className="h-3.5 w-3.5" />
-              Chờ duyệt
+              Chờ cấp quyền
               {pendingUsers.length > 0 && (
                 <span className="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 text-[10px] font-bold text-white bg-xanh-coral rounded-full">
                   {pendingUsers.length}
@@ -481,5 +514,160 @@ function AdminPage() {
         </Tabs>
       )}
     </div>
+  );
+}
+
+const EMPTY_NEW_USER = {
+  email: "",
+  full_name: "",
+  role: "staff" as StaffRole,
+  department: "",
+  temp_password: "",
+};
+
+// Admin creates a Staff account with a temporary password (POST /api/admin/users).
+// The account must replace the password on first login (app_metadata.must_change_password, set by the backend).
+function CreateUserForm({ onDone }: { onDone: () => void }) {
+  const qc = useQueryClient();
+  const [form, setForm] = useState(EMPTY_NEW_USER);
+  const [error, setError] = useState("");
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      await apiFetch("/api/admin/users", {
+        method: "POST",
+        body: JSON.stringify({
+          email: form.email.trim(),
+          full_name: form.full_name.trim(),
+          role: form.role,
+          department: form.department || null,
+          temp_password: form.temp_password,
+        }),
+      });
+    },
+    onSuccess: () => {
+      toast.success(`Đã tạo tài khoản ${form.email.trim()}`);
+      setForm(EMPTY_NEW_USER); // never keep the temporary password in state
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      onDone();
+    },
+    onError: (e) => setError(e instanceof Error ? e.message : "Tạo tài khoản thất bại"),
+  });
+
+  function set<K extends keyof typeof EMPTY_NEW_USER>(key: K, value: (typeof EMPTY_NEW_USER)[K]) {
+    setForm((f) => ({ ...f, [key]: value }));
+    setError("");
+  }
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!isStrongPassword(form.temp_password)) {
+      setError("Mật khẩu tạm chưa đủ mạnh. Hãy đáp ứng tất cả 5 tiêu chí.");
+      return;
+    }
+    createMutation.mutate();
+  }
+
+  const fieldCls =
+    "w-full h-10 px-3 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-xanh-green/40";
+
+  return (
+    <form
+      onSubmit={submit}
+      className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)] space-y-4"
+    >
+      <div>
+        <h2 className="font-display font-semibold">Tạo tài khoản</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Người dùng đăng nhập bằng mật khẩu tạm và phải đổi mật khẩu ở lần đăng nhập đầu tiên.
+        </p>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-3">
+        <label className="text-xs space-y-1">
+          <span className="text-muted-foreground">Email</span>
+          <input
+            type="email"
+            required
+            autoComplete="off"
+            value={form.email}
+            onChange={(e) => set("email", e.target.value)}
+            className={fieldCls}
+          />
+        </label>
+        <label className="text-xs space-y-1">
+          <span className="text-muted-foreground">Họ và tên</span>
+          <input
+            required
+            value={form.full_name}
+            onChange={(e) => set("full_name", e.target.value)}
+            className={fieldCls}
+          />
+        </label>
+        <label className="text-xs space-y-1">
+          <span className="text-muted-foreground">Vai trò</span>
+          <select
+            value={form.role}
+            onChange={(e) => set("role", e.target.value as StaffRole)}
+            className={fieldCls}
+          >
+            {CREATE_ROLES.map((r) => (
+              <option key={r} value={r}>
+                {ROLE_LABELS[r]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs space-y-1">
+          <span className="text-muted-foreground">Phòng ban</span>
+          <select
+            value={form.department}
+            onChange={(e) => set("department", e.target.value)}
+            className={fieldCls}
+          >
+            <option value="">Chưa gán</option>
+            {DEPARTMENTS.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs space-y-1 sm:col-span-2">
+          <span className="text-muted-foreground">Mật khẩu tạm</span>
+          <input
+            type="password"
+            required
+            autoComplete="new-password"
+            value={form.temp_password}
+            onChange={(e) => set("temp_password", e.target.value)}
+            className={fieldCls}
+          />
+        </label>
+      </div>
+      <PasswordStrengthHint password={form.temp_password} />
+      {error && (
+        <p role="alert" className="text-sm text-xanh-coral">
+          {error}
+        </p>
+      )}
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onDone}
+          className="px-4 py-2 rounded-lg border border-border text-sm hover:bg-muted"
+        >
+          Huỷ
+        </button>
+        <button
+          type="submit"
+          disabled={createMutation.isPending}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-white text-sm font-semibold shadow-[var(--shadow-green)] disabled:opacity-60"
+          style={{ background: "var(--gradient-green)" }}
+        >
+          {createMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+          Tạo tài khoản
+        </button>
+      </div>
+    </form>
   );
 }

@@ -22,7 +22,7 @@ def test_staff_forbidden():
     assert exc.value.status_code == 403
 
 
-def test_guest_forbidden():
+def test_pending_forbidden():
     with pytest.raises(HTTPException) as exc:
-        require_manager(_u("guest"))
+        require_manager(_u("pending"))
     assert exc.value.status_code == 403

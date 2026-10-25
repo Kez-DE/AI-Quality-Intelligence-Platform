@@ -8,7 +8,9 @@ def _db_returning(rows):
     """MagicMock supabase double: select chain returns rows, captures updates."""
     db = MagicMock()
     select_chain = db.table.return_value.select.return_value
-    select_chain.is_.return_value.eq.return_value.limit.return_value.execute.return_value.data = rows
+    # select().is_(overall_risk).eq(sentiment).is_(redacted_at).limit() — the
+    # redacted_at filter keeps retention-wiped rows out of scoring (decision 0017).
+    select_chain.is_.return_value.eq.return_value.is_.return_value.limit.return_value.execute.return_value.data = rows
     return db
 
 

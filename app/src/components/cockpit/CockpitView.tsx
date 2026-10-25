@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Info, Shield, X } from "lucide-react";
+import { Shield, X } from "lucide-react";
 import { useMe } from "@/lib/api";
 import { useCockpitRealtime } from "@/hooks/useCockpitRealtime";
 import { useCockpitFilter } from "./CockpitFilterContext";
@@ -14,18 +14,6 @@ import { LiveFeed } from "./widgets/LiveFeed";
 import { TeamLeaderboard } from "./widgets/TeamLeaderboard";
 import { TicketBoard } from "./widgets/TicketBoard";
 import { TrendCard } from "./widgets/TrendCard";
-
-function SecurityNotice() {
-  return (
-    <div className="rounded-2xl border border-dashed border-border bg-muted/50 p-6 text-center">
-      <Shield className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
-      <h3 className="text-sm font-semibold text-foreground">Khu vực hạn chế</h3>
-      <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-        Một số dữ liệu nội bộ đã được ẩn vì quyền bảo mật của tài khoản Khách.
-      </p>
-    </div>
-  );
-}
 
 function UnassignedNotice() {
   return (
@@ -57,8 +45,7 @@ function FilterChip({ filter, clear }: { filter: { topic: string | null; area: s
 
 export function CockpitView() {
   const { data: me } = useMe();
-  const isGuest = me?.role === "guest";
-  const isUnassigned = !!me && me.role !== "admin" && me.role !== "guest" && !me.department;
+  const isUnassigned = !!me && me.role !== "admin" && !me.department;
   const { filter, clear } = useCockpitFilter();
   const [drawer, setDrawer] = useState<DrawerFilter | null>(null);
 
@@ -70,19 +57,11 @@ export function CockpitView() {
 
   return (
     <div className="mt-6 space-y-6">
-      {isGuest && (
-        <div className="flex items-center gap-2.5 rounded-xl border border-xanh-green/20 bg-xanh-mint/30 px-4 py-2.5 text-sm text-xanh-deep">
-          <Info className="h-4 w-4 flex-shrink-0 text-xanh-green" />
-          <span>
-            Bạn đang xem ở chế độ <strong>Khách</strong> — dữ liệu nhạy cảm và tính năng vận hành đã được bảo mật.
-          </span>
-        </div>
-      )}
       <FilterChip filter={filter} clear={clear} />
       <KpiStrip />
       <div className="grid lg:grid-cols-12 gap-6">
         <div className="lg:col-span-8 space-y-6">
-          {!isGuest ? <LiveFeed /> : <SecurityNotice />}
+          <LiveFeed />
           <TrendCard />
           <CategoryBreakdown
             onOpenDrawer={(topic) =>
@@ -91,17 +70,17 @@ export function CockpitView() {
           />
         </div>
         <aside className="lg:col-span-4 space-y-6">
-          {!isGuest && <AlertsPanel />}
+          <AlertsPanel />
           <Heatmap
             onOpenDrawer={(area) =>
               setDrawer({ area, title: `Phản hồi · ${area}` })
             }
           />
-          {!isGuest && <TeamLeaderboard />}
-          {!isGuest && <DriverWatchlist />}
+          <TeamLeaderboard />
+          <DriverWatchlist />
         </aside>
       </div>
-      {!isGuest && <TicketBoard />}
+      <TicketBoard />
 
       <AdvancedAnalytics />
 

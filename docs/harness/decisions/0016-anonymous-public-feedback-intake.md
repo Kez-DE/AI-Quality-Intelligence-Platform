@@ -4,7 +4,10 @@ Date: 2026-09-23
 
 ## Status
 
-Accepted
+Accepted. Superseded in part by decision 0017 (2026-09-27), which moves the
+public routes out of the Staff web into a separate Customer web, cuts the status
+response to `public_ref`, `status` and `created_at`, renames `resolved` to
+`reviewed`, and turns the retention follow-up into daily redaction.
 
 ## Context
 

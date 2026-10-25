@@ -46,7 +46,8 @@ def test_unknown_role_gets_no_ops_tools():
     sẽ mặc nhiên có quyền cao nhất mà không ai nhận ra.
     """
     assert tools_for_role(None) == []
-    assert tools_for_role("guest") == []
+    assert tools_for_role("pending") == []
+    assert tools_for_role("guest") == []  # retired role (decision 0017) stays closed
     assert tools_for_role("vai_tro_moi_chua_khai_bao") == []
     # admin vẫn phải là toàn bộ tool
     assert _names(tools_for_role("admin")) == _names(TOOLS_DEFINITIONS)

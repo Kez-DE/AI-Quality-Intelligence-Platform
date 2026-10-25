@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 import logging
 import os
+import re
 import time
 from datetime import datetime, timezone, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -19,15 +20,16 @@ from agent.rag_engine import rag_chat
 from auth_guard import AuthUser, can_view_team, get_current_user, require_admin, require_manager, require_ops_staff, scoped_team
 from dispatch_utils import parse_deadline
 from db_utils import fetch_paginated
-from users_admin import router as users_router, audit_router
+from users_admin import router as users_router, audit_router, admin_router, me_router
 from public_intake import router as public_intake_router
+from customer_api import router as customer_router
 from rate_limiter import RateLimiter, check_rate_limit
 from clean import mask_pii
 from env_config import get_settings
 from core.paths import DEFAULT_DATA_FILE
 from departments import alert_department
 from agents.router_agent import route_ticket
-from services.agent_context import AGENT_SYSTEM_PROMPT, GUEST_SYSTEM_PROMPT, build_agent_data_context, build_agent_system_prompt
+from services.agent_context import AGENT_SYSTEM_PROMPT, PUBLIC_SYSTEM_PROMPT, build_agent_data_context, build_agent_system_prompt
 from services.live_stream import DEFAULT_MAX_SPIKES, get_live_stream_status, set_scheduler, start_live_stream, stop_live_stream
 from services.ticket_workflow import ticket_workflow_state
 
@@ -41,9 +43,9 @@ class ChatMessageReq(BaseModel):
 
 class ChatReq(BaseModel):
     messages: list[ChatMessageReq]
-    # public_only: ép trợ lý chạy ở TẦNG CÔNG KHAI (Public FAQ/CSKH) cho MỌI vai trò.
-    # Chỉ HẠ quyền, không bao giờ nâng quyền (guest vẫn là guest). Dùng cho widget trợ lý
-    # ở trang chủ/landing để không lộ dữ liệu nội bộ kể cả khi ops/admin đang đăng nhập.
+    # public_only: ép trợ lý chạy ở TẦNG CÔNG KHAI (Public FAQ/CSKH) cho ops/admin.
+    # Chỉ HẠ quyền, không bao giờ nâng quyền. Dùng cho widget trợ lý ở trang chủ/landing
+    # để không lộ dữ liệu nội bộ kể cả khi ops/admin đang đăng nhập.
     public_only: bool = False
 
 
@@ -106,8 +108,7 @@ class ApproveDispatchReq(BaseModel):
 
 _s = get_settings()
 
-feedback_rate_limit = RateLimiter(max_requests=_s.rate_limit_feedback_guest, window_seconds=3600, scope="feedback_submit")
-chat_rate_limit = RateLimiter(max_requests=_s.rate_limit_chat_guest, window_seconds=3600, scope="agent_chat")
+chat_rate_limit = RateLimiter(max_requests=_s.rate_limit_chat_public, window_seconds=3600, scope="agent_chat")
 chat_rate_limit_staff = RateLimiter(max_requests=_s.rate_limit_chat_staff, window_seconds=3600, scope="agent_chat_staff")
 
 scheduler: BackgroundScheduler | None = None
@@ -254,7 +255,8 @@ async def validation_exception_handler(_request, exc: RequestValidationError):
             "error": {
                 "code": "VALIDATION_ERROR",
                 "message": "Invalid input",
-                "details": exc.errors(),
+                # Drop `input`: it can echo a request body back, a password included.
+                "details": [{k: v for k, v in e.items() if k != "input"} for e in exc.errors()],
             }
         },
     )
@@ -266,21 +268,34 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Customer web reads Retry-After on 429 to tell the customer how long to wait.
+    expose_headers=["Retry-After"],
 )
 
 # User-management (admin only) — định danh + RBAC ở tầng API vì service role bypass RLS.
 app.include_router(users_router)
 app.include_router(audit_router)
+app.include_router(admin_router)
+app.include_router(me_router)
 
 # Anonymous intake (decision 0016) — the only routes here with no auth dependency.
 # Kept in their own module so the unauthenticated contract stays one small file.
 app.include_router(public_intake_router)
 
+# Customer account (guest, decision 0018): own feedback + customer assistant only.
+app.include_router(customer_router)
+
 
 @app.get("/api/me")
 def whoami(user: AuthUser = Depends(get_current_user)):
-    """Trả về danh tính + role của user đang đăng nhập (frontend dùng để render nav theo quyền)."""
-    return {"status": "success", "data": {"id": user.id, "email": user.email, "role": user.role, "department": user.department}}
+    """Trả về danh tính + role của user đang đăng nhập (frontend dùng để render nav theo quyền).
+
+    Mở cho Pending account và tài khoản còn mật khẩu tạm (decision 0017), cùng với
+    POST /api/me/password: Staff web cần role + cờ để chọn màn hình chờ / đổi mật khẩu."""
+    return {"status": "success", "data": {
+        "id": user.id, "email": user.email, "role": user.role, "department": user.department,
+        "must_change_password": user.must_change_password,
+    }}
 
 
 @app.get("/")
@@ -345,11 +360,10 @@ def recent_feedback(
     limit: int = Query(default=100, ge=1, le=500),
     needs_review: bool | None = Query(default=None),
     reviewed: bool | None = Query(default=None),
-    user: AuthUser = Depends(get_current_user),
+    user: AuthUser = Depends(require_ops_staff),
 ):
-    """Đọc feedback gần nhất.
+    """Đọc feedback gần nhất (chỉ Staff account; Pending account nhận 403).
 
-    - Guest: chỉ xem feedback của chính mình.
     - Staff/Manager: chỉ xem feedback được định tuyến về phòng của mình.
     - Admin: xem toàn bộ feedback.
     """
@@ -358,17 +372,13 @@ def recent_feedback(
         q = db.table("feedback").select("*")
         feedback_team = None
         fetch_limit = limit
-        if user.role == "guest":
-            # Guest chỉ xem feedback do chính mình gửi
-            q = q.eq("user_id", user.id)
-        else:
-            if user.role in ("staff", "manager"):
-                feedback_team = scoped_team(user, None)
-                fetch_limit = 500
-            if needs_review is not None:
-                q = q.eq("needs_review", needs_review)
-            if reviewed is not None:
-                q = q.eq("reviewed", reviewed)
+        if user.role in ("staff", "manager"):
+            feedback_team = scoped_team(user, None)
+            fetch_limit = 500
+        if needs_review is not None:
+            q = q.eq("needs_review", needs_review)
+        if reviewed is not None:
+            q = q.eq("reviewed", reviewed)
         data = q.order("created_at", desc=True).limit(fetch_limit).execute().data or []
         if feedback_team:
             data = [row for row in data if _feedback_team(row) == feedback_team][:limit]
@@ -423,7 +433,7 @@ def _alert_status_counts(db, team: str | None = None) -> dict:
 def recent_alerts(limit: int = Query(default=100, ge=1, le=500),
                   status: str | None = Query(default=None),
                   user: AuthUser = Depends(require_ops_staff)):
-    """Alerts chỉ dành cho ops staff (staff/manager/admin). Guest không được xem.
+    """Alerts chỉ dành cho ops staff (staff/manager/admin). Pending account không được xem.
 
     Admin xem tất cả; ops khác chỉ xem alert phòng mình (hoặc gắn task của phòng).
     `status` (open/in_progress/resolved): lọc đúng trạng thái ở server để xem được cả 'resolved'
@@ -1308,7 +1318,7 @@ def agent_ai_log(
 ):
     """AI-log vận hành (6 agent nghiệp vụ + chat agent), bóc theo phòng ban.
 
-    - admin: xem mọi phòng; lọc theo ?team nếu truyền (vd team=guest, team=Safety).
+    - admin: xem mọi phòng; lọc theo ?team nếu truyền (vd team=public, team=IT).
     - ops đã gán phòng: CHỈ thấy log phòng mình (ép team, bỏ qua ?team).
     - ops chưa gán phòng: 403."""
     from agents.ai_log import read_recent
@@ -1431,7 +1441,7 @@ def agent_stats(
 
 
 def _log_chat_event(team: str, status: str, latency_ms: int, *, provider: str = "", model: str = "", error: str = ""):
-    """Ghi ai-log cho 1 lượt chat agent, gắn phòng ban của account (guest/admin/tên phòng).
+    """Ghi ai-log cho 1 lượt chat agent, gắn phòng ban của account (public/admin/tên phòng).
 
     Best-effort — không bao giờ làm vỡ request chat."""
     try:
@@ -1468,51 +1478,87 @@ def _append_safe_client_history(normalized: list[dict], messages: list[ChatMessa
         normalized.append({"role": role, "content": safe_content[:8000]})
 
 
-@app.post("/api/agent/chat")
-def agent_chat(payload: ChatReq, user: AuthUser = Depends(get_current_user)):
-    # TẦNG CÔNG KHAI: áp dụng cho guest, hoặc khi client yêu cầu public_only (widget trang chủ).
-    # public_only chỉ HẠ quyền — ops/admin đăng nhập vẫn bị giới hạn về Public FAQ + submit_feedback,
-    # KHÔNG truy cập tool/dữ liệu nội bộ. Không thể dùng để nâng quyền.
-    if user.role == "guest" or payload.public_only:
-        check_rate_limit(chat_rate_limit, user.id)
-        if not payload.messages:
-            raise HTTPException(status_code=400, detail="messages must be a non-empty list")
+_MD_EMPHASIS = re.compile(r"\*\*|__")
+_MD_HEADING = re.compile(r"^[ \t]{0,3}#{1,6}[ \t]+", re.M)
+_MD_STAR_BULLET = re.compile(r"^([ \t]*)\*[ \t]+", re.M)
 
-        # --- Import guest tool support ---
-        from agent.chat_tools import GUEST_TOOLS_DEFINITIONS, execute_guest_tool
 
-        # RAG công khai: lấy câu hỏi cuối của khách -> tra public KB (chính sách/FAQ).
-        last_user_q = next(
-            (m.content for m in reversed(payload.messages) if m.role == "user" and m.content.strip()),
-            "",
-        )
-        normalized = [{"role": "system", "content": GUEST_SYSTEM_PROMPT}]
-        if last_user_q:
-            try:
-                from agent.public_kb import search_public_knowledge, format_public_for_prompt
-                kb = format_public_for_prompt(search_public_knowledge(mask_pii(last_user_q), top_k=3))
-                normalized.append({"role": "system", "content": kb})
-            except Exception as exc:
-                print(f"[agent_chat] public KB lookup failed: {exc}", flush=True)
-        _append_safe_client_history(normalized, payload.messages)
-        _t0 = time.time()
+def _plain_text(text: str) -> str:
+    """Customer-facing chat renders plain text, so markdown marks would show as-is.
+    The prompt asks for plain text; this catches a model that ignores it."""
+    text = _MD_HEADING.sub("", _MD_EMPHASIS.sub("", text))
+    return _MD_STAR_BULLET.sub(r"\1- ", text)
+
+
+# Both chat widgets open with a local greeting bubble the server never sees, so a
+# self-introduction in a reply is always the second one; the model adds it anyway.
+_REPEAT_GREETING = re.compile(r"^\s*(?:xin\s+)?chào(?:\s+bạn)?[,!.]?\s*tôi là trợ lý AI-Quality[.!]?\s*", re.I)
+
+
+def run_public_chat(messages: list[ChatMessageReq], execute_fn, log_team: str = "public") -> dict:
+    """TẦNG CÔNG KHAI: Public KB + PUBLIC_SYSTEM_PROMPT + chỉ PUBLIC_TOOLS (submit_feedback).
+
+    Dùng chung cho public_only của staff và trợ lý của Customer account
+    (/api/customer/chat). execute_fn quyết định submit_feedback ghi vào đâu."""
+    if not messages:
+        raise HTTPException(status_code=400, detail="messages must be a non-empty list")
+
+    from agent.chat_tools import PUBLIC_TOOLS_DEFINITIONS
+
+    # RAG công khai: lấy câu hỏi cuối của khách -> tra public KB (chính sách/FAQ).
+    last_user_q = next(
+        (m.content for m in reversed(messages) if m.role == "user" and m.content.strip()),
+        "",
+    )
+    normalized = [{"role": "system", "content": PUBLIC_SYSTEM_PROMPT}]
+    # Public KB offers carry end dates; the model has no clock of its own.
+    today_vn = datetime.now(timezone(timedelta(hours=7))).strftime("%d/%m/%Y")
+    normalized.append({"role": "system", "content": f"Hôm nay là ngày {today_vn}."})
+    if last_user_q:
         try:
-            # Chạy ReAct agent nhưng CHỈ với GUEST_TOOLS (submit_feedback).
-            # Truyền tools_override và execute_fn để agent không có quyền gọi OPS tools.
-            result = run_chat_agent(
-                normalized,
-                temperature=0.4,
-                tools_override=GUEST_TOOLS_DEFINITIONS,
-                execute_fn=lambda name, args: execute_guest_tool(name, args, user_id=user.id),
-            )
+            from agent.public_kb import search_public_knowledge, format_public_for_prompt
+            kb = format_public_for_prompt(search_public_knowledge(mask_pii(last_user_q), top_k=3))
+            normalized.append({"role": "system", "content": kb})
         except Exception as exc:
-            _log_chat_event("guest", "error", int((time.time() - _t0) * 1000), error=str(exc)[:200])
-            raise HTTPException(status_code=502, detail=f"Agent model error: {str(exc)[:300]}") from exc
-        if isinstance(result.get("content"), str):
-            result["content"] = mask_pii(result["content"])
-        _log_chat_event("guest", "success", int((time.time() - _t0) * 1000),
-                        provider=result.get("provider", ""), model=result.get("model", ""))
-        return {"status": "success", "data": result}
+            print(f"[agent_chat] public KB lookup failed: {exc}", flush=True)
+    _append_safe_client_history(normalized, messages)
+    _t0 = time.time()
+    try:
+        # Chạy ReAct agent nhưng CHỈ với PUBLIC_TOOLS (submit_feedback).
+        # Truyền tools_override và execute_fn để agent không có quyền gọi OPS tools.
+        result = run_chat_agent(
+            normalized,
+            temperature=0.4,
+            tools_override=PUBLIC_TOOLS_DEFINITIONS,
+            execute_fn=execute_fn,
+            log_preview=False,  # Customer words stay out of agent.log
+        )
+    except Exception as exc:
+        _log_chat_event(log_team, "error", int((time.time() - _t0) * 1000), error=str(exc)[:200])
+        # Customer-facing tier: provider error text stays in ai-log, never in the response.
+        raise HTTPException(status_code=502, detail="Trợ lý tạm thời không phản hồi, vui lòng thử lại") from exc
+    if isinstance(result.get("content"), str):
+        content = _plain_text(mask_pii(result["content"]))
+        content = _REPEAT_GREETING.sub("", content, count=1) or content
+        result["content"] = content
+    _log_chat_event(log_team, "success", int((time.time() - _t0) * 1000),
+                    provider=result.get("provider", ""), model=result.get("model", ""))
+    return {"status": "success", "data": result}
+
+
+@app.post("/api/agent/chat")
+def agent_chat(payload: ChatReq, user: AuthUser = Depends(require_ops_staff)):
+    # Chỉ Staff account (decision 0017): Pending account nhận 403 kể cả với public_only.
+    # TẦNG CÔNG KHAI: khi client yêu cầu public_only (widget trang chủ). Cờ này chỉ HẠ quyền —
+    # ops/admin đăng nhập bị giới hạn về Public FAQ + submit_feedback, KHÔNG truy cập
+    # tool/dữ liệu nội bộ. Không thể dùng để nâng quyền.
+    if payload.public_only:
+        check_rate_limit(chat_rate_limit, user.id)
+        from agent.chat_tools import execute_public_tool
+
+        return run_public_chat(
+            payload.messages, lambda name, args: execute_public_tool(name, args, user_id=user.id)
+        )
 
     # Staff / manager / admin — apply a higher rate limit to prevent LLM API key abuse
     check_rate_limit(chat_rate_limit_staff, user.id)
@@ -1679,15 +1725,14 @@ def trigger_spike_detect(
     return {"status": "success", "data": result}
 
 @app.post("/api/feedback/submit")
-def submit_feedback(payload: dict, user: AuthUser = Depends(get_current_user)):
-    """Người dùng gửi phản hồi: CHỈ nhập text + kênh + khu vực.
+def submit_feedback(payload: dict, user: AuthUser = Depends(require_ops_staff)):
+    """Staff account gửi phản hồi: CHỈ nhập text + kênh + khu vực.
 
-    Topic / sentiment / severity / confidence do AI tự phân tích (classifier +
-    rule Safety) — KHÔNG cho người gửi tự chọn, tránh làm hỏng dữ liệu nhãn.
+    Customer gửi qua Customer web (/api/public/feedback); route này chỉ cho ops
+    staff (decision 0017). Topic / sentiment / severity / confidence do AI tự phân
+    tích (classifier + rule Safety) — KHÔNG cho người gửi tự chọn, tránh làm hỏng
+    dữ liệu nhãn.
     """
-    if user.role == "guest":
-        check_rate_limit(feedback_rate_limit, user.id)
-
     text = (payload.get("text") or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="Thiếu nội dung phản hồi (text)")
@@ -1823,11 +1868,13 @@ def reclassify_feedback(
     from regions import region_code
 
     db = get_supabase()
-    rows = db.table("feedback").select("id,text,area,reviewed").limit(limit).execute().data or []
+    rows = db.table("feedback").select("id,text,area,reviewed,redacted_at").limit(limit).execute().data or []
     updated_count = 0
     needs_review_count = 0
     for r in rows:
-        if r.get("reviewed"):
+        # Redacted rows keep their labels but their text is the retention
+        # placeholder; re-predicting from it would overwrite real labels.
+        if r.get("reviewed") or r.get("redacted_at"):
             continue
         pred = predict_feedback(r.get("text") or "")
         sev = pred["severity"]
@@ -1908,14 +1955,15 @@ def get_department_insights(
 @app.get("/api/cockpit/overview")
 def cockpit_overview(
     days: int = Query(default=14, ge=1, le=90),
-    user: AuthUser = Depends(get_current_user),
+    user: AuthUser = Depends(require_ops_staff),
 ):
     """Số liệu tổng hợp cho Quality Cockpit, scope theo RBAC phòng ban.
 
     - admin: toàn bộ phòng.
     - manager/staff đã gán phòng: chỉ phòng mình.
     - manager/staff chưa gán phòng: trả unassigned=true (frontend hiện thông báo).
-    - guest: payload rút gọn (kpis cơ bản + trend + categories; không alerts/tickets/heatmap).
+    - Pending account: 403 (require_ops_staff). scope.restricted luôn False; giữ khoá
+      để không đổi hình dạng response (payload rút gọn của guest đã bỏ, decision 0017).
 
     Mọi truy vấn bọc try/except — lỗi DB không làm vỡ trang (trả field rỗng + db_error).
     """
@@ -1925,7 +1973,6 @@ def cockpit_overview(
     empty_heatmap = {"areas": [], "hours": COCKPIT_HOUR_BUCKETS, "cells": []}
 
     # ----- Scope theo RBAC -----
-    restricted = role == "guest"
     if role == "admin":
         team = None
     elif role in ("manager", "staff"):
@@ -1941,8 +1988,10 @@ def cockpit_overview(
                 "db_error": None,
             }}
         team = user.department
-    else:  # guest
-        team = None
+    else:
+        # Unreachable through HTTP (require_ops_staff); a direct caller gets the
+        # same answer as the route would give.
+        raise HTTPException(status_code=403, detail="Yêu cầu quyền staff/manager/admin")
 
     # ----- Lấy feedback trong cửa sổ (1 lượt), filter theo phòng nếu là ops -----
     db_error = None
@@ -2063,7 +2112,7 @@ def cockpit_overview(
     }
 
     # ----- KPI từ tasks/alerts/correction_logs (chỉ ops/admin) -----
-    if not restricted and db_error is None:
+    if db_error is None:
         alerts_open = tickets_open = corrections_7d = 0
         tickets_by_priority: dict[str, int] = {}
         try:
@@ -2105,7 +2154,7 @@ def cockpit_overview(
     # ----- Chart data: funnel + sankey (chỉ ops/admin) -----
     funnel: dict = {}
     sankey_flows: list = []
-    if not restricted and db_error is None:
+    if db_error is None:
         try:
             db2 = get_supabase()
             # Funnel: alerts + tasks trong cửa sổ
@@ -2147,16 +2196,14 @@ def cockpit_overview(
             db_error = str(exc)[:200]
 
     return {"status": "success", "data": {
-        "scope": {"team": team, "role": role, "unassigned": False, "restricted": restricted},
+        "scope": {"team": team, "role": role, "unassigned": False, "restricted": False},
         "window_days": days,
         "generated_at": now.isoformat(),
         "kpis": kpis,
         "trend": list(trend_map.values()),
         "trend_sentiment": trend_sentiment,
         "categories": categories,
-        "heatmap": empty_heatmap if restricted else {
-            "areas": top_areas, "hours": COCKPIT_HOUR_BUCKETS, "cells": cells,
-        },
+        "heatmap": {"areas": top_areas, "hours": COCKPIT_HOUR_BUCKETS, "cells": cells},
         "risk_distribution": risk_distribution,
         "funnel": funnel,
         "sankey_flows": sankey_flows,
@@ -2235,9 +2282,8 @@ def health_services(_: AuthUser = Depends(require_ops_staff)):
 
     # Rate limit settings (no counts — just config for visibility)
     rate_limits = {
-        "chat_guest_per_hour": _s.rate_limit_chat_guest,
+        "chat_public_per_hour": _s.rate_limit_chat_public,
         "chat_staff_per_hour": _s.rate_limit_chat_staff,
-        "feedback_guest_per_hour": _s.rate_limit_feedback_guest,
     }
 
     api_latency_ms = round((time.perf_counter() - api_start) * 1000)

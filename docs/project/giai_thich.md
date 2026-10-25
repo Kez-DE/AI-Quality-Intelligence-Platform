@@ -1,12 +1,16 @@
 # Giải thích hệ thống: từ một review đến lúc phòng ban xử lý xong
 
 > **Cập nhật 2026-06-27:** đồng bộ 6 phòng ban, RAG hybrid, roster agent với code hoàn thiện.
+>
+> **Cập nhật 2026-09-27 (US-077 / decision 0017):** tách Customer web khỏi Staff web, bỏ role `guest` thay bằng `pending`, chỉ admin tạo tài khoản.
+>
+> **Cập nhật 2026-09-28 (US-078 / decision 0018):** `guest` quay lại làm tài khoản khách hàng (tuỳ chọn, chỉ dùng Customer web); tự đăng ký và tài khoản tạo trong Supabase Dashboard vào với `guest`.
 
 Tài liệu này mô tả toàn bộ cách hệ thống vận hành: một phản hồi của khách đi vào, được phân loại, định tuyến về phòng ban, rồi xử lý ra sao. Phần sau giải thích các loại tài khoản, các bộ máy chạy nền, các lớp AI, và đi qua từng màn hình của ứng dụng kèm các nút bấm chính.
 
 Hệ thống tên là AI Quality Intelligence Platform (Quality Operation Cockpit của xanhSM). Bài toán nó giải: mỗi ngày có hàng nghìn phản hồi khách hàng về dịch vụ gọi xe, con người không đọc xuể. Hệ thống đọc thay, gán nhãn, phát hiện cụm vấn đề bất thường, sinh cảnh báo và ticket theo SLA, rồi giao đúng phòng ban để xử lý trước khi sự cố lan rộng.
 
-Mã nguồn chia ba tầng trong một repo: `app/` (frontend React), `pipeline/` (backend Python FastAPI + các worker), `supabase/` (PostgreSQL + RBAC). Supabase là trục nối: pipeline ghi kết quả vào đó, frontend đọc ra để hiển thị realtime.
+Mã nguồn chia ba tầng trong một repo: frontend gồm hai web riêng là `app/` (Staff web, cho nhân viên) và `customer-web/` (Customer web, khách gửi phản hồi không cần tài khoản), `pipeline/` (backend Python FastAPI + các worker), `supabase/` (PostgreSQL + RBAC). Supabase là trục nối: pipeline ghi kết quả vào đó, frontend đọc ra để hiển thị realtime.
 
 ---
 
@@ -15,7 +19,7 @@ Mã nguồn chia ba tầng trong một repo: `app/` (frontend React), `pipeline/
 Lấy ví dụ một câu phản hồi: "Tài xế đi ẩu, suýt tông người, thái độ còn khó chịu". Đây là đường đi của nó.
 
 ```
-Review vào (form / CSV / dataset / streaming)
+Review vào (Customer web / form / CSV / dataset / streaming)
    │
    ▼
 [1] clean.py        che PII (số điện thoại, email, biển số), chuẩn hóa text
@@ -80,7 +84,7 @@ Bốn role:
 | `admin` | Quản trị viên | Toàn quyền: quản lý user, bật/tắt streaming, trigger pipeline, xem mọi phòng |
 | `manager` | Quản lý | Giám sát phòng mình: alerts, tasks, insights, reports, chat |
 | `staff` | Nhân viên | Việc hàng ngày của phòng mình: feedback, tasks, support, chat |
-| `guest` | Khách | Dashboard rút gọn, gửi feedback, chat hỗ trợ CSKH |
+| `pending` | Chờ cấp quyền | Chưa làm được gì: chỉ thấy màn chờ admin cấp quyền |
 
 Sáu phòng ban: IT, CSKH, Vận hành, Tài chính & Thanh toán, Sản phẩm, Quản lý Rủi ro & Gian lận. Một tài khoản vận hành (admin/manager/staff) có thể chưa được gán phòng. Khi đó họ chưa xem được dữ liệu phòng nào cho tới khi admin gán.
 
@@ -89,9 +93,11 @@ Cách hệ thống chặn xem chéo phòng: backend chạy bằng service role k
 - `scoped_team` dùng cho endpoint danh sách: admin thấy tất cả, ops bị ép lọc về đúng phòng mình, ops chưa gán phòng bị chặn 403.
 - `can_view_team` dùng cho thao tác trên một record: chặn ghi/đọc chéo phòng.
 
-Bootstrap tài khoản: người đăng ký đầu tiên thành admin, những người sau mặc định là guest, chờ admin duyệt lên staff hoặc manager.
+Khách hàng (người ngoài công ty) không cần tài khoản. Họ gửi phản hồi trên Customer web và tra cứu bằng mã tra cứu (xem mục Customer web ở phần 5). Nếu muốn, họ tự đăng ký tài khoản khách hàng (role `guest`) để xem lịch sử phản hồi và dùng trợ lý chat; tài khoản này không vào được Staff web.
 
-Chat cũng phân quyền theo phòng. Guest dùng prompt riêng, chỉ trả lời về cách dùng app, đặt xe, thanh toán, khuyến mãi, khiếu nại, và không bao giờ chạm dữ liệu nội bộ. Ops dùng prompt nội bộ kèm RAG, và mọi truy vấn bị ép lọc về phòng của họ (admin xem toàn hệ thống). Cả hai luồng đều che PII ở cả đầu vào lẫn đầu ra.
+Tạo tài khoản: chỉ admin tạo, bằng form "Tạo tài khoản" trong trang Quản lý người dùng; Staff web không còn form tự đăng ký. Bootstrap: profile đầu tiên của hệ thống thành admin. Tài khoản tự đăng ký và tài khoản tạo ngoài form của admin (ví dụ trong Supabase Dashboard) vào với `guest` (tài khoản khách hàng), không được nâng lên Staff. Hai tài khoản `guest` cũ trước US-077 vẫn là `pending`, chờ admin duyệt lên staff hoặc manager.
+
+Chat cũng phân quyền theo phòng và chỉ dành cho ops (tài khoản `pending` bị chặn 403). Khi widget trang chủ gửi cờ `public_only`, trợ lý chạy tầng công khai với prompt riêng, chỉ trả lời về cách dùng app, đặt xe, thanh toán, khuyến mãi, khiếu nại, và không bao giờ chạm dữ liệu nội bộ. Ops dùng prompt nội bộ kèm RAG, và mọi truy vấn bị ép lọc về phòng của họ (admin xem toàn hệ thống). Cả hai luồng đều che PII ở cả đầu vào lẫn đầu ra.
 
 ---
 
@@ -105,7 +111,7 @@ Backend không phải một tiến trình. Nó là một web API cộng bốn wo
 | `ingest-worker` | Bơm dataset theo batch, tự phát hiện spike | 10 giây/batch | gián tiếp |
 | `ml-worker` | Quét feedback tiêu cực chưa chấm rủi ro, chấm 5 chiều bằng LLM | 30 đến 60 giây | có |
 | `agent-worker` | Chạy full multi-agent pipeline | 300 giây | có |
-| `backend-worker` | Đẩy vòng đời ticket open → in_progress → resolved | 5 giây | không (rule) |
+| `backend-worker` | Đẩy vòng đời ticket open → in_progress → resolved; 03:00 hằng ngày xoá nội dung phản hồi ẩn danh quá hạn lưu trữ | 5 giây + cron 03:00 | không (rule) |
 
 Chỉ `agent-worker` và `ml-worker` tốn tiền gọi LLM, và cả hai đều có cờ tắt hoặc fallback mock.
 
@@ -148,11 +154,13 @@ Model machine learning đạt khoảng 77% chính xác trên topic và 94% trên
 
 Phần này mô tả các màn hình theo góc nhìn người dùng: ai thấy gì, các nút chính làm gì, bấm vào thì gọi API nào.
 
-Thanh điều hướng bên trái lọc theo role. Guest chỉ thấy Dashboard, Phản hồi, và Hỗ trợ CSKH. Staff và manager thấy thêm Ticket Triage, Task Manager, CSKH Support, Phân tích phòng ban, AI Chat, Giới thiệu. Manager và admin thấy thêm Báo cáo AI. Admin thấy thêm Live Stream và Quản lý người dùng. Góc trên phải có badge phòng ban, chuông thông báo realtime (ẩn với guest), nút đổi sáng/tối, và nút đăng xuất.
+Thanh điều hướng bên trái lọc theo role. Tài khoản `pending` không có thanh điều hướng, chỉ thấy màn "Tài khoản đang chờ admin cấp quyền" với nút đăng xuất. Staff và manager thấy thêm Ticket Triage, Task Manager, CSKH Support, Phân tích phòng ban, AI Chat, Giới thiệu. Manager và admin thấy thêm Báo cáo AI. Admin thấy thêm Live Stream và Quản lý người dùng. Góc trên phải có badge phòng ban, chuông thông báo realtime, nút đổi sáng/tối, và nút đăng xuất.
 
-### Đăng nhập và đăng ký
+### Đăng nhập
 
-Màn `/auth` có hai chế độ chuyển qua lại: đăng nhập và đăng ký. Form đăng ký thêm ô họ tên. Mật khẩu yêu cầu tối thiểu 8 ký tự, có nút con mắt để hiện hoặc ẩn. Đăng ký xong, nếu Supabase yêu cầu xác nhận email thì hiện thông báo kiểm tra email. Báo lỗi được dịch sang tiếng Việt rõ ràng (sai mật khẩu, email chưa xác nhận, email đã tồn tại).
+Màn `/auth` chỉ còn đăng nhập bằng email và mật khẩu, có nút con mắt để hiện hoặc ẩn mật khẩu. Không còn form đăng ký, cũng không còn nút đăng nhập Google/Facebook. Báo lỗi được dịch sang tiếng Việt rõ ràng (sai mật khẩu, email chưa xác nhận).
+
+Tài khoản do admin tạo có mật khẩu tạm. Lần đăng nhập đầu, Staff web chỉ hiện màn đổi mật khẩu: nhập mật khẩu mới hai lần, đạt 5 tiêu chí (ít nhất 8 ký tự, chữ hoa, chữ thường, chữ số, ký tự đặc biệt). Màn này gửi mật khẩu mới tới `POST /api/me/password`; backend đặt mật khẩu và xoá cờ `must_change_password` trong `app_metadata`. Đổi xong mới vào được các màn khác. Việc chặn không chỉ nằm ở giao diện: chừng nào cờ còn bật, backend trả 403, MCP trả 401 và RLS không cho quyền ops.
 
 ### Dashboard
 
@@ -160,7 +168,7 @@ Màn `/dashboard` là cockpit tổng quan, đọc realtime. Trên cùng là dả
 
 Bấm vào một nhóm chủ đề hoặc một khu vực trên bản đồ nhiệt sẽ mở drawer chi tiết, liệt kê các feedback thuộc nhóm hoặc khu vực đó.
 
-Guest thấy bản rút gọn: phần dữ liệu nội bộ bị thay bằng thông báo khu vực hạn chế, các widget vận hành bị ẩn. Ops chưa gán phòng thấy thông báo nhắc liên hệ admin.
+Ops chưa gán phòng thấy thông báo nhắc liên hệ admin.
 
 ### Phản hồi (Feedback)
 
@@ -170,7 +178,7 @@ Với tài khoản vận hành, bên dưới có bốn thẻ thống kê bấm �
 
 Phần chính chia hai cột. Cột trái là luồng phản hồi chung, có nút refresh. Cột phải là hàng đợi cần duyệt, lấy đúng các ca P5, safety, hoặc confidence thấp từ `GET /api/feedback/recent?needs_review=true&reviewed=false`, kèm badge giải thích lý do cần duyệt.
 
-Mỗi dòng phản hồi hiện nhãn AI gán (chủ đề, cảm xúc, mức độ, phần trăm confidence, khu vực). Hai nút thao tác:
+Mỗi dòng phản hồi hiện nhãn AI gán (chủ đề, cảm xúc, mức độ, phần trăm confidence, khu vực). Phản hồi khách hàng gửi từ Customer web (`source = 'public'`) có thêm badge "Khách hàng". Hai nút thao tác:
 
 - "Sửa nhãn" mở ô chỉnh ba nhãn (chủ đề, cảm xúc, mức độ). Bấm "Lưu nhãn" gọi `PATCH /api/feedback/{id}/label`, ghi lại vào correction log (ai sửa, sửa field gì, từ cũ sang mới), đặt confidence về 1.0 và đánh dấu đã duyệt. Đây vừa là audit, vừa là dữ liệu để retrain sau này.
 - "Duyệt" (chỉ ở hàng đợi cần duyệt) gọi `PATCH /api/feedback/{id}/review`, chuyển phản hồi ra khỏi hàng đợi.
@@ -230,11 +238,11 @@ Sau khi duyệt, báo cáo bị khóa: editor ẩn đi, chỉ còn thông báo "
 
 ### AI Chat
 
-Màn `/chat` thay đổi theo role. Tiêu đề, gợi ý câu hỏi, và phạm vi dữ liệu khác nhau giữa guest, staff, manager, admin. Guest gọi là "Hỗ trợ Trực tuyến", chỉ hỏi về dùng app và khiếu nại. Ops thấy phạm vi là phòng của mình, admin thấy "Toàn hệ thống".
+Màn `/chat` thay đổi theo role. Tiêu đề, gợi ý câu hỏi, và phạm vi dữ liệu khác nhau giữa staff, manager, admin. Ops thấy phạm vi là phòng của mình, admin thấy "Toàn hệ thống".
 
 Khung chat có các thẻ gợi ý câu hỏi để bấm nhanh, ô soạn tin (Enter để gửi, Shift+Enter xuống dòng), nút gửi. Mỗi câu trả lời của AI hiện kèm provider, model, độ trễ, và có nút copy. Câu hỏi của người dùng có nút sửa để hỏi lại. Nút "Cuộc trò chuyện mới" xóa lịch sử chat.
 
-Mọi tin nhắn gửi qua `POST /api/agent/chat`. Backend tự phân tầng: guest dùng RAG công khai, ops và admin dùng ReAct agent kèm RAG nội bộ lọc theo phòng. Với ops, nếu câu trả lời có trích dẫn tài liệu SOP/SLA thì hiện thêm cột nguồn tham khảo bên phải kèm độ tương đồng.
+Mọi tin nhắn gửi qua `POST /api/agent/chat`. Backend tự phân tầng: khi có cờ `public_only` (widget trang chủ) thì dùng RAG công khai, còn lại ops và admin dùng ReAct agent kèm RAG nội bộ lọc theo phòng. Với ops, nếu câu trả lời có trích dẫn tài liệu SOP/SLA thì hiện thêm cột nguồn tham khảo bên phải kèm độ tương đồng.
 
 ### Live Stream (chỉ admin)
 
@@ -244,15 +252,25 @@ Nút lớn "Bật Live Stream" gọi `POST /api/live-stream/start` kèm tham s�
 
 ### Quản lý người dùng (chỉ admin)
 
-Màn `/admin` chia tab theo nhóm: chờ duyệt, quản lý, nhân viên, quản trị viên. Trên cùng có bốn ô đếm số lượng từng nhóm.
+Màn `/admin` chia tab theo nhóm: chờ cấp quyền, quản lý, nhân viên, quản trị viên. Trên cùng có bốn ô đếm số lượng từng nhóm.
 
-Tab chờ duyệt hiển thị các tài khoản guest mới đăng ký dưới dạng thẻ, với ba nút: "Duyệt Nhân viên" và "Duyệt Quản lý" (gọi `PATCH /api/users/{id}/role`), và "Từ chối" (xóa tài khoản, có hỏi xác nhận).
+Form "Tạo tài khoản" nhận email, họ tên, role (admin, manager hoặc staff), phòng ban và mật khẩu tạm, rồi gọi `POST /api/admin/users`. Email đã tồn tại thì báo lỗi. Admin tự gửi mật khẩu tạm cho người đó; người đó phải đổi mật khẩu ở lần đăng nhập đầu.
+
+Tab "Chờ cấp quyền" hiển thị các tài khoản `pending` dưới dạng thẻ, với ba nút: "Cấp quyền Nhân viên" và "Cấp quyền Quản lý" (gọi `PATCH /api/users/{id}/role`), và "Từ chối và xoá tài khoản" (có hỏi xác nhận). Lưu ý: xoá tài khoản xoá luôn feedback, alert và lịch sử chat của người đó (FK `ON DELETE CASCADE`).
 
 Các tab còn lại hiển thị bảng. Mỗi dòng có dropdown đổi role, dropdown gán phòng ban (`PATCH /api/users/{id}/department`), và nút xóa. Admin không tự đổi quyền hay tự xóa tài khoản đang đăng nhập của mình. Mọi thay đổi role và phòng ban đều ghi audit log.
 
 ### Giới thiệu (About)
 
 Màn `/about` có ba tab giải thích bài toán và giải pháp, kiến trúc hệ thống, và giá trị mang lại. Đây là trang trình bày, không có thao tác nghiệp vụ.
+
+### Customer web (khách hàng, không đăng nhập)
+
+Customer web là một website riêng (`customer-web/`), không phải một màn của Staff web. Khách tới đó bằng mã QR hoặc nút "Gửi phản hồi" trên trang chủ Staff web. Giao diện ưu tiên điện thoại, chỉ có tiếng Việt, không có đăng nhập.
+
+Trang `/` là form gửi phản hồi: ô nội dung (bắt buộc), chọn kênh, chọn khu vực. Dưới form có dòng "Không cần tài khoản. Số điện thoại, email, biển số được che tự động. Nội dung tự xoá sau 180 ngày." Bấm gửi gọi `POST /api/public/feedback`. Thành công thì chỉ hiện mã tra cứu (có nút sao chép) và link tới trang trạng thái, không hiện nhãn AI. Lỗi nhập liệu, lỗi gửi quá nhiều lần (429) hay lỗi mạng đều hiện thông báo rõ ràng. Trên trang còn có ô "Tra cứu mã" để mở trạng thái của một mã cũ.
+
+Trang `/status/:code` gọi `GET /api/public/feedback/{code}` và chỉ hiện trạng thái cùng ngày gửi: "Đã tiếp nhận", "Đang xem xét" hoặc "Đã xem xét" (nhân viên đã kiểm tra phân loại của AI, không có nghĩa sự việc đã xử lý xong). Mã sai, hết hạn hoặc đã bị xoá nội dung đều hiện chung một thông báo không tìm thấy.
 
 ---
 

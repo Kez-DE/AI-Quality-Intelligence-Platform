@@ -24,7 +24,7 @@ from spike_detector import DEFAULT_MAX_SPIKES
 FEEDBACK_COLUMNS = {
     "id", "user_id", "source", "channel", "text", "topic", "sentiment",
     "severity", "area", "confidence", "created_at",
-    "needs_review", "reviewed", "overall_risk",
+    "needs_review", "reviewed", "overall_risk", "review_reason",
 }
 
 
@@ -51,6 +51,25 @@ def test_submit_feedback_only_writes_columns_that_exist(monkeypatch):
     unknown = set(db.row) - FEEDBACK_COLUMNS
     assert not unknown, f"ghi vào cột không có trong lược đồ: {unknown}"
     assert db.row["text"] == "tài xế đi ẩu"
+
+
+def test_submit_feedback_labels_come_from_the_classifier(monkeypatch):
+    """US-078: the chat tool used to write topic/sentiment from the model and a flat P3."""
+    import classifier
+
+    db = _CaptureDB()
+    monkeypatch.setattr(chat_tools, "get_supabase", lambda: db)
+    monkeypatch.setattr(classifier, "predict_feedback", lambda _t: {
+        "topic": "Safety", "sentiment": "negative", "severity": "P5", "confidence": 0.9,
+        "needs_review": True, "review_reason": "safety_grid",
+    })
+    out = chat_tools.execute_public_tool(
+        "submit_feedback", {"content": "tài xế đi ẩu", "topic": "Other", "sentiment": "positive"}, user_id="u-1"
+    )
+    assert "✅" in out
+    assert (db.row["topic"], db.row["sentiment"], db.row["severity"]) == ("Safety", "negative", "P5")
+    tool = chat_tools.PUBLIC_TOOLS_DEFINITIONS[0]["function"]["parameters"]["properties"]
+    assert set(tool) == {"content"}
 
 
 def test_submit_feedback_refuses_when_user_id_missing(monkeypatch):
@@ -102,3 +121,19 @@ def test_run_chat_agent_records_tools_used(monkeypatch):
         execute_fn=lambda name, args: "kết quả giả",
     )
     assert out["tools_used"] == [{"name": "get_hot_areas", "scope_team": "Vận hành"}]
+
+
+def test_staff_public_tier_report_always_lands_in_review_queue(monkeypatch):
+    """The staff landing assistant always queued its reports for review; the
+    classifier path (US-078) must not silently drop an ordinary one."""
+    import classifier
+
+    db = _CaptureDB()
+    monkeypatch.setattr(chat_tools, "get_supabase", lambda: db)
+    monkeypatch.setattr(classifier, "predict_feedback", lambda _t: {
+        "topic": "App Issue", "sentiment": "negative", "severity": "P2", "confidence": 0.95,
+        "needs_review": False, "review_reason": None,
+    })
+    chat_tools.submit_feedback("app bị lag", user_id="u-1")
+    assert db.row["needs_review"] is True
+    assert db.row["severity"] == "P2"  # labels still from the classifier

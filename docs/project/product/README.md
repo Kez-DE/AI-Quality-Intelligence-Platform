@@ -17,9 +17,9 @@ Stack: FastAPI + scikit-learn + LLM multi-agent (backend), React 19 + TanStack S
 | 5 | Multi-Agent | 8 agent nghiệp vụ + Orchestrator + report_builder (helper) |
 | 6 | Phân tích phòng ban | 6 phòng ban, nhiều báo cáo/ngày (09:00 và 14:00), cấu trúc 3 khối: Vấn đề, Phân tích, Đề xuất |
 | 7 | Human-in-the-Loop | Hàng đợi duyệt nhãn, nhân viên sửa nhãn AI, ghi correction log |
-| 8 | AI Chat + RAG Hybrid | Hybrid Search (Cohere embed-multilingual-v3.0 + BM25-lite + RRF k=60), tiered RBAC (Guest: Public FAQ, Staff: Internal KB) |
+| 8 | AI Chat + RAG Hybrid | Hybrid Search (Cohere embed-multilingual-v3.0 + BM25-lite + RRF k=60), tiered RBAC (widget trang chủ `public_only`: Public FAQ, Staff: Internal KB) |
 | 9 | Streaming Realtime | Ingest phản hồi theo luồng thời gian thực |
-| 10 | RBAC 4 vai trò | admin, manager, staff, guest |
+| 10 | RBAC 4 vai trò | admin, manager, staff, pending (chờ cấp quyền) |
 | 11 | Khép kín Báo cáo → Task | HI-Loop Approval: manager biên tập đề xuất AI trong báo cáo, duyệt một nút tạo task chính thức, có liên kết ngược về báo cáo gốc |
 
 ## Phòng ban (6 phòng)
@@ -40,7 +40,9 @@ Stack: FastAPI + scikit-learn + LLM multi-agent (backend), React 19 + TanStack S
 | admin | Toàn quyền, quản lý user, xem mọi phòng |
 | manager | Giám sát phòng mình: alerts, feedback, insights, reports, chat |
 | staff | Công việc hàng ngày phòng mình: feedback, tasks, chat |
-| guest | Dashboard, feedback, chat CSKH (Public FAQ) |
+| pending | Chưa có quyền, chờ admin cấp role |
+
+Khách hàng không có tài khoản: gửi phản hồi và tra cứu trạng thái trên Customer web (`customer-web/`).
 
 Scope dữ liệu theo phòng ban: manager và staff chỉ xem dữ liệu phòng mình.
 

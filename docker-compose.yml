@@ -30,6 +30,7 @@ services:
       - BACKEND_API_URL=http://backend:8000
       # Browser code runs on the host, so it must call the published backend port.
       - VITE_BACKEND_API_URL=http://localhost:8000
+      - VITE_CUSTOMER_WEB_URL=http://localhost:5175
     depends_on:
       backend:
         condition: service_healthy

@@ -43,8 +43,8 @@ PUBLIC_REF_BYTES = 9
 # needs one so a single request cannot be used as free storage.
 MAX_PUBLIC_TEXT = 4000
 
-# How long an anonymous report's personal text is kept. Nothing purges on this
-# yet (follow-up in decision 0016) — the column records the commitment.
+# How long an anonymous report's personal text is kept. The backend-worker
+# redacts it once this passes (services/retention.py, decision 0017).
 RETENTION_DAYS = 180
 
 # Salt for the stored IP hash. A random per-process salt is the fail-safe
@@ -73,6 +73,11 @@ class PublicFeedbackReq(BaseModel):
     text: str = Field(..., min_length=1, max_length=MAX_PUBLIC_TEXT)
     channel: str = Field(default="web", max_length=40)
     area: Optional[str] = Field(default=None, max_length=80)
+    # Honeypot (decision 0017). The Customer web renders this input hidden and
+    # unfocusable, so a person leaves it empty and a form-filling bot does not.
+    # Uncapped on purpose: a length error would be a 422 raised before the rate
+    # limiter runs, and a bot must not get a way to probe for free.
+    website: Optional[str] = None
 
 
 def client_ip(request: Request) -> str:
@@ -108,11 +113,45 @@ def derive_status(row: dict) -> str:
     Only what the feedback row itself knows. Deliberately not joined to alerts or
     tasks: those carry internal routing the holder of a reference has no claim to.
     """
+    # "reviewed" = staff checked the AI label, not that the problem is fixed
+    # (CONTEXT.md: Feedback status). The old "resolved" promised more than that.
     if row.get("reviewed"):
-        return "resolved"
+        return "reviewed"
     if row.get("needs_review"):
         return "under_review"
     return "received"
+
+
+def classified_fields(raw_text: str) -> dict:
+    """Masked text plus server-side labels: the one classify path for every
+    Customer-facing write (public intake, Customer account, customer chat).
+
+    Raises 400 when nothing is left after cleaning.
+    """
+    from classifier import predict_feedback
+
+    # clean_text masks phone, email and plate before anything else touches the
+    # string — the classifier, the database and any future LLM all see the masked
+    # form. The raw body is never stored and never logged.
+    cleaned = clean_text(raw_text)
+    if not cleaned.strip():
+        raise HTTPException(status_code=400, detail="Thiếu nội dung phản hồi")
+
+    prediction = predict_feedback(cleaned)
+    severity = prediction["severity"]
+    return {
+        "text": cleaned,
+        "topic": prediction["topic"],
+        "sentiment": prediction["sentiment"],
+        "severity": (
+            severity
+            if isinstance(severity, str) and severity.upper().startswith("P")
+            else f"P{int(severity)}"
+        ),
+        "confidence": prediction["confidence"],
+        "needs_review": prediction.get("needs_review", False),
+        "review_reason": prediction.get("review_reason"),
+    }
 
 
 @router.post("/feedback")
@@ -124,23 +163,14 @@ def submit_public_feedback(payload: PublicFeedbackReq, request: Request):
     """
     check_rate_limit(public_intake_limit, fingerprint(request))
 
-    from classifier import predict_feedback
+    # After the limiter on purpose: a tripped honeypot still spends a request, so
+    # a bot learns nothing by retrying. Nothing is stored or logged.
+    if (payload.website or "").strip():
+        raise HTTPException(status_code=400, detail="Invalid submission")
+
     from regions import region_code
 
-    # clean_text masks phone, email and plate before anything else touches the
-    # string — the classifier, the database and any future LLM all see the masked
-    # form. The raw body is never stored and never logged.
-    cleaned = clean_text(payload.text)
-    if not cleaned.strip():
-        raise HTTPException(status_code=400, detail="Thiếu nội dung phản hồi")
-
-    prediction = predict_feedback(cleaned)
-    severity = prediction["severity"]
-    severity_value = (
-        severity
-        if isinstance(severity, str) and severity.upper().startswith("P")
-        else f"P{int(severity)}"
-    )
+    labels = classified_fields(payload.text)
 
     public_ref = secrets.token_urlsafe(PUBLIC_REF_BYTES)
     row = {
@@ -154,14 +184,8 @@ def submit_public_feedback(payload: PublicFeedbackReq, request: Request):
         ).isoformat(),
         "source": "public",
         "channel": (payload.channel or "web").strip() or "web",
-        "text": cleaned,
-        "topic": prediction["topic"],
-        "sentiment": prediction["sentiment"],
-        "severity": severity_value,
-        "confidence": prediction["confidence"],
         "area": region_code((payload.area or "").strip()),
-        "needs_review": prediction.get("needs_review", False),
-        "review_reason": prediction.get("review_reason"),
+        **labels,
     }
 
     try:
@@ -189,10 +213,10 @@ def submit_public_feedback(payload: PublicFeedbackReq, request: Request):
 def get_public_feedback_status(public_ref: str, request: Request):
     """Progress of one report, for whoever holds its reference.
 
-    The response is an allowlist. `user_id`, `submitter_hash`, `retention_until`,
-    `confidence`, `review_reason`, the five risk dimensions, `overall_risk` and
-    the submitted text are all withheld: a reference that leaks into browser
-    history or a screenshot must not hand over the body or the internal scoring.
+    The response is an allowlist of three fields. Everything else is withheld,
+    the AI labels included (decision 0017): a Customer never sees topic,
+    sentiment or severity, and a reference that leaks into browser history or a
+    screenshot must not hand over the body or the internal scoring.
     """
     check_rate_limit(public_status_limit, fingerprint(request))
 
@@ -200,8 +224,9 @@ def get_public_feedback_status(public_ref: str, request: Request):
         rows = (
             get_supabase()
             .table("feedback")
-            .select("public_ref,created_at,topic,severity,needs_review,reviewed")
+            .select("public_ref,created_at,needs_review,reviewed,retention_until")
             .eq("public_ref", public_ref)
+            .is_("redacted_at", "null")
             .limit(1)
             .execute()
             .data
@@ -213,9 +238,17 @@ def get_public_feedback_status(public_ref: str, request: Request):
             status_code=503, detail="Không tra cứu được, vui lòng thử lại"
         ) from exc
 
+    # Expired or redacted rows fall into the same 404 as unknown codes. Checked at
+    # read time, not left to the 03:00 job, so a row is gone the moment its
+    # deadline passes. A Customer account's row has no deadline (decision 0018).
+    now = datetime.now(timezone.utc)
+    rows = [
+        r for r in rows
+        if not r.get("retention_until") or datetime.fromisoformat(r["retention_until"]) > now
+    ]
     if not rows:
-        # Same response for "never existed" and "gone", so this is not an oracle
-        # telling an enumerator which references are real.
+        # Same response for "never existed", "expired" and "redacted", so this is
+        # not an oracle telling an enumerator which references are real.
         raise HTTPException(status_code=404, detail="Không tìm thấy phản hồi với mã này")
 
     row = rows[0]
@@ -225,7 +258,5 @@ def get_public_feedback_status(public_ref: str, request: Request):
             "public_ref": row.get("public_ref"),
             "status": derive_status(row),
             "created_at": row.get("created_at"),
-            "topic": row.get("topic"),
-            "severity": row.get("severity"),
         },
     }

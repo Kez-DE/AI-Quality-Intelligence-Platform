@@ -4,7 +4,7 @@ Bối cảnh: widget trợ lý ở trang chủ/landing gửi public_only=true đ
 kể cả khi một tài khoản ops/admin đang đăng nhập. Cờ này chỉ HẠ quyền, không bao giờ nâng quyền.
 
 Kiểm chứng ở tầng routing: khi public_only=true, run_chat_agent được gọi với
-GUEST_TOOLS_DEFINITIONS (chỉ submit_feedback) + execute_fn riêng của guest — không có bộ tool
+PUBLIC_TOOLS_DEFINITIONS (chỉ submit_feedback) + execute_fn riêng của tầng công khai — không có bộ tool
 nội bộ; khi không có cờ, admin vẫn nhận đủ bộ tool OPS như bình thường.
 """
 import pytest
@@ -14,7 +14,7 @@ from httpx import AsyncClient, ASGITransport
 import main
 from main import app
 from auth_guard import get_current_user, AuthUser
-from agent.chat_tools import GUEST_TOOLS_DEFINITIONS, tools_for_role
+from agent.chat_tools import PUBLIC_TOOLS_DEFINITIONS, tools_for_role
 
 _FAKE_AGENT_RESULT = {"content": "ok", "provider": "mock", "model": "mock"}
 
@@ -34,7 +34,7 @@ def _override_user(user: AuthUser):
 
 
 @pytest.mark.asyncio
-async def test_public_only_forces_guest_tier_for_admin():
+async def test_public_only_forces_public_tier_for_admin():
     admin = AuthUser(id="admin_public_only", email="a@test.com", role="admin", department="")
     restore = _override_user(admin)
     try:
@@ -52,10 +52,10 @@ async def test_public_only_forces_guest_tier_for_admin():
         assert resp.status_code == 200, resp.text
         assert mock_run.call_count == 1
         _, kwargs = mock_run.call_args
-        # Tầng công khai: CHỈ bộ tool guest (submit_feedback) — không có tool nội bộ.
-        assert kwargs.get("tools_override") == GUEST_TOOLS_DEFINITIONS
+        # Tầng công khai: CHỈ bộ tool công khai (submit_feedback) — không có tool nội bộ.
+        assert kwargs.get("tools_override") == PUBLIC_TOOLS_DEFINITIONS
         assert kwargs.get("tools_override") != tools_for_role("admin")
-        # Không scope kiểu ops; dùng execute_fn riêng của guest.
+        # Không scope kiểu ops; dùng execute_fn riêng của tầng công khai.
         assert kwargs.get("scope_team") is None
         assert kwargs.get("execute_fn") is not None
     finally:
@@ -78,18 +78,18 @@ async def test_admin_without_public_only_keeps_ops_tier():
         assert resp.status_code == 200, resp.text
         assert mock_run.call_count == 1
         _, kwargs = mock_run.call_args
-        # Admin bình thường: đủ bộ tool OPS, KHÁC bộ tool guest.
+        # Admin bình thường: đủ bộ tool OPS, KHÁC bộ tool công khai.
         assert kwargs.get("tools_override") == tools_for_role("admin")
-        assert kwargs.get("tools_override") != GUEST_TOOLS_DEFINITIONS
+        assert kwargs.get("tools_override") != PUBLIC_TOOLS_DEFINITIONS
     finally:
         restore()
 
 
 @pytest.mark.asyncio
-async def test_public_only_keeps_guest_tier_for_guest():
-    """Guest gửi public_only=false vẫn là guest tier (không thể nâng quyền)."""
-    guest = AuthUser(id="guest_user", email="g@test.com", role="guest", department="")
-    restore = _override_user(guest)
+async def test_public_only_forces_public_tier_for_staff():
+    """Cờ chỉ HẠ quyền: staff có phòng gửi public_only=true cũng về tầng công khai."""
+    staff = AuthUser(id="staff_public_only", email="s@test.com", role="staff", department="CSKH")
+    restore = _override_user(staff)
     try:
         with patch.object(main, "run_chat_agent", return_value=dict(_FAKE_AGENT_RESULT)) as mock_run, \
                 patch("agent.public_kb.search_public_knowledge", return_value=[]), \
@@ -99,11 +99,12 @@ async def test_public_only_keeps_guest_tier_for_guest():
                     "/api/agent/chat",
                     json={
                         "messages": [{"role": "user", "content": "cách gửi phản hồi?"}],
-                        "public_only": False,
+                        "public_only": True,
                     },
                 )
         assert resp.status_code == 200, resp.text
         _, kwargs = mock_run.call_args
-        assert kwargs.get("tools_override") == GUEST_TOOLS_DEFINITIONS
+        assert kwargs.get("tools_override") == PUBLIC_TOOLS_DEFINITIONS
+        assert kwargs.get("scope_team") is None
     finally:
         restore()

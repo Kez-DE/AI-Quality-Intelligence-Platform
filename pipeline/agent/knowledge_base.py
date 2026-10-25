@@ -45,8 +45,9 @@ _KB_DIR = _resolve_kb_dir()
 _STOPWORDS = {
     "la", "va", "co", "cua", "cho", "khi", "the", "nao", "gi", "thi", "mot", "cac",
     "nhung", "duoc", "voi", "trong", "tai", "ve", "den", "tu", "hay", "lam", "bi",
-    "se", "da", "dang", "nay", "do", "ra", "len", "xuong", "phai", "can", "neu",
-    "the", "a", "an", "the", "to", "of", "in", "on", "for", "and", "or", "is", "how",
+    # No "do" or "an": accent-stripped they are đồ/đỏ and ăn/"an toàn".
+    "se", "da", "dang", "nay", "ra", "len", "xuong", "phai", "can", "neu",
+    "the", "a", "the", "to", "of", "in", "on", "for", "and", "or", "is", "how",
     "what", "khong", "co", "bao", "nhieu", "may",
 }
 
@@ -60,6 +61,8 @@ def _strip_accents(text: str) -> str:
 
 def _tokenize(text: str) -> List[str]:
     norm = _strip_accents(text.lower())
+    # "7 chỗ" -> "7cho": the digit alone is dropped and "cho" is a stopword.
+    norm = re.sub(r"\b(\d+)\s*cho\b", r"\1cho", norm)
     tokens = re.findall(r"[a-z0-9]+", norm)
     return [t for t in tokens if len(t) > 1 and t not in _STOPWORDS]
 

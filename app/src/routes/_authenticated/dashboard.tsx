@@ -3,7 +3,6 @@ import { Gauge, Sparkles } from "lucide-react";
 import { useMe } from "@/lib/api";
 import { CockpitFilterProvider } from "@/components/cockpit/CockpitFilterContext";
 import { CockpitView } from "@/components/cockpit/CockpitView";
-import GuestDashboard from "@/components/GuestDashboard";
 import EmployeesPanel from "@/components/EmployeesPanel";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -29,11 +28,6 @@ function DashboardPage() {
         </button>
       </div>
     );
-  }
-
-  // Khách (guest): trang khách hàng đầy đủ panel — chỉ số công khai, gửi phản hồi, quyền lợi.
-  if (me?.role === "guest") {
-    return <GuestDashboard />;
   }
 
   const showEmployees = me?.role === "admin" || me?.role === "manager";

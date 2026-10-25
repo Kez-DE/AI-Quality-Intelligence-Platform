@@ -20,9 +20,9 @@ const ADMIN_STYLE =
 /** Ô định danh phòng ban hiển thị ở góc trên bên phải.
  *  - admin: hiện "Toàn hệ thống" (xem mọi phòng).
  *  - manager/staff đã gán phòng: hiện tên phòng + màu riêng.
- *  - guest hoặc ops chưa gán phòng: không hiện (trả null) — UI khác. */
+ *  - pending hoặc ops chưa gán phòng: không hiện (trả null) — UI khác. */
 export function DepartmentBadge({ me, className = "" }: { me: Me | null | undefined; className?: string }) {
-  if (!me || me.role === "guest") return null;
+  if (!me || me.role === "pending") return null;
 
   const isAdmin = me.role === "admin";
   if (!isAdmin && !me.department) return null;

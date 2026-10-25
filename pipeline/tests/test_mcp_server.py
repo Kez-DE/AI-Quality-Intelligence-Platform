@@ -20,8 +20,25 @@ def test_manager_role_adds_reporting_tools():
     assert {"get_feedback_summary", "get_hot_areas", "get_sla_tickets"} <= names
 
 
-def test_guest_role_only_submit_feedback():
-    assert m.registered_tool_names("guest") == ["submit_feedback"]
+@pytest.mark.parametrize("role", ["pending", "guest", None, "__hacker__"])
+def test_pending_or_unknown_role_has_no_tools(role):
+    """Decision 0017: the guest tool tier is gone; Pending means no access at all."""
+    assert m.registered_tool_names(role) == []
+
+
+def test_submit_feedback_is_no_longer_an_mcp_tool():
+    """It was the guest-only tool. Customers report through the Customer web now."""
+    for role in ("admin", "manager", "staff", "pending"):
+        assert "submit_feedback" not in m.registered_tool_names(role)
+    assert "submit_feedback" not in m.make_tool_handlers(lambda: ("admin", None, "u1"))
+
+
+def test_pending_tool_call_is_refused_at_execution(monkeypatch):
+    called = []
+    monkeypatch.setattr(m, "execute_tool", lambda *a, **k: called.append(a) or "leaked")
+    out = m.call_tool("pending", None, "get_hot_areas", {}, user_id="u1")
+    assert "không có quyền" in out
+    assert called == []
 
 
 def test_admin_role_has_all_ops_tools():
@@ -59,34 +76,18 @@ def test_admin_scope_is_system_wide(monkeypatch):
     assert captured["scope_team"] is None  # admin = toàn hệ thống, bỏ qua scope
 
 
-def test_guest_routes_to_guest_tool(monkeypatch):
+def test_handlers_pass_identity_to_call_tool(monkeypatch):
     captured = {}
 
-    def fake_guest(name, args, user_id=None):
+    def fake_execute(name, args, scope_team=None, sources_out=None):
         captured["name"] = name
-        captured["user_id"] = user_id
+        captured["scope_team"] = scope_team
         return "ok"
 
-    monkeypatch.setattr(m, "execute_guest_tool", fake_guest)
-    m.call_tool(role="guest", scope_team=None,
-                name="submit_feedback", args={"content": "test"}, user_id="u1")
-    assert captured["name"] == "submit_feedback"
-    # feedback.user_id là NOT NULL: nuốt user_id ở đây thì submit_feedback luôn
-    # từ chối, im lặng, và chỉ lộ ra khi có client MCP thật gọi trên production.
-    assert captured["user_id"] == "u1"
-
-
-def test_handlers_pass_identity_user_id_to_call_tool(monkeypatch):
-    captured = {}
-
-    def fake_guest(name, args, user_id=None):
-        captured["user_id"] = user_id
-        return "ok"
-
-    monkeypatch.setattr(m, "execute_guest_tool", fake_guest)
-    handlers = m.make_tool_handlers(lambda: ("guest", None, "u1"))
-    handlers["submit_feedback"](content="test")
-    assert captured["user_id"] == "u1"
+    monkeypatch.setattr(m, "execute_tool", fake_execute)
+    handlers = m.make_tool_handlers(lambda: ("staff", "CSKH", "u1"))
+    handlers["search_knowledge_base"](query="quy trình")
+    assert captured == {"name": "search_knowledge_base", "scope_team": "CSKH"}
 
 
 def test_build_server_ops_requires_scope(monkeypatch):
@@ -96,6 +97,14 @@ def test_build_server_ops_requires_scope(monkeypatch):
     with pytest.raises(SystemExit):
         m.build_server()
     importlib.reload(m)  # trả module về trạng thái sạch cho test khác
+
+
+def test_build_server_defaults_to_no_tools(monkeypatch):
+    """No MCP_ROLE means Pending, which means an empty tool list, not a guest tier."""
+    monkeypatch.delenv("MCP_ROLE", raising=False)
+    importlib.reload(m)
+    assert m._resolve_identity() == ("pending", None)
+    importlib.reload(m)
 
 
 def test_build_server_admin_registers_tools(monkeypatch):

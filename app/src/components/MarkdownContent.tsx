@@ -49,7 +49,8 @@ function normalizePipeGlyphs(line: string): string {
 }
 
 function isPipeRow(line: string): boolean {
-  const trimmed = stripListPrefix(normalizePipeGlyphs(line)).trim();
+  // Pipes inside inline code are text, not cell borders ("* `[P5] open | area | title`").
+  const trimmed = stripListPrefix(normalizePipeGlyphs(line).replace(/`[^`]*`/g, "c")).trim();
   if (!trimmed.includes("|")) return false;
   const cells = trimmed.split("|").filter((cell) => cell.trim().length > 0);
   return cells.length >= 2;

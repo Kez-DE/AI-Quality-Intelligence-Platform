@@ -23,6 +23,7 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import SupportChatWidget from "@/components/SupportChatWidget";
+import { CUSTOMER_WEB_URL } from "@/lib/api";
 import heroPoster from "@/assets/hero-poster.jpg";
 import posterPassenger from "@/assets/poster-passenger.jpg";
 import posterDashboard from "@/assets/poster-dashboard.jpg";
@@ -153,17 +154,17 @@ function Header() {
           </a>
         </nav>
         <div className="flex items-center gap-2">
-          <Link to="/auth">
+          <a href={CUSTOMER_WEB_URL}>
             <Button variant="ghost" size="sm">
-              Đăng nhập
+              Gửi phản hồi
             </Button>
-          </Link>
+          </a>
           <Link to="/auth">
             <Button
               size="sm"
               className="bg-gradient-to-r from-primary to-chart-2 text-primary-foreground shadow-lg shadow-primary/30"
             >
-              Bắt đầu <ArrowRight className="w-4 h-4 ml-1" />
+              Đăng nhập <ArrowRight className="w-4 h-4 ml-1" />
             </Button>
           </Link>
         </div>
@@ -235,18 +236,18 @@ function PosterHero() {
                   size="lg"
                   className="h-12 px-7 bg-gradient-to-r from-primary to-chart-2 text-primary-foreground shadow-xl shadow-primary/40"
                 >
-                  Trải nghiệm miễn phí <ArrowRight className="w-4 h-4 ml-2" />
+                  Đăng nhập <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
-              <Link to="/auth">
+              <a href={CUSTOMER_WEB_URL}>
                 <Button
                   size="lg"
                   variant="outline"
                   className="h-12 px-7 bg-white/10 hover:bg-white/20 backdrop-blur-md border-white/25 text-white"
                 >
-                  Mở workspace <ArrowRight className="w-4 h-4 ml-2" />
+                  Gửi phản hồi <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
-              </Link>
+              </a>
             </div>
           </div>
 
@@ -635,7 +636,7 @@ function FinalCTA() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.3),transparent_60%)]" />
         <div className="relative">
           <Badge className="bg-background/90 text-foreground border-0 mb-6">
-            Bắt đầu trong 60 giây
+            Khách hàng gửi phản hồi không cần tài khoản
           </Badge>
           <h2 className="text-4xl md:text-6xl font-black text-primary-foreground leading-[1.05] max-w-3xl mx-auto">
             Đừng đoán điều khách hàng muốn. <br />
@@ -647,18 +648,18 @@ function FinalCTA() {
                 size="lg"
                 className="h-13 px-8 bg-background text-foreground hover:bg-background/90"
               >
-                Tạo tài khoản miễn phí <ArrowRight className="w-4 h-4 ml-2" />
+                Đăng nhập <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </Link>
-            <Link to="/auth">
+            <a href={CUSTOMER_WEB_URL}>
               <Button
                 size="lg"
                 variant="outline"
                 className="h-13 px-8 bg-transparent text-primary-foreground border-primary-foreground/40 hover:bg-primary-foreground/10"
               >
-                Xem dashboard mẫu
+                Gửi phản hồi
               </Button>
-            </Link>
+            </a>
           </div>
         </div>
       </div>

@@ -5,6 +5,10 @@
 
 > **Cập nhật 2026-06-27:** rà soát khớp với migrations & schema 6 phòng hiện tại; nội dung kỹ thuật giữ nguyên.
 
+> **Cập nhật 2026-09-27 (US-077 / decision 0017):** thêm bước tay tắt tự đăng ký và OAuth (8.1); admin đầu tiên tạo trong Dashboard vì Staff web không còn form đăng ký (8.4); role `guest` đổi thành `pending`.
+
+> **Cập nhật 2026-09-28 (US-078 / decision 0018):** Customer web có đăng nhập tuỳ chọn cho khách hàng, nên **giữ bật** tự đăng ký và các provider Email, Google, Facebook (8.1 thay cho bước tắt cũ); thêm redirect URL của Customer web (8.3). Tự đăng ký vào với role `guest` (tài khoản khách hàng), không còn `pending`.
+
 ---
 
 ## 1. Tạo project trên Supabase Cloud
@@ -115,34 +119,58 @@ Hoặc migration đã tự bật (file `enable_feedback_realtime.sql`).
 
 ## 8. Cấu hình Authentication
 
-### 8.1 Email Auth (mặc định)
+### 8.1 Đăng ký và provider: giữ bật (thao tác tay)
+
+Decision 0017 từng yêu cầu tắt tự đăng ký và Google/Facebook. Từ US-078 (decision 0018) **không tắt nữa**: Customer web cho khách hàng tự đăng ký và đăng nhập bằng email/mật khẩu, Google hoặc Facebook. Staff web vẫn không có form đăng ký; tài khoản Staff vẫn chỉ do admin tạo (8.4).
+
+Nhãn có thể khác nhau giữa các phiên bản Dashboard:
+
+1. Vào **Authentication → Sign In / Providers** (bản cũ: **Authentication → Providers**).
+2. Ở mục **User Signups**, **giữ bật** **Allow new users to sign up**.
+3. **Giữ bật** các provider **Email**, **Google** và **Facebook**. Callback của Google/Facebook vẫn là URL callback của Supabase; trang quay về sau khi đăng nhập là Customer web, nên URL đó phải nằm trong danh sách Redirect URLs (8.3).
+4. Nếu đã lỡ tắt theo hướng dẫn cũ của US-077, bật lại cả ba mục trên.
+5. Xác nhận email: tuỳ chủ dự án quyết định (8.2).
+
+Mọi tài khoản tự đăng ký (qua Customer web hay gọi thẳng `/auth/v1/signup`) vào với role `guest`: tài khoản khách hàng, chỉ dùng được Customer web. Backend trả 403 ở mọi route Staff, RLS không cho quyền ops. Phanh duy nhất với việc tạo tài khoản hàng loạt là rate limit theo user id ở `/api/customer/*`; captcha là việc tiếp theo (decision 0018).
+
+Stack local: `supabase/config.toml`, mục `[auth]`, không đặt `enable_signup = false`; `additional_redirect_urls` có `http://localhost:5175/**` cho Customer web.
+
+### 8.2 Email Auth
 
 Vào **Authentication → Providers → Email**:
 
-- ✅ Enable Email
+- ✅ Enable Email (giữ bật, xem 8.1)
 - ✅ Enable Email Confirmations: **TẮT** (cho dev/demo nhanh)
-- Hoặc bật nếu muốn verify email thật
+- Hoặc bật nếu muốn verify email thật. Tài khoản admin tạo qua `POST /api/admin/users` đã được xác nhận email sẵn.
+- Khi bật, khách hàng đăng ký trên Customer web phải mở email xác nhận trước khi đăng nhập được. Chủ dự án tự chọn bật hay tắt (decision 0018).
 
-### 8.2 Site URL & Redirect
+### 8.3 Site URL & Redirect
 
 Vào **Authentication → URL Configuration**:
 
 - **Site URL:** `http://localhost:5174` (dev) hoặc URL deploy
-- **Redirect URLs:** thêm `http://localhost:5174/`**
+- **Redirect URLs:**
+  - Staff web: `http://localhost:5174/**`
+  - Customer web (US-078): `http://localhost:5175/**`. Cần cho OAuth Google/Facebook (quay về `${origin}/`) và cho link đặt lại mật khẩu (`${origin}/dat-lai-mat-khau`).
+  - Khi deploy: thêm domain production của Staff web và Customer web theo cùng mẫu `https://<domain>/**`. Domain Customer web production chưa chốt (backlog), phải thêm trước khi deploy, nếu không OAuth và link đặt lại mật khẩu sẽ quay về Site URL.
 
-### 8.3 Tạo tài khoản admin đầu tiên
+### 8.4 Tạo tài khoản admin đầu tiên
 
-Cách 1 — Qua UI frontend:
+Staff web không còn form đăng ký, nên admin đầu tiên được tạo trong Dashboard:
 
-1. Mở `http://localhost:5174/auth`
-2. Đăng ký email/password
-3. User đầu tiên tự động được gán role `admin`
+Cách 1 — Database mới (chưa có profile nào):
 
-Cách 2 — Qua Supabase Dashboard:
+1. **Authentication → Users → Add user**, nhập email + password, chọn tự xác nhận email.
+2. Trigger `handle_new_user` gán role `admin` cho profile đầu tiên của hệ thống.
+3. Đăng nhập Staff web bằng tài khoản này; các tài khoản sau tạo bằng form "Tạo tài khoản" trong trang Quản lý người dùng.
+
+Cách 2 — Database đã có profile:
 
 1. **Authentication → Users → Add user**
-2. Nhập email + password
+2. Nhập email + password (tài khoản vào với role `guest`, tức tài khoản khách hàng)
 3. Vào **Table Editor → profiles** → sửa cột `role` = `admin`
+
+Chỉ làm với tài khoản vừa tạo cho đúng người cần quyền admin. Không nâng tài khoản khách hàng tự đăng ký trên Customer web lên Staff; tài khoản Staff do admin tạo bằng form "Tạo tài khoản" (decision 0018).
 
 ## 9. Row Level Security (RLS)
 
@@ -150,8 +178,12 @@ Project dùng `SERVICE_ROLE_KEY` ở backend (bypass RLS), nên gate quyền ở
 
 Frontend đọc trực tiếp qua anon key + RLS:
 
-- Guest chỉ đọc được dashboard view
-- Staff/admin đọc được feedback, alerts
+- `feedback` và `alerts`: chỉ ops staff (admin/manager/staff, đã đổi mật khẩu tạm) đọc được; `pending` và `guest` không đọc được dòng nào, kể cả dòng của mình (migration `20260928000000` mục 3). Tài khoản khách hàng xem lịch sử qua `GET /api/customer/feedback`
+- Chỉ ops staff được insert vào `feedback`, và phải đúng `user_id` của mình
+- Knowledge base nội bộ (`graph_nodes`, `graph_edges`) chỉ ops staff đọc được
+- `is_ops_staff()` và `is_admin()` đòi `password_is_current()`: tài khoản còn mật khẩu tạm (`app_metadata.must_change_password`) không có quyền ops/admin qua PostgREST và realtime cho tới khi đổi mật khẩu và refresh session
+
+Bảng RLS đầy đủ theo từng bảng: [data-model.md](data-model.md) mục 11.
 
 Kiểm tra RLS đã bật:
 
@@ -167,7 +199,7 @@ SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public';
 | ----------------- | ---------------------------------------------------------------------------------- |
 | `feedback`        | Phản hồi đã phân loại (topic, sentiment, severity, confidence, area, needs_review) |
 | `alerts`          | Ticket/Alert do spike detector + LLM sinh ra                                       |
-| `profiles`        | User profile kèm role (admin/manager/staff/guest)                                  |
+| `profiles`        | User profile kèm role (admin/manager/staff/pending/guest)                          |
 | `correction_logs` | Audit trail khi staff sửa nhãn AI                                                  |
 | `chat_messages`   | Lịch sử chat AI                                                                    |
 

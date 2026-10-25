@@ -11,7 +11,7 @@ export function AdvancedAnalytics() {
   const { data: me } = useMe();
 
   // Unassigned ops không thấy section này
-  const isUnassigned = !!me && me.role !== "admin" && me.role !== "guest" && !me.department;
+  const isUnassigned = !!me && me.role !== "admin" && !me.department;
   if (isUnassigned) return null;
 
   return (

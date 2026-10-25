@@ -39,16 +39,16 @@ LLM_PROVIDER=auto  →  thử lần lượt provider CÓ KEY theo thứ tự:
 
 ### Endpoint chat — `POST /api/agent/chat` (`main.py`)
 
-Có **2 cơ chế**, chia theo `guest` vs non-guest:
+Chỉ ops staff gọi được (tài khoản `pending` → 403). Có **2 cơ chế**, chia theo cờ `public_only`:
 
 
 | Role                        | System prompt                                                        | Data context                   | Rate limit  |
 | --------------------------- | -------------------------------------------------------------------- | ------------------------------ | ----------- |
-| **guest**                   | `GUEST_SYSTEM_PROMPT` — chỉ hướng dẫn dùng app, KHÔNG lộ data nội bộ | không                              | 20 req/giờ  |
+| **`public_only`** (widget trang chủ) | `PUBLIC_SYSTEM_PROMPT` — chỉ hướng dẫn dùng app, KHÔNG lộ data nội bộ | không                              | 20 req/giờ  |
 | **staff / manager / admin** | `AGENT_SYSTEM_PROMPT`                                                | có `build_agent_data_context()` | 100 req/giờ |
 
 
-> Staff/manager/admin hiện dùng **chung một cơ chế chat** (cùng prompt, cùng data context, cùng rate limit). Backend chỉ phân biệt guest vs non-guest.
+> Staff/manager/admin hiện dùng **chung một cơ chế chat** (cùng prompt, cùng data context, cùng rate limit). Backend chỉ phân biệt có hay không cờ `public_only`.
 
 ### Context builder — `services/agent_context.py` (RAG-lite, rule-based)
 
@@ -171,7 +171,7 @@ dataset ─ingest-worker→ ingest_dataset → feedback
    ticket-worker (5s):  ticket_workflow[RULE time]  open → in_progress → resolved
 
 CHAT (sync, /api/agent/chat):
-   guest → GUEST_SYSTEM_PROMPT ─┐
+   public_only → PUBLIC_SYSTEM_PROMPT ─┐
    staff → AGENT_SYSTEM_PROMPT + agent_context.build_agent_data_context()[RULE aggregate]
                                 └→ chat_completion → model_router [LLM failover]
 

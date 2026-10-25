@@ -88,7 +88,8 @@ def test_batch_insert_failure_counts_all_rows_and_clears_batch():
         path = f.name
 
     db = MagicMock()
-    db.table.return_value.select.return_value.limit.return_value.execute.return_value.data = [{"id": "u1"}]
+    (db.table.return_value.select.return_value.eq.return_value.order.return_value
+       .limit.return_value.execute.return_value.data) = [{"id": "u1"}]
     calls = {"n": 0}
 
     def insert_side_effect(batch):
@@ -111,3 +112,44 @@ def test_batch_insert_failure_counts_all_rows_and_clears_batch():
     assert result["failed"] == 2          # first batch of 2 lost, counted fully
     assert result["inserted"] == 2        # second batch unaffected by poison
     assert calls["n"] == 2                # batch cleared → no cascading retries
+
+
+def _ingest_one_row(profiles):
+    """Run ingest_dataset on one record against FakeDB; return (result, db)."""
+    import json, tempfile, os
+    import ingest as ingest_mod
+    from tests._fakedb import FakeDB
+
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+        json.dump([{"text": "app ổn", "sentiment": "positive"}], f)
+        path = f.name
+    db = FakeDB(profiles=profiles, feedback=[])
+    try:
+        with patch.object(ingest_mod, "get_supabase", return_value=db), \
+             patch.object(ingest_mod, "has_supabase_admin_key", return_value=True), \
+             patch("classifier.predict_feedback", return_value={
+                 "topic": "Other", "sentiment": "positive", "severity": "P1",
+                 "confidence": 0.9, "needs_review": False, "review_reason": None}):
+            result = ingest_mod.ingest_dataset(path)
+    finally:
+        os.unlink(path)
+    return result, db
+
+
+def test_dataset_owner_is_the_oldest_admin_never_a_customer():
+    """US-078: owner used to be `profiles limit(1)` (heap order), which can be a
+    Customer account. It would then see every rider's text in its history, and
+    deleting it would cascade-delete the dataset."""
+    result, db = _ingest_one_row([
+        {"id": "cust", "role": "guest", "created_at": "2026-01-01T00:00:00+00:00"},
+        {"id": "admin-new", "role": "admin", "created_at": "2026-06-01T00:00:00+00:00"},
+        {"id": "admin-old", "role": "admin", "created_at": "2026-02-01T00:00:00+00:00"},
+    ])
+    assert result["inserted"] == 1
+    assert [r["user_id"] for r in db.tables["feedback"]] == ["admin-old"]
+
+
+def test_dataset_ingest_refuses_without_an_admin():
+    result, db = _ingest_one_row([{"id": "cust", "role": "guest", "created_at": "2026-01-01T00:00:00+00:00"}])
+    assert result == {"success": False, "error": "No user found"}
+    assert db.tables["feedback"] == []

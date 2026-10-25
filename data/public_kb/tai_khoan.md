@@ -27,7 +27,8 @@ Green SM có thể cần xác minh quyền sở hữu tài khoản trước khi 
 Khách nên dùng chức năng quên mật khẩu/khôi phục đăng nhập trên ứng dụng nếu có.
 Nếu không nhận OTP, mất quyền truy cập số điện thoại hoặc gặp lỗi đăng nhập, hãy
 liên hệ Trung tâm hỗ trợ và cung cấp thông tin tài khoản cần thiết để được hướng
-dẫn.
+dẫn. Nếu không vào được ứng dụng, hãy gọi Hotline 1555 hoặc gửi email
+support.vn@greensm.com. Không bao giờ chia sẻ mã OTP cho người khác.
 
 ## Bảo mật dữ liệu cá nhân
 

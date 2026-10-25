@@ -195,7 +195,7 @@ Mở trình duyệt: **http://localhost:5174**
 | Role | Email | Password |
 |------|-------|----------|
 | Admin | `manhnguyn1912@gmail.com` | `Admin@12345` |
-| Guest | Tự tạo trong Supabase Auth hoặc Admin page | |
+| Tài khoản khác | Admin tạo bằng form "Tạo tài khoản" trong trang Admin (mật khẩu tạm, đổi ở lần đăng nhập đầu) | |
 
 ## 7. Script tiện lợi — file `.bat`
 
